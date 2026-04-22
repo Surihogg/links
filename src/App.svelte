@@ -9,8 +9,10 @@
 
   let links = $derived($linksStore);
   let categories = $derived($categoriesStore);
+  let tags = $derived($tagsStore);
 
   let selected_category = $state(null);
+  let selected_tag = $state(null);
   let search_query = $state("");
   let show_add_form = $state(false);
   let edit_link = $state(null);
@@ -33,7 +35,9 @@
 
   async function load_links() {
     const params = {};
-    if (selected_category === "favorite") {
+    if (selected_tag) {
+      params.tag = selected_tag;
+    } else if (selected_category === "favorite") {
       params.favorite_only = true;
     } else if (selected_category != null) {
       params.category_id = selected_category;
@@ -41,8 +45,29 @@
     await linksStore.load(params);
   }
 
+  async function refresh_current_view() {
+    if (search_query.trim()) {
+      await linksStore.search(search_query);
+    } else {
+      await load_links();
+    }
+    await categoriesStore.load();
+  }
+
   function on_category_select(id) {
     selected_category = id;
+    selected_tag = null;
+    search_query = "";
+    load_links();
+  }
+
+  function on_tag_select(tag) {
+    if (selected_tag === tag) {
+      selected_tag = null;
+    } else {
+      selected_tag = tag;
+      selected_category = null;
+    }
     search_query = "";
     load_links();
   }
@@ -63,16 +88,18 @@
     }
     show_add_form = false;
     edit_link = null;
+    await refresh_current_view();
+    await tagsStore.load();
   }
 
   async function on_toggle_favorite(link) {
     await linksStore.update({ id: link.id, is_favorite: !link.is_favorite });
+    await refresh_current_view();
   }
 
   async function on_delete_link(link) {
-    if (confirm(`确定删除 "${link.title || link.url}" 吗？`)) {
-      await linksStore.remove(link.id);
-    }
+    await linksStore.remove(link.id);
+    await refresh_current_view();
   }
 
   async function on_create_category(payload) {
@@ -85,55 +112,59 @@
   }
 
   let filtered_links = $derived(links.items);
+  let current_title = $derived(
+    selected_tag ? `标签: ${selected_tag}` :
+    selected_category === "favorite" ? "特别关注" :
+    selected_category != null ? categories.find(c => c.id === selected_category)?.name ?? "链接" :
+    "全部链接"
+  );
 </script>
 
-<svelte:head>
-  <title>Links</title>
-</svelte:head>
-
 <div class={dark_mode ? "dark" : ""}>
-  <div class="h-screen flex flex-col" style="background:var(--color-bg);color:var(--color-text)">
-    <header class="flex items-center justify-between px-4 py-2" style="background:var(--color-bg-secondary);border-bottom:1px solid var(--color-border)">
-      <h1 class="text-sm font-bold" style="color:var(--color-text)">🔗 Links</h1>
-      <div class="flex items-center gap-2">
-        <button onclick={toggle_dark} class="px-2 py-1 rounded text-sm" style="color:var(--color-text-secondary)" title="切换主题">
-          {dark_mode ? "☀" : "🌙"}
-        </button>
-        <button onclick={() => show_export = true} class="px-2 py-1 rounded text-sm" style="color:var(--color-text-secondary)" title="导出">📤</button>
-      </div>
-    </header>
+  <div class="app-root">
+    <div class="titlebar-drag" data-tauri-drag-region></div>
+    <Sidebar
+      {categories}
+      tags={tags}
+      selected_id={selected_category}
+      selected_tag={selected_tag}
+      onselect={on_category_select}
+      onselect_tag={on_tag_select}
+      oncreate={on_create_category}
+      ontag_delete={refresh_current_view}
+      dark={dark_mode}
+      ontoggle_dark={toggle_dark}
+      onexport={() => show_export = true}
+    />
 
-    <SearchBar bind:query={search_query} onsearch={on_search} />
-
-    <div class="flex flex-1 overflow-hidden">
-      <Sidebar {categories} selected_id={selected_category} onselect={on_category_select} oncreate={on_create_category} />
-
-      <main class="flex-1 flex flex-col overflow-hidden">
-        <div class="px-4 py-2 flex items-center justify-between" style="border-bottom:1px solid var(--color-border)">
-          <span class="text-xs" style="color:var(--color-text-secondary)">
-            {filtered_links.length} 个链接
-          </span>
+    <main class="main-content">
+      <header class="content-header">
+        <div class="header-left">
+          <h2 class="header-title">{current_title}</h2>
+          <span class="header-count">{filtered_links.length} 条</span>
         </div>
+        <div class="header-right">
+          <SearchBar bind:query={search_query} onsearch={on_search} />
+        </div>
+      </header>
 
-        <LinkList
-          links={filtered_links}
-          loading={links.loading}
-          onedit={(link) => edit_link = link}
-          ondelete={on_delete_link}
-          ontoggle_favorite={on_toggle_favorite}
-        />
-      </main>
-    </div>
+      <LinkList
+        links={filtered_links}
+        {categories}
+        loading={links.loading}
+        highlight={search_query}
+        onedit={(link) => edit_link = link}
+        ondelete={on_delete_link}
+        ontoggle_favorite={on_toggle_favorite}
+      />
 
-    <footer class="p-3" style="background:var(--color-bg-secondary);border-top:1px solid var(--color-border)">
-      <button
-        onclick={() => show_add_form = true}
-        class="w-full py-2.5 rounded-lg text-sm font-medium text-white"
-        style="background:var(--color-primary)"
-      >
-        + 添加链接
+      <button class="fab" onclick={() => show_add_form = true} title="添加链接">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="10" y1="4" x2="10" y2="16"/>
+          <line x1="4" y1="10" x2="16" y2="10"/>
+        </svg>
       </button>
-    </footer>
+    </main>
   </div>
 </div>
 
@@ -148,3 +179,101 @@
 {#if show_export}
   <ExportDialog onclose={() => show_export = false} />
 {/if}
+
+<style>
+  .app-root {
+    position: relative;
+    display: flex;
+    height: 100vh;
+    background: var(--bg-0);
+    color: var(--text-0);
+    overflow: hidden;
+    padding-top: 36px;
+  }
+
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+  }
+
+  .content-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-0);
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .header-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-0);
+    white-space: nowrap;
+  }
+
+  .header-count {
+    font-size: 12px;
+    color: var(--text-3);
+    flex-shrink: 0;
+  }
+
+  .header-right {
+    flex-shrink: 0;
+  }
+
+  .fab {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-lg);
+    background: var(--accent);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-lg);
+    transition: all var(--transition);
+    z-index: 10;
+  }
+
+  .fab:hover {
+    background: var(--accent-hover);
+    transform: scale(1.05);
+    box-shadow: var(--shadow-xl);
+  }
+
+  .fab:active {
+    transform: scale(0.97);
+  }
+
+  .titlebar-drag {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 36px;
+    background: var(--bg-0);
+    z-index: 100;
+    pointer-events: auto;
+  }
+
+  .dark .titlebar-drag {
+    background: #0a0a0b;
+  }
+</style>

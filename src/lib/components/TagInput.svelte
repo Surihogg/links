@@ -55,12 +55,12 @@
   }
 </script>
 
-<div class="relative">
-  <div class="flex flex-wrap gap-1 p-2 rounded-lg min-h-[38px] items-center" style="border:1px solid var(--color-border);background:var(--color-bg)">
+<div class="tag-input-wrap">
+  <div class="tag-input-field">
     {#each tags as tag, i}
-      <span class="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs" style="background:var(--color-tag-bg);color:var(--color-tag-text)">
-        #{tag}
-        <button onclick={() => remove_tag(i)} class="hover:opacity-70">✕</button>
+      <span class="tag-pill">
+        {tag}
+        <button class="tag-remove" onclick={() => remove_tag(i)}>×</button>
       </span>
     {/each}
     <input
@@ -70,22 +70,109 @@
       onkeydown={onkeydown}
       onblur={() => setTimeout(() => show_suggestions = false, 150)}
       placeholder={tags.length === 0 ? "输入标签，回车添加..." : ""}
-      class="flex-1 min-w-[80px] bg-transparent outline-none text-sm"
-      style="color:var(--color-text)"
+      class="tag-text-input"
     />
   </div>
   {#if show_suggestions}
-    <div class="absolute z-10 mt-1 w-full rounded-lg shadow-lg overflow-hidden" style="background:var(--color-bg);border:1px solid var(--color-border)">
+    <div class="tag-suggestions">
       {#each suggestions as suggestion, i}
         <button
-          class="w-full text-left px-3 py-1.5 text-sm"
-          style="background:{i === active_index ? 'var(--color-bg-hover)' : 'transparent'};color:var(--color-text)"
+          class="suggestion-item"
+          class:active={i === active_index}
           onclick={() => add_tag(suggestion.name)}
           onmouseenter={() => active_index = i}
         >
-          #{suggestion.name}
+          {suggestion.name}
         </button>
       {/each}
     </div>
   {/if}
 </div>
+
+<style>
+  .tag-input-wrap { position: relative; }
+
+  .tag-input-field {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 8px;
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    background: var(--bg-0);
+    min-height: 36px;
+    align-items: center;
+    transition: border-color var(--transition);
+  }
+
+  .tag-input-field:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .tag-remove {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--accent-text);
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+    opacity: 0.6;
+    transition: opacity var(--transition);
+  }
+
+  .tag-remove:hover { opacity: 1; }
+
+  .tag-text-input {
+    flex: 1;
+    min-width: 80px;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-0);
+    font-size: 13px;
+  }
+
+  .tag-text-input::placeholder { color: var(--text-3); }
+
+  .tag-suggestions {
+    position: absolute;
+    z-index: 10;
+    width: 100%;
+    margin-top: 4px;
+    background: var(--bg-0);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+  }
+
+  .suggestion-item {
+    width: 100%;
+    text-align: left;
+    padding: 6px 10px;
+    border: none;
+    background: none;
+    color: var(--text-1);
+    font-size: 12px;
+    cursor: pointer;
+    display: block;
+    transition: background var(--transition);
+  }
+
+  .suggestion-item:hover,
+  .suggestion-item.active { background: var(--accent-soft); }
+</style>

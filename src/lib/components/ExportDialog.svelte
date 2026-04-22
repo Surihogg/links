@@ -1,49 +1,264 @@
 <script>
-  import { exportLinks } from "../api.js";
+  import { exportLinks, saveFile } from "../api.js";
 
   let { onclose } = $props();
   let format = $state("json");
   let exporting = $state(false);
 
+  const formats = [
+    { id: "json", name: "JSON", desc: "结构化数据，可重新导入" },
+    { id: "markdown", name: "Markdown", desc: "纯文本格式，方便阅读" },
+    { id: "csv", name: "CSV", desc: "表格格式，可在 Excel 中打开" },
+  ];
+
   async function do_export() {
     exporting = true;
     try {
       const content = await exportLinks({ format });
-      let mime = "text/plain";
       let ext = "txt";
-      if (format === "json") { mime = "application/json"; ext = "json"; }
-      else if (format === "markdown") { mime = "text/markdown"; ext = "md"; }
-      else if (format === "csv") { mime = "text/csv"; ext = "csv"; }
-      const blob = new Blob([content], { type: mime });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `links-export.${ext}`;
-      a.click();
-      URL.revokeObjectURL(url);
+      let filename = "links-export";
+      if (format === "json") { ext = "json"; }
+      else if (format === "markdown") { ext = "md"; }
+      else if (format === "csv") { ext = "csv"; }
+      await saveFile(content, `${filename}.${ext}`);
       onclose?.();
     } finally {
       exporting = false;
     }
   }
+
+  function on_overlay_click(e) {
+    if (e.target === e.currentTarget) onclose?.();
+  }
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.5)">
-  <div class="w-full max-w-sm rounded-xl p-6 shadow-2xl" style="background:var(--color-bg)">
-    <h2 class="text-lg font-semibold mb-4" style="color:var(--color-text)">导出链接</h2>
-    <div class="space-y-2 mb-4">
-      {#each ["json", "markdown", "csv"] as f}
-        <label class="flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer" style="background:{format === f ? 'var(--color-bg-hover)' : 'transparent'};border:1px solid var(--color-border)">
-          <input type="radio" name="format" value={f} bind:group={format} />
-          <span class="text-sm" style="color:var(--color-text)">
-            {f === "json" ? "JSON" : f === "markdown" ? "Markdown" : "CSV"}
-          </span>
-        </label>
-      {/each}
+<div class="modal-overlay" onclick={on_overlay_click}>
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">导出链接</h2>
+      <button class="modal-close" onclick={onclose}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
+        </svg>
+      </button>
     </div>
-    <div class="flex justify-end gap-2">
-      <button onclick={onclose} class="px-4 py-2 rounded-lg text-sm" style="color:var(--color-text-secondary);background:var(--color-bg-secondary)">取消</button>
-      <button onclick={do_export} disabled={exporting} class="px-4 py-2 rounded-lg text-sm text-white" style="background:var(--color-primary)">{exporting ? "导出中..." : "导出"}</button>
+
+    <div class="modal-body">
+      <div class="format-list">
+        {#each formats as f (f.id)}
+          <button
+            class="format-option"
+            class:active={format === f.id}
+            onclick={() => format = f.id}
+          >
+            <div class="format-radio">
+              {#if format === f.id}
+                <div class="format-dot"></div>
+              {/if}
+            </div>
+            <div class="format-info">
+              <span class="format-name">{f.name}</span>
+              <span class="format-desc">{f.desc}</span>
+            </div>
+            {#if format === f.id}
+              <svg class="format-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 8l3.5 3.5L13 5"/>
+              </svg>
+            {/if}
+          </button>
+        {/each}
+      </div>
+
+      <div class="modal-footer">
+        <button onclick={onclose} class="btn btn-secondary">取消</button>
+        <button onclick={do_export} disabled={exporting} class="btn btn-primary">
+          {exporting ? "导出中..." : "导出"}
+        </button>
+      </div>
     </div>
   </div>
 </div>
+
+<style>
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .modal {
+    width: 100%;
+    max-width: 400px;
+    background: var(--bg-0);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-0);
+    overflow: hidden;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 12px;
+  }
+
+  .modal-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-0);
+  }
+
+  .modal-close {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: var(--text-3);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+  }
+
+  .modal-close:hover {
+    background: var(--bg-2);
+    color: var(--text-1);
+  }
+
+  .modal-body {
+    padding: 0 20px 20px;
+  }
+
+  .format-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .format-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    background: var(--bg-1);
+    color: var(--text-1);
+    cursor: pointer;
+    transition: all var(--transition);
+    text-align: left;
+    font-size: 13px;
+  }
+
+  .format-option:hover {
+    border-color: var(--border-2);
+    background: var(--bg-hover);
+  }
+
+  .format-option.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+
+  .format-radio {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: border-color var(--transition);
+  }
+
+  .format-option.active .format-radio {
+    border-color: var(--accent);
+  }
+
+  .format-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .format-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .format-name {
+    font-weight: 500;
+    font-size: 13px;
+  }
+
+  .format-desc {
+    font-size: 11px;
+    color: var(--text-3);
+  }
+
+  .format-option.active .format-desc {
+    color: var(--accent-text);
+    opacity: 0.7;
+  }
+
+  .format-check {
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 7px 16px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+
+  .btn-secondary {
+    background: var(--bg-2);
+    color: var(--text-2);
+  }
+
+  .btn-secondary:hover {
+    background: var(--border-1);
+    color: var(--text-1);
+  }
+</style>
