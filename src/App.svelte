@@ -7,6 +7,8 @@
   import LinkForm from "./lib/components/LinkForm.svelte";
   import ExportDialog from "./lib/components/ExportDialog.svelte";
 
+  let is_macos = $state(false);
+
   let links = $derived($linksStore);
   let categories = $derived($categoriesStore);
   let tags = $derived($tagsStore);
@@ -22,6 +24,7 @@
   onMount(() => {
     const saved = localStorage.getItem("links-dark-mode");
     dark_mode = saved === "true";
+    is_macos = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
     load_data();
   });
 
@@ -121,8 +124,10 @@
 </script>
 
 <div class={dark_mode ? "dark" : ""}>
-  <div class="app-root">
-    <div class="titlebar-drag" data-tauri-drag-region></div>
+  <div class="app-root" class:has-titlebar={is_macos}>
+    {#if is_macos}
+      <div class="titlebar-drag" data-tauri-drag-region></div>
+    {/if}
     <Sidebar
       {categories}
       tags={tags}
@@ -188,6 +193,9 @@
     background: var(--bg-0);
     color: var(--text-0);
     overflow: hidden;
+  }
+
+  .app-root.has-titlebar {
     padding-top: 36px;
   }
 
