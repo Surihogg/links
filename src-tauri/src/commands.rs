@@ -193,13 +193,18 @@ pub fn links_create(
     let link_id = link.id;
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
-        if let Ok(meta) = crate::fetcher::fetch_metadata(&url_for_fetch).await {
-            let db_state = app_clone.state::<Db>();
-            let Ok(c) = db_state.0.lock() else { return; };
-            c.execute(
-                "UPDATE links SET title = CASE WHEN title = '' THEN ?1 ELSE title END, description = CASE WHEN description = '' THEN ?2 ELSE description END, favicon_url = CASE WHEN favicon_url = '' THEN ?3 ELSE favicon_url END, og_image_url = CASE WHEN og_image_url = '' THEN ?4 ELSE og_image_url END, updated_at = datetime('now','localtime') WHERE id = ?5",
-                params![meta.title, meta.description, meta.favicon_url, meta.og_image_url, link_id],
-            ).ok();
+        match crate::fetcher::fetch_metadata(&url_for_fetch).await {
+            Ok(meta) => {
+                let db_state = app_clone.state::<Db>();
+                let Ok(c) = db_state.0.lock() else { return; };
+                c.execute(
+                    "UPDATE links SET title = CASE WHEN title = '' THEN ?1 ELSE title END, description = CASE WHEN description = '' THEN ?2 ELSE description END, favicon_url = CASE WHEN favicon_url = '' THEN ?3 ELSE favicon_url END, og_image_url = CASE WHEN og_image_url = '' THEN ?4 ELSE og_image_url END, updated_at = datetime('now','localtime') WHERE id = ?5",
+                    params![meta.title, meta.description, meta.favicon_url, meta.og_image_url, link_id],
+                ).ok();
+            }
+            Err(e) => {
+                log::warn!("metadata fetch failed for {}: {}", url_for_fetch, e);
+            }
         }
     });
 
@@ -491,7 +496,10 @@ pub fn tags_autocomplete(db: State<'_, Db>, prefix: String) -> Result<Vec<Tag>, 
 pub async fn fetch_metadata(url: String) -> Result<crate::fetcher::PageMeta, AppError> {
     crate::fetcher::fetch_metadata(&url)
         .await
-        .map_err(|e| AppError::General(e.to_string()))
+        .map_err(|e| {
+            log::warn!("metadata fetch failed for {}: {}", url, e);
+            AppError::General(e.to_string())
+        })
 }
 
 #[tauri::command]
