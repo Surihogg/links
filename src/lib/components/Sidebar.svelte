@@ -123,7 +123,7 @@
   <div class="sidebar-section">
     <div class="section-header" onclick={() => toggle_section('categories')}>
       <span class="section-label" style="cursor:pointer;">
-        <svg class="chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({collapsed.has('categories') ? 0 : 90}deg); transition: transform var(--transition); display:inline-block; vertical-align:middle; margin-right:4px;">
+        <svg class="chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({collapsed.has('categories') ? 0 : 90}deg); transition: transform var(--transition);">
           <path d="M3 1l4 4-4 4"/>
         </svg>
         分组管理
@@ -192,7 +192,7 @@
 
     <div class="section-header" onclick={() => toggle_section('tags')}>
       <span class="section-label" style="cursor:pointer;">
-        <svg class="chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({collapsed.has('tags') ? 0 : 90}deg); transition: transform var(--transition); display:inline-block; vertical-align:middle; margin-right:4px;">
+        <svg class="chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({collapsed.has('tags') ? 0 : 90}deg); transition: transform var(--transition);">
           <path d="M3 1l4 4-4 4"/>
         </svg>
         标签管理
@@ -355,10 +355,13 @@
   }
 
   .section-label {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-2);
     letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
   .section-action {
