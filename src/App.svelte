@@ -109,6 +109,16 @@
     await categoriesStore.create(payload);
   }
 
+  async function on_delete_category(id) {
+    await categoriesStore.remove(id);
+    // 如果当前正在查看被删除的分组，切回"全部链接"
+    // （该分组的子分组会因 schema 的 ON DELETE SET NULL 自动提升为根级分组，不必处理）
+    if (selected_category === id) {
+      selected_category = null;
+    }
+    await refresh_current_view();
+  }
+
   function toggle_dark() {
     dark_mode = !dark_mode;
     localStorage.setItem("links-dark-mode", String(dark_mode));
@@ -136,6 +146,7 @@
       onselect={on_category_select}
       onselect_tag={on_tag_select}
       oncreate={on_create_category}
+      ondelete_cat={on_delete_category}
       ontag_delete={refresh_current_view}
       dark={dark_mode}
       ontoggle_dark={toggle_dark}

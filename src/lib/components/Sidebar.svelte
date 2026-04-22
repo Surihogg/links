@@ -1,6 +1,4 @@
 <script>
-  import { categoriesStore } from "../stores/index.js";
-
   let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, ontag_delete, dark = false, ontoggle_dark, onexport } = $props();
   let expanded = $state(new Set());
   let show_new = $state(false);
@@ -59,7 +57,7 @@
   async function handle_delete_cat(e, id) {
     e.stopPropagation();
     if (deleting_id === id) {
-      await categoriesStore.remove(id);
+      ondelete_cat?.(id);
       deleting_id = null;
     } else {
       deleting_id = id;
