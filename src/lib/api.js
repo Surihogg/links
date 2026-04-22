@@ -40,10 +40,30 @@ export async function listTags() {
   return invoke("tags_list");
 }
 
+export async function deleteTag(id) {
+  return invoke("tags_delete", { id });
+}
+
+export async function createTag(name) {
+  return invoke("tags_create", { name });
+}
+
 export async function autocompleteTags(prefix) {
   return invoke("tags_autocomplete", { prefix });
 }
 
 export async function exportLinks(params) {
   return invoke("export_links", { params });
+}
+
+export async function openUrl(url) {
+  return invoke("open_url", { url });
+}
+
+export async function saveFile(content, filename) {
+  return invoke("save_file", { content, filename });
+}
+
+export async function fetchMeta(url) {
+  return invoke("fetch_metadata", { url });
 }

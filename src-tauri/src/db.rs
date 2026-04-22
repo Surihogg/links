@@ -104,6 +104,8 @@ pub struct CreateLinkPayload {
     pub notes: Option<String>,
     pub category_id: Option<i64>,
     pub tags: Option<Vec<String>>,
+    pub favicon_url: Option<String>,
+    pub og_image_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

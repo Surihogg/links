@@ -40,15 +40,17 @@ fn row_to_link(row: &rusqlite::Row) -> rusqlite::Result<Link> {
 }
 
 fn load_tags_for_link(conn: &rusqlite::Connection, link_id: i64) -> Vec<String> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT t.name FROM tags t JOIN link_tags lt ON lt.tag_id = t.id WHERE lt.link_id = ?",
-        )
-        .unwrap();
-    stmt.query_map(params![link_id], |row| row.get(0))
-        .unwrap()
-        .flatten()
-        .collect()
+    let Ok(mut stmt) = conn.prepare(
+        "SELECT t.name FROM tags t JOIN link_tags lt ON lt.tag_id = t.id WHERE lt.link_id = ?",
+    ) else {
+        return vec![];
+    };
+    let tags: Vec<String> = match stmt.query_map(params![link_id], |row| row.get::<_, String>(0)) {
+        Ok(rows) => rows.flatten().collect(),
+        Err(_) => vec![],
+    };
+    drop(stmt);
+    tags
 }
 
 fn ensure_tags(conn: &rusqlite::Connection, tags: &[String]) -> Vec<i64> {
@@ -60,10 +62,9 @@ fn ensure_tags(conn: &rusqlite::Connection, tags: &[String]) -> Vec<i64> {
         }
         conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", params![tag])
             .ok();
-        let id: i64 = conn
-            .query_row("SELECT id FROM tags WHERE name = ?", params![tag], |r| r.get(0))
-            .unwrap();
-        ids.push(id);
+        if let Ok(id) = conn.query_row("SELECT id FROM tags WHERE name = ?", params![tag], |r| r.get::<_, i64>(0)) {
+            ids.push(id);
+        }
     }
     ids
 }
@@ -159,10 +160,13 @@ pub fn links_create(
     let title = payload.title.unwrap_or_default();
     let description = payload.description.unwrap_or_default();
     let notes = payload.notes.unwrap_or_default();
+    let favicon_url = payload.favicon_url.unwrap_or_default();
+    let og_image_url = payload.og_image_url.unwrap_or_default();
+    let category_id = payload.category_id.filter(|&id| id > 0);
 
     conn.execute(
-        "INSERT INTO links (url, title, description, notes, category_id) VALUES (?, ?, ?, ?, ?)",
-        params![payload.url, title, description, notes, payload.category_id],
+        "INSERT INTO links (url, title, description, notes, favicon_url, og_image_url, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        params![payload.url, title, description, notes, favicon_url, og_image_url, category_id],
     )?;
     let id = conn.last_insert_rowid();
 
@@ -188,12 +192,12 @@ pub fn links_create(
     let url_for_fetch = link.url.clone();
     let link_id = link.id;
     let app_clone = app.clone();
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         if let Ok(meta) = crate::fetcher::fetch_metadata(&url_for_fetch).await {
             let db_state = app_clone.state::<Db>();
-            let c = db_state.0.lock().unwrap();
+            let Ok(c) = db_state.0.lock() else { return; };
             c.execute(
-                "UPDATE links SET title = CASE WHEN title = '' THEN ?1 ELSE title END, description = CASE WHEN description = '' THEN ?2 ELSE description END, favicon_url = CASE WHEN favicon_url = '' THEN ?3 ELSE favicon_url END, og_image_url = CASE WHEN og_image_url = '' THEN ?4 ELSE og_image_url END, updated_at = datetime('now','localtime') WHERE id = ?5 AND (title = '' OR description = '')",
+                "UPDATE links SET title = CASE WHEN title = '' THEN ?1 ELSE title END, description = CASE WHEN description = '' THEN ?2 ELSE description END, favicon_url = CASE WHEN favicon_url = '' THEN ?3 ELSE favicon_url END, og_image_url = CASE WHEN og_image_url = '' THEN ?4 ELSE og_image_url END, updated_at = datetime('now','localtime') WHERE id = ?5",
                 params![meta.title, meta.description, meta.favicon_url, meta.og_image_url, link_id],
             ).ok();
         }
@@ -226,8 +230,12 @@ pub fn links_update(db: State<'_, Db>, payload: UpdateLinkPayload) -> Result<Lin
         p.push(Box::new(v.clone()));
     }
     if let Some(v) = payload.category_id {
-        sets.push("category_id = ?".to_string());
-        p.push(Box::new(v));
+        if v == -1 {
+            sets.push("category_id = NULL".to_string());
+        } else {
+            sets.push("category_id = ?".to_string());
+            p.push(Box::new(v));
+        }
     }
     if let Some(v) = payload.is_favorite {
         sets.push("is_favorite = ?".to_string());
@@ -278,12 +286,41 @@ pub fn links_delete(db: State<'_, Db>, id: i64) -> Result<(), AppError> {
 #[tauri::command]
 pub fn links_search(db: State<'_, Db>, query: String) -> Result<Vec<Link>, AppError> {
     let conn = db.0.lock().unwrap();
+    let like_pattern = format!("%{}%", query.replace('%', "\\%").replace('_', "\\_"));
+
     let fts_query = format!("{}*", query.replace('"', "\"\""));
-    let sql = "SELECT l.id, l.url, l.title, l.description, l.notes, l.favicon_url, l.og_image_url, l.category_id, l.is_favorite, l.created_at, l.updated_at FROM links l JOIN links_fts fts ON fts.rowid = l.id WHERE links_fts MATCH ? ORDER BY rank LIMIT 50";
-    let mut stmt = conn.prepare(sql)?;
-    let items: Vec<Link> = stmt
-        .query_map(params![fts_query], row_to_link)?
-        .collect::<Result<Vec<_>, _>>()?;
+    let fts_sql = "SELECT l.id, l.url, l.title, l.description, l.notes, l.favicon_url, l.og_image_url, l.category_id, l.is_favorite, l.created_at, l.updated_at FROM links l JOIN links_fts fts ON fts.rowid = l.id WHERE links_fts MATCH ?";
+    let tag_sql = "SELECT DISTINCT l.id, l.url, l.title, l.description, l.notes, l.favicon_url, l.og_image_url, l.category_id, l.is_favorite, l.created_at, l.updated_at FROM links l JOIN link_tags lt ON lt.link_id = l.id JOIN tags t ON t.id = lt.tag_id WHERE t.name LIKE ?";
+    let like_sql = "SELECT l.id, l.url, l.title, l.description, l.notes, l.favicon_url, l.og_image_url, l.category_id, l.is_favorite, l.created_at, l.updated_at FROM links l WHERE l.title LIKE ? OR l.description LIKE ? OR l.notes LIKE ?";
+
+    let items: Vec<Link> = {
+        let full_sql = format!(
+            "{} UNION {} UNION {} ORDER BY updated_at DESC LIMIT 50",
+            fts_sql, tag_sql, like_sql
+        );
+        let fallback_sql = format!(
+            "{} UNION {} ORDER BY updated_at DESC LIMIT 50",
+            tag_sql, like_sql
+        );
+        let mut stmt = conn.prepare(&full_sql)?;
+        let res: Result<Vec<Link>, _> = stmt.query_map(
+            rusqlite::params![fts_query, like_pattern, like_pattern, like_pattern, like_pattern],
+            row_to_link,
+        )?.collect();
+        drop(stmt);
+        match res {
+            Ok(v) => Ok(v),
+            Err(_) => {
+                let mut fb = conn.prepare(&fallback_sql)?;
+                let res: Result<Vec<Link>, _> = fb.query_map(
+                    rusqlite::params![like_pattern, like_pattern, like_pattern],
+                    row_to_link,
+                )?.collect();
+                drop(fb);
+                res
+            }
+        }?
+    };
 
     let mut items = items;
     for link in &mut items {
@@ -416,9 +453,28 @@ pub fn tags_list(db: State<'_, Db>) -> Result<Vec<Tag>, AppError> {
 }
 
 #[tauri::command]
+pub fn tags_delete(db: State<'_, Db>, id: i64) -> Result<(), AppError> {
+    let conn = db.0.lock().unwrap();
+    conn.execute("DELETE FROM tags WHERE id = ?", params![id])?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn tags_create(db: State<'_, Db>, name: String) -> Result<Tag, AppError> {
+    let conn = db.0.lock().unwrap();
+    conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", params![name])?;
+    let tag = conn.query_row(
+        "SELECT id, name FROM tags WHERE name = ?",
+        params![name],
+        |row| Ok(Tag { id: row.get(0)?, name: row.get(1)? }),
+    )?;
+    Ok(tag)
+}
+
+#[tauri::command]
 pub fn tags_autocomplete(db: State<'_, Db>, prefix: String) -> Result<Vec<Tag>, AppError> {
     let conn = db.0.lock().unwrap();
-    let pattern = format!("{}%", prefix);
+    let pattern = format!("%{}%", prefix.replace('%', "\\%").replace('_', "\\_"));
     let mut stmt = conn.prepare("SELECT id, name FROM tags WHERE name LIKE ? ORDER BY name LIMIT 10")?;
     let tags = stmt
         .query_map(params![pattern], |row| {
@@ -429,6 +485,30 @@ pub fn tags_autocomplete(db: State<'_, Db>, prefix: String) -> Result<Vec<Tag>, 
         })?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(tags)
+}
+
+#[tauri::command]
+pub async fn fetch_metadata(url: String) -> Result<crate::fetcher::PageMeta, AppError> {
+    crate::fetcher::fetch_metadata(&url)
+        .await
+        .map_err(|e| AppError::General(e.to_string()))
+}
+
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), AppError> {
+    open::that(&url).map_err(|e| AppError::General(e.to_string()))
+}
+
+#[tauri::command]
+pub fn save_file(content: String, filename: String) -> Result<(), AppError> {
+    let Some(path) = rfd::FileDialog::new()
+        .set_file_name(&filename)
+        .save_file()
+    else {
+        return Ok(());
+    };
+    std::fs::write(&path, content)?;
+    Ok(())
 }
 
 #[tauri::command]

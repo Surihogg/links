@@ -53,8 +53,12 @@ function createLinksStore() {
     },
     async search(query) {
       update((s) => ({ ...s, loading: true }));
-      const items = await api.searchLinks(query);
-      update((s) => ({ ...s, items, total: items.length, loading: false }));
+      try {
+        const items = await api.searchLinks(query);
+        update((s) => ({ ...s, items, total: items.length, loading: false }));
+      } catch {
+        update((s) => ({ ...s, loading: false }));
+      }
     },
   };
 }
@@ -85,13 +89,22 @@ function createCategoriesStore() {
 }
 
 function createTagsStore() {
-  const { subscribe, set } = writable([]);
+  const { subscribe, set, update } = writable([]);
 
   return {
     subscribe,
     async load() {
       const tags = await api.listTags();
       set(tags);
+    },
+    async remove(id) {
+      await api.deleteTag(id);
+      update((s) => s.filter((t) => t.id !== id));
+    },
+    async create(name) {
+      const tag = await api.createTag(name);
+      update((s) => [...s, tag].sort((a, b) => a.name.localeCompare(b.name)));
+      return tag;
     },
   };
 }
