@@ -10,10 +10,11 @@ pub struct PageMeta {
 
 pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(8))
         .build()?;
 
     let resp = client.get(url).send().await?;
+
     let content_type = resp
         .headers()
         .get("content-type")
@@ -28,18 +29,31 @@ pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
         });
     }
 
-    let html = resp.text().await?;
+    let bytes = resp.bytes().await?;
+    let cap = 512 * 1024;
+    let html = if bytes.len() > cap {
+        String::from_utf8_lossy(&bytes[..cap]).to_string()
+    } else {
+        String::from_utf8_lossy(&bytes).to_string()
+    };
+
     let doc = scraper::Html::parse_document(&html);
 
-    let title = doc
+    let title: String = doc
         .select(&scraper::Selector::parse("title").unwrap())
         .next()
         .map(|e| e.inner_html().trim().to_string())
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .chars()
+        .take(500)
+        .collect();
 
-    let description = select_meta_content(&doc, "meta[property=\"og:description\"]")
+    let description: String = select_meta_content(&doc, "meta[property=\"og:description\"]")
         .or_else(|| select_meta_content(&doc, "meta[name=\"description\"]"))
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .chars()
+        .take(2000)
+        .collect();
 
     let og_image_url = select_meta_content(&doc, "meta[property=\"og:image\"]").unwrap_or_default();
 

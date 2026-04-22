@@ -166,19 +166,19 @@
       </button>
     </main>
   </div>
+
+  {#if show_add_form}
+    <LinkForm categories={categories} onsave={on_save_link} oncancel={() => show_add_form = false} />
+  {/if}
+
+  {#if edit_link}
+    <LinkForm link={edit_link} categories={categories} onsave={on_save_link} oncancel={() => edit_link = null} />
+  {/if}
+
+  {#if show_export}
+    <ExportDialog onclose={() => show_export = false} />
+  {/if}
 </div>
-
-{#if show_add_form}
-  <LinkForm categories={categories} onsave={on_save_link} oncancel={() => show_add_form = false} />
-{/if}
-
-{#if edit_link}
-  <LinkForm link={edit_link} categories={categories} onsave={on_save_link} oncancel={() => edit_link = null} />
-{/if}
-
-{#if show_export}
-  <ExportDialog onclose={() => show_export = false} />
-{/if}
 
 <style>
   .app-root {
