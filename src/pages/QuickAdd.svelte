@@ -44,7 +44,7 @@
     <input type="text" bind:value={title} placeholder="标题（可选）" class="w-full px-3 py-2 rounded-lg text-sm outline-none" style="background:var(--color-bg-secondary);border:1px solid var(--color-border);color:var(--color-text)" />
     <TagInput bind:tags />
     <select bind:value={category_id} class="w-full px-3 py-2 rounded-lg text-sm outline-none" style="background:var(--color-bg-secondary);border:1px solid var(--color-border);color:var(--color-text)">
-      <option value={null}>未分类</option>
+      <option value="">无分组</option>
       {#each categories as cat}
         <option value={cat.id}>{cat.name}</option>
       {/each}
