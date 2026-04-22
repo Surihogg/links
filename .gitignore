@@ -10,3 +10,5 @@ Desktop.ini
 .vscode/
 *.swp
 *.swo
+
+.sisyphus/
