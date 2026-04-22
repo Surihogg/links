@@ -1,5 +1,12 @@
 node_modules/
 dist/
-.DS_Store
 src-tauri/target/
 *.log
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo

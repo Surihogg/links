@@ -1,0 +1,12 @@
+* text=auto eol=lf
+*.rs text eol=lf
+*.js text eol=lf
+*.svelte text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+*.sql text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
