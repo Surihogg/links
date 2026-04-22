@@ -119,6 +119,19 @@
     await refresh_current_view();
   }
 
+  async function on_delete_tag(id) {
+    await tagsStore.remove(id);
+    // 如果当前正在查看被删除的标签，切回"全部链接"
+    if (selected_tag) {
+      selected_tag = null;
+    }
+    await refresh_current_view();
+  }
+
+  async function on_create_tag(name) {
+    await tagsStore.create(name);
+  }
+
   function toggle_dark() {
     dark_mode = !dark_mode;
     localStorage.setItem("links-dark-mode", String(dark_mode));
@@ -147,7 +160,8 @@
       onselect_tag={on_tag_select}
       oncreate={on_create_category}
       ondelete_cat={on_delete_category}
-      ontag_delete={refresh_current_view}
+      ontag_delete={on_delete_tag}
+      oncreate_tag={on_create_tag}
       dark={dark_mode}
       ontoggle_dark={toggle_dark}
       onexport={() => show_export = true}

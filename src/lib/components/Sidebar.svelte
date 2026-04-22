@@ -1,5 +1,5 @@
 <script>
-  let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, ontag_delete, dark = false, ontoggle_dark, onexport } = $props();
+  let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, ontag_delete, oncreate_tag, dark = false, ontoggle_dark, onexport } = $props();
   let expanded = $state(new Set());
   let show_new = $state(false);
   let new_name = $state("");
@@ -67,19 +67,16 @@
   async function handle_delete_tag(e, id) {
     e.stopPropagation();
     if (deleting_tag_id === id) {
-      const { tagsStore } = await import("../stores/index.js");
-      await tagsStore.remove(id);
+      ontag_delete?.(id);
       deleting_tag_id = null;
-      ontag_delete?.();
     } else {
       deleting_tag_id = id;
     }
   }
 
-  async function submit_tag() {
+  function submit_tag() {
     if (!new_tag_name.trim()) return;
-    const { tagsStore } = await import("../stores/index.js");
-    await tagsStore.create(new_tag_name.trim());
+    oncreate_tag?.(new_tag_name.trim());
     new_tag_name = "";
     show_new_tag = false;
   }
