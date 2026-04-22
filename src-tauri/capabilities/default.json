@@ -5,6 +5,7 @@
   "windows": ["main", "quick-add"],
   "permissions": [
     "core:default",
+    "core:window:allow-start-dragging",
     "global-shortcut:allow-register",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-unregister"
