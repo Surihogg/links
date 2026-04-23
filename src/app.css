@@ -28,6 +28,11 @@
   --danger: #dc2626;
   --danger-soft: #fee2e2;
 
+  /* Category */
+  --cat-soft: #f0fdf4;
+  --cat-text: #15803d;
+  --cat-idle: #22c55e;
+
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
@@ -69,6 +74,10 @@
 
   --danger: #f87171;
   --danger-soft: #3b1c1c;
+
+  --cat-soft: #14532d;
+  --cat-text: #86efac;
+  --cat-idle: #4ade80;
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.3);

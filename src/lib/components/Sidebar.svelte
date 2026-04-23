@@ -1,5 +1,5 @@
 <script>
-  let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, ontag_delete, oncreate_tag, dark = false, ontoggle_dark, onexport } = $props();
+  let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, ontag_delete, oncreate_tag, dark = false, ontoggle_dark, onexport, onimport } = $props();
   let expanded = $state(new Set());
   let show_new = $state(false);
   let new_name = $state("");
@@ -153,7 +153,7 @@
               </svg>
             </span>
           {:else}
-            <span class="cat-dot"></span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
           {/if}
           <span class="cat-name">{cat.name}</span>
           {#if deleting_id === cat.id}
@@ -228,7 +228,7 @@
           class:active={selected_tag === tag.name}
           onclick={() => onselect_tag?.(tag.name)}
         >
-          <span class="cat-dot"></span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tag-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
           <span class="cat-name">{tag.name}</span>
           {#if deleting_tag_id === tag.id}
             <span class="cat-delete-hint">确认?</span>
@@ -259,6 +259,12 @@
     </button>
 
     <button class="footer-btn" onclick={onexport} title="导出">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+      </svg>
+    </button>
+
+    <button class="footer-btn" onclick={onimport} title="导入书签">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
       </svg>
@@ -329,6 +335,16 @@
     color: var(--accent);
   }
 
+  .cat-item.active {
+    background: var(--cat-soft);
+    color: var(--cat-text);
+  }
+
+  .cat-icon, .tag-icon {
+    flex-shrink: 0;
+    margin: 0 5px;
+  }
+
   .sidebar-section {
     flex: 1;
     padding: 8px 8px 0;
@@ -385,6 +401,41 @@
   .cat-item {
     font-size: 13px;
     position: relative;
+    background: var(--cat-soft);
+  }
+
+  .cat-item:hover {
+    background: #bbf7d0;
+  }
+
+  .cat-item.active {
+    background: #bbf7d0;
+    font-weight: 500;
+  }
+
+  :global(.dark) .cat-item:hover,
+  :global(.dark) .cat-item.active {
+    background: #166534;
+  }
+
+  .tag-item {
+    font-size: 12px;
+    position: relative;
+    background: var(--accent-soft);
+  }
+
+  .tag-item:hover {
+    background: #bfdbfe;
+  }
+
+  .tag-item.active {
+    background: #bfdbfe;
+    font-weight: 500;
+  }
+
+  :global(.dark) .tag-item:hover,
+  :global(.dark) .tag-item.active {
+    background: #1e3a8a;
   }
 
   .cat-delete-btn {
@@ -449,15 +500,6 @@
     color: var(--text-3);
   }
 
-  .cat-dot {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: var(--text-3);
-    flex-shrink: 0;
-    margin: 0 5px;
-  }
-
   .cat-name {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -516,11 +558,6 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
-  }
-
-  .tag-item {
-    font-size: 12px;
-    position: relative;
   }
 
   .tag-delete-btn {
