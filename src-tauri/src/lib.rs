@@ -106,6 +106,8 @@ pub fn run() {
             commands::save_file,
             commands::fetch_metadata,
             commands::import_bookmarks,
+            commands::get_setting,
+            commands::set_setting,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

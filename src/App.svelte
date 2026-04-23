@@ -7,6 +7,7 @@
   import LinkList from "./lib/components/LinkList.svelte";
   import LinkForm from "./lib/components/LinkForm.svelte";
   import ExportDialog from "./lib/components/ExportDialog.svelte";
+  import SettingsDialog from "./lib/components/SettingsDialog.svelte";
 
   let is_macos = $state(false);
 
@@ -20,20 +21,42 @@
   let show_add_form = $state(false);
   let edit_link = $state(null);
   let show_export = $state(false);
+  let show_settings = $state(false);
   let dark_mode = $state(false);
   let show_close_dialog = $state(false);
 
   onMount(async () => {
-    const saved = localStorage.getItem("links-dark-mode");
-    dark_mode = saved === "true";
+    // Load settings from SQLite via API
+    const darkVal = await api.getSetting("dark-mode");
+    dark_mode = darkVal === "true";
     is_macos = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
     load_data();
 
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const { getCurrentWindow, LogicalSize } = await import("@tauri-apps/api/window");
     const mainWindow = getCurrentWindow();
+
+    const savedSize = await api.getSetting("window-size");
+    if (savedSize) {
+      try {
+        const { width, height } = JSON.parse(savedSize);
+        await mainWindow.setSize(new LogicalSize(width, height));
+      } catch (e) {}
+    }
+
+    let resize_timer;
+    window.addEventListener("resize", () => {
+      clearTimeout(resize_timer);
+      resize_timer = setTimeout(async () => {
+        await api.setSetting("window-size", JSON.stringify({
+          width: window.innerWidth,
+          height: window.innerHeight
+        }));
+      }, 500);
+    });
+
     await mainWindow.onCloseRequested(async (event) => {
       event.preventDefault();
-      const behavior = localStorage.getItem("links-close-behavior");
+      const behavior = (await api.getSetting("close-behavior")) || "ask";
       if (behavior === "exit") {
         await mainWindow.destroy();
       } else if (behavior === "tray") {
@@ -163,21 +186,21 @@
 
   async function close_to_tray() {
     show_close_dialog = false;
-    localStorage.setItem("links-close-behavior", "tray");
+    await api.setSetting("close-behavior", "tray");
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     await getCurrentWindow().hide();
   }
 
   async function close_exit() {
     show_close_dialog = false;
-    localStorage.setItem("links-close-behavior", "exit");
+    await api.setSetting("close-behavior", "exit");
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     await getCurrentWindow().destroy();
   }
 
-  function toggle_dark() {
+  async function toggle_dark() {
     dark_mode = !dark_mode;
-    localStorage.setItem("links-dark-mode", String(dark_mode));
+    await api.setSetting("dark-mode", String(dark_mode));
   }
 
   let filtered_links = $derived(links.items);
@@ -235,6 +258,7 @@
       ontoggle_dark={toggle_dark}
       onexport={() => show_export = true}
       onimport={on_import_bookmarks}
+      onsettings={() => show_settings = true}
       {importing}
     />
 
@@ -282,11 +306,15 @@
     <ExportDialog onclose={() => show_export = false} />
   {/if}
 
+  {#if show_settings}
+    <SettingsDialog onclose={() => show_settings = false} />
+  {/if}
+
   {#if show_close_dialog}
     <div class="close-overlay" onclick={() => show_close_dialog = false}>
       <div class="close-dialog" onclick={(e) => e.stopPropagation()}>
-        <p class="close-title">关闭窗口</p>
-        <p class="close-desc">你希望关闭时如何处理？</p>
+        <p class="close-title">要走了吗？</p>
+        <p class="close-desc">选择一下你希望的离开方式~</p>
         <div class="close-actions">
           <button class="close-btn tray" onclick={close_to_tray}>最小化到托盘</button>
           <button class="close-btn exit" onclick={close_exit}>退出应用</button>

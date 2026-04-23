@@ -4,9 +4,18 @@
   let { link, highlight = "", category_name = null, onedit, ondelete, ontoggle_favorite } = $props();
   let show_confirm = $state(false);
 
+  let show_full_url = $state(false);
+
   let domain = $derived.by(() => {
     try { return new URL(link.url).hostname.replace('www.', ''); } catch { return ''; }
   });
+
+  let url_matches_search = $derived.by(() => {
+    if (!highlight) return false;
+    try { return link.url.toLowerCase().includes(highlight.toLowerCase()); } catch { return false; }
+  });
+
+  let display_full_url = $derived(show_full_url || url_matches_search);
 
   function esc(s) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -49,22 +58,28 @@
   <div class="card-main">
     <div class="card-content" onclick={card_click}>
       <div class="card-top">
-        <div class="card-title-row">
+        <div class="card-title-row" data-tooltip={link.title || link.url}>
           {#if link.favicon_url}
             <img src={link.favicon_url} alt="" class="favicon" onerror={(e) => e.target.style.display = 'none'} />
           {:else}
             <div class="favicon-ph">🔗</div>
           {/if}
-          <span class="card-title">{@html hl(link.title || link.url)}</span>
+          <div class="card-title">{@html hl(link.title || link.url)}</div>
         </div>
       </div>
 
       <div class="card-meta">
-        <span class="card-domain">{domain}</span>
+        {#if display_full_url}
+          <span class="card-url-full" onmouseout={() => { if (!url_matches_search) show_full_url = false; }}>{@html hl(link.url)}</span>
+        {:else}
+          <span class="card-domain" onmouseover={() => show_full_url = true}>{domain}</span>
+        {/if}
       </div>
 
       {#if link.description}
-        <p class="card-desc">{@html hl(link.description)}</p>
+        <div class="card-desc-wrap" data-tooltip={link.description}>
+          <p class="card-desc">{@html hl(link.description)}</p>
+        </div>
       {/if}
 
       {#if category_name || link.tags.length > 0}
@@ -104,7 +119,7 @@
   {#if show_confirm}
     <div class="confirm-overlay" onclick={() => show_confirm = false}>
       <div class="confirm-box" onclick={(e) => e.stopPropagation()}>
-        <p class="confirm-text">确定要删除这个链接吗？</p>
+        <p class="confirm-text">确定要和这个链接说再见吗？</p>
         <div class="confirm-actions">
           <button class="confirm-btn cancel" onclick={() => show_confirm = false}>取消</button>
           <button class="confirm-btn delete" onclick={confirm_delete}>删除</button>
@@ -152,7 +167,7 @@
     gap: 6px;
     min-width: 0;
     flex: 1;
-    overflow: hidden;
+    position: relative;
   }
 
   .favicon, .favicon-ph {
@@ -177,6 +192,37 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    position: relative;
+  }
+
+  .card-title-row[data-tooltip]:hover::after,
+  .card-desc-wrap[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 0;
+    top: 100%;
+    z-index: 30;
+    max-width: 360px;
+    padding: 6px 10px;
+    background: var(--bg-0);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-1);
+    line-height: 1.5;
+    white-space: normal;
+    word-break: break-all;
+    pointer-events: none;
+  }
+
+  .card-title-row {
+    position: relative;
+  }
+
+  .card-desc-wrap {
+    position: relative;
   }
 
   .card-meta {
@@ -185,9 +231,32 @@
     gap: 6px;
     margin-top: 2px;
     padding-left: 22px;
+    position: relative;
+    min-height: 16px;
   }
 
-  .card-domain { font-size: 11px; color: var(--text-3); }
+  .card-domain { font-size: 11px; color: var(--text-3); cursor: default; }
+
+  .card-url-full {
+    font-size: 11px;
+    color: var(--text-3);
+    word-break: break-all;
+    line-height: 1.4;
+    position: absolute;
+    left: 22px;
+    right: 0;
+    z-index: 10;
+    background: var(--bg-0);
+    padding: 2px 0;
+  }
+
+  :global(.dark) .card-url-full {
+    background: var(--bg-0);
+  }
+
+  .link-card:hover .card-url-full {
+    background: var(--bg-hover);
+  }
 
   .card-desc {
     font-size: 12px;

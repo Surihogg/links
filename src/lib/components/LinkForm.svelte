@@ -32,12 +32,12 @@
         if (!user_edited.title && meta.title) title = meta.title;
         if (!user_edited.description && meta.description) description = meta.description;
       } else {
-        fetch_error = "该站点禁止抓取，请手动填写标题";
+        fetch_error = "这个小站不想被抓取呢，手动填写标题吧~";
       }
       fetched_meta = { favicon_url: meta.favicon_url || "", og_image_url: meta.og_image_url || "" };
       fetched_url = u;
     } catch {
-      fetch_error = "抓取失败，请手动填写标题";
+      fetch_error = "抓取失败了，手动填一下标题吧~";
     }
     fetching = false;
     pending_fetch = null;
@@ -77,6 +77,14 @@
     saving ? "保存中..." : "保存"
   );
   let btn_disabled = $derived(saving);
+  let disabled = $derived(!!link);
+
+  async function refresh_meta() {
+    const u = url.trim();
+    if (!u) return;
+    user_edited = { title: false, description: false };
+    await do_fetch(u);
+  }
 </script>
 
 <div class="modal-overlay" onclick={on_overlay_click}>
@@ -94,10 +102,13 @@
       <div class="field">
         <label class="field-label">URL <span class="required">*</span></label>
         <div class="url-input-wrap">
-          <input type="url" bind:value={url} oninput={on_url_input} required placeholder="https://..." class="field-input" />
-          {#if fetching}
-            <span class="fetch-hint">抓取中...</span>
-          {:else if fetch_error}
+          <input type="url" bind:value={url} oninput={on_url_input} required placeholder="https://..." class="field-input" {disabled} />
+          <button type="button" class="refresh-btn" onclick={refresh_meta} disabled={fetching || !url.trim()} title="重新抓取元数据">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class={fetching ? 'spin-anim' : ''}>
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
+            </svg>
+          </button>
+          {#if fetch_error}
             <span class="fetch-error">{fetch_error}</span>
           {/if}
         </div>
@@ -105,17 +116,17 @@
 
       <div class="field">
         <label class="field-label">标题</label>
-        <input type="text" bind:value={title} oninput={mark_edited("title")} placeholder="自动抓取" class="field-input" />
+        <input type="text" bind:value={title} oninput={mark_edited("title")} placeholder="会自动帮你抓取哦" class="field-input" />
       </div>
 
       <div class="field">
         <label class="field-label">描述</label>
-        <textarea bind:value={description} oninput={mark_edited("description")} rows="2" placeholder="自动抓取" class="field-input field-textarea"></textarea>
+        <textarea bind:value={description} oninput={mark_edited("description")} rows="2" placeholder="会自动帮你抓取哦" class="field-input field-textarea"></textarea>
       </div>
 
       <div class="field">
         <label class="field-label">备注</label>
-        <textarea bind:value={notes} rows="2" placeholder="个人备注..." class="field-input field-textarea"></textarea>
+        <textarea bind:value={notes} rows="2" placeholder="添加你的想法吧~" class="field-input field-textarea"></textarea>
       </div>
 
       <div class="field">
@@ -282,6 +293,44 @@
     font-size: 11px;
     color: var(--text-3);
     pointer-events: none;
+  }
+
+  .refresh-btn {
+    position: absolute;
+    right: 10px;
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: var(--bg-2);
+    color: var(--text-2);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+  }
+
+  .refresh-btn:hover:not(:disabled) {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .refresh-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .spin-anim {
+    animation: spin 0.6s linear infinite;
+  }
+
+  .url-input-wrap .field-input {
+    padding-right: 42px;
+  }
+
+  .fetch-error {
+    right: 42px;
   }
 
   .field-textarea {

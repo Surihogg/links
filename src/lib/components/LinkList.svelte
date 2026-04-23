@@ -34,8 +34,8 @@
           <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
         </svg>
       </div>
-      <p class="empty-text">暂无链接</p>
-      <p class="empty-hint">点击右下角按钮添加第一个链接</p>
+      <p class="empty-text">还没有收藏过链接呢</p>
+      <p class="empty-hint">点击右下角的 + 开始收集吧 ✨</p>
     </div>
   {:else}
     {#each links as link (link.id)}

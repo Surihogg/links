@@ -71,3 +71,12 @@ export async function fetchMeta(url) {
 export async function importBookmarks() {
   return invoke("import_bookmarks");
 }
+
+// Settings: migrate from localStorage to SQLite-backed settings table
+export async function getSetting(key) {
+  return invoke("get_setting", { key });
+}
+
+export async function setSetting(key, value) {
+  return invoke("set_setting", { key, value });
+}

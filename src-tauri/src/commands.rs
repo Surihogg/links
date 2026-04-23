@@ -197,3 +197,13 @@ pub fn import_bookmarks(db: State<'_, Db>) -> Result<u32, AppError> {
 
     Ok(count)
 }
+
+#[tauri::command]
+pub fn get_setting(db: State<'_, Db>, key: String) -> Result<Option<String>, AppError> {
+    db.get_setting(&key)
+}
+
+#[tauri::command]
+pub fn set_setting(db: State<'_, Db>, key: String, value: String) -> Result<(), AppError> {
+    db.set_setting(&key, &value)
+}
