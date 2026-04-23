@@ -1,5 +1,5 @@
 <script>
-  let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, ontag_delete, oncreate_tag, dark = false, ontoggle_dark, onexport, onimport } = $props();
+  let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, ontag_delete, oncreate_tag, dark = false, ontoggle_dark, onexport, onimport, importing = false } = $props();
   let expanded = $state(new Set());
   let show_new = $state(false);
   let new_name = $state("");
@@ -264,10 +264,14 @@
       </svg>
     </button>
 
-    <button class="footer-btn" onclick={onimport} title="导入书签">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-      </svg>
+    <button class="footer-btn" onclick={onimport} title="导入书签" disabled={importing}>
+      {#if importing}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spin"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+      {:else}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+        </svg>
+      {/if}
     </button>
   </div>
 </aside>
@@ -401,19 +405,21 @@
   .cat-item {
     font-size: 13px;
     position: relative;
-    background: var(--cat-soft);
   }
 
   .cat-item:hover {
-    background: #bbf7d0;
+    background: var(--bg-2);
   }
 
   .cat-item.active {
-    background: #bbf7d0;
+    background: var(--cat-soft);
     font-weight: 500;
   }
 
-  :global(.dark) .cat-item:hover,
+  :global(.dark) .cat-item:hover {
+    background: var(--bg-2);
+  }
+
   :global(.dark) .cat-item.active {
     background: #166534;
   }
@@ -421,19 +427,21 @@
   .tag-item {
     font-size: 12px;
     position: relative;
-    background: var(--accent-soft);
   }
 
   .tag-item:hover {
-    background: #bfdbfe;
+    background: var(--bg-2);
   }
 
   .tag-item.active {
-    background: #bfdbfe;
+    background: var(--accent-soft);
     font-weight: 500;
   }
 
-  :global(.dark) .tag-item:hover,
+  :global(.dark) .tag-item:hover {
+    background: var(--bg-2);
+  }
+
   :global(.dark) .tag-item.active {
     background: #1e3a8a;
   }
@@ -607,5 +615,18 @@
   .footer-btn:hover {
     background: var(--bg-2);
     color: var(--text-1);
+  }
+
+  .footer-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .spin {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 </style>

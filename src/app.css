@@ -103,6 +103,7 @@ body {
 html, body {
   height: 100%;
   background-color: var(--bg-0);
+  overscroll-behavior: none;
 }
 
 .dark, .dark body, .dark html {
