@@ -67,3 +67,7 @@ export async function saveFile(content, filename) {
 export async function fetchMeta(url) {
   return invoke("fetch_metadata", { url });
 }
+
+export async function importBookmarks() {
+  return invoke("import_bookmarks");
+}

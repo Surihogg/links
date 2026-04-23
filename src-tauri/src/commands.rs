@@ -147,3 +147,53 @@ pub fn save_file(content: String, filename: String) -> Result<(), AppError> {
 pub fn export_links(db: State<'_, Db>, params: ExportParams) -> Result<String, AppError> {
     db.export_links(&params)
 }
+
+#[tauri::command]
+pub fn import_bookmarks(db: State<'_, Db>) -> Result<u32, AppError> {
+    let Some(path) = rfd::FileDialog::new()
+        .add_filter("书签文件", &["html", "htm"])
+        .set_title("导入浏览器书签")
+        .pick_file()
+    else {
+        return Ok(0);
+    };
+
+    let html = std::fs::read_to_string(&path)?;
+    let doc = scraper::Html::parse_document(&html);
+
+    let conn = db.0.lock().unwrap();
+    let mut count: u32 = 0;
+
+    for node in doc.select(&scraper::Selector::parse("a").unwrap()) {
+        let Some(href) = node.value().attr("href") else { continue };
+        if href.is_empty() || !href.starts_with("http") {
+            continue;
+        }
+
+        let title = node.text().collect::<String>().trim().to_string();
+        let favicon = node.value().attr("icon").unwrap_or("").to_string();
+
+        if conn.query_row(
+            "SELECT COUNT(*) FROM links WHERE url = ?",
+            rusqlite::params![href],
+            |r| r.get::<_, i64>(0),
+        ).unwrap_or(0) > 0 {
+            continue;
+        }
+
+        conn.execute(
+            "INSERT INTO links (url, title, favicon_url) VALUES (?, ?, ?)",
+            rusqlite::params![href, title, favicon],
+        )?;
+        let id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO links_fts (rowid, title, description, notes, url) VALUES (?, '', '', '', ?)",
+            rusqlite::params![id, href],
+        ).ok();
+
+        count += 1;
+    }
+
+    Ok(count)
+}
