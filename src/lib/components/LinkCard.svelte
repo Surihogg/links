@@ -266,20 +266,6 @@
     color: var(--text-3);
     word-break: break-all;
     line-height: 1.4;
-    position: absolute;
-    left: 22px;
-    right: 0;
-    z-index: 10;
-    background: var(--bg-0);
-    padding: 2px 0;
-  }
-
-  :global(.dark) .card-url-full {
-    background: var(--bg-0);
-  }
-
-  .link-card:hover .card-url-full {
-    background: var(--bg-hover);
   }
 
   .card-desc {
