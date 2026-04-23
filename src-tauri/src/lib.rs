@@ -9,7 +9,8 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use std::str::FromStr;
 
 fn static_data_dir() -> PathBuf {
     dirs::data_dir()
@@ -37,6 +38,8 @@ pub fn run() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, _event, _shortcut| {
                     if let Some(window) = app.get_webview_window("quick-add") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
                         let _ = window.set_focus();
                     } else {
                         let _ = tauri::WebviewWindowBuilder::new(
@@ -65,6 +68,7 @@ pub fn run() {
                     }
                 }
             }
+            let shortcut_str = cfg.get("global-shortcut").unwrap_or_else(|| commands::DEFAULT_SHORTCUT.to_string());
             app.manage(cfg);
 
             let show_i = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
@@ -106,7 +110,7 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            let shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyL);
+            let shortcut = Shortcut::from_str(&shortcut_str).expect("failed to parse shortcut");
             app.global_shortcut().register(shortcut)?;
             Ok(())
         })
@@ -131,6 +135,8 @@ pub fn run() {
             commands::import_bookmarks,
             commands::get_setting,
             commands::set_setting,
+            commands::get_shortcut,
+            commands::set_shortcut,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

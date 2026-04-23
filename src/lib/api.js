@@ -80,3 +80,11 @@ export async function getSetting(key) {
 export async function setSetting(key, value) {
   return invoke("set_setting", { key, value });
 }
+
+export async function getShortcut() {
+  return invoke("get_shortcut");
+}
+
+export async function setShortcut(shortcut) {
+  return invoke("set_shortcut", { shortcut });
+}

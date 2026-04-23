@@ -6,6 +6,7 @@ use crate::db::{
 use rusqlite::params;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager, State};
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 fn get_db_path(app: &AppHandle) -> PathBuf {
     let dir = app
@@ -210,4 +211,29 @@ pub fn set_setting(app: AppHandle, config: State<'_, Config>, key: String, value
     let dir = app.path().app_data_dir().expect("failed to resolve app data dir");
     config.save(&dir)?;
     Ok(())
+}
+
+pub const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+L";
+
+#[tauri::command]
+pub fn get_shortcut(config: State<'_, Config>) -> Result<String, AppError> {
+    Ok(config.get("global-shortcut").unwrap_or_else(|| DEFAULT_SHORTCUT.to_string()))
+}
+
+#[tauri::command]
+pub fn set_shortcut(app: AppHandle, config: State<'_, Config>, shortcut: String) -> Result<String, AppError> {
+    let parsed: tauri_plugin_global_shortcut::Shortcut = shortcut.parse()
+        .map_err(|e: <tauri_plugin_global_shortcut::Shortcut as std::str::FromStr>::Err| AppError::General(e.to_string()))?;
+
+    let old = config.get("global-shortcut").unwrap_or_else(|| DEFAULT_SHORTCUT.to_string());
+    let _ = app.global_shortcut().unregister(old.as_str());
+
+    app.global_shortcut().register(parsed)
+        .map_err(|e| AppError::General(e.to_string()))?;
+
+    config.set("global-shortcut", &shortcut)?;
+    let dir = app.path().app_data_dir().expect("failed to resolve app data dir");
+    config.save(&dir)?;
+
+    Ok(parsed.to_string())
 }

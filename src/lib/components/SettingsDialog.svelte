@@ -5,9 +5,82 @@
   let close_behavior = $state(null);
   let loaded = $state(false);
 
+  let shortcut_raw = $state(null);
+  let shortcut_loaded = $state(false);
+  let recording = $state(false);
+  let recorded_shortcut = $state(null);
+  let shortcut_error = $state(false);
+
+  const isMac = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
+
+  function formatShortcut(raw) {
+    if (!raw) return "";
+    const parts = raw.split("+");
+    const map = isMac
+      ? { super: "\u2318", cmdorctrl: "\u2318", control: "\u2325", alt: "\u2325", shift: "\u21E7" }
+      : { super: "Win", cmdorctrl: "Ctrl", control: "Ctrl", alt: "Alt", shift: "Shift" };
+    const separator = isMac ? " " : "+";
+    return parts.map((p) => {
+      const lower = p.toLowerCase();
+      return map[lower] ?? p.toUpperCase();
+    }).join(separator);
+  }
+
+  function buildShortcutFromEvent(e) {
+    const modifiers = [];
+    if (e.metaKey || e.ctrlKey) modifiers.push("CmdOrCtrl");
+    if (e.shiftKey) modifiers.push("Shift");
+    if (e.altKey) modifiers.push("Alt");
+    const ignore = ["Meta", "Control", "Shift", "Alt"];
+    if (ignore.includes(e.key)) return null;
+    if (modifiers.length === 0) return null;
+    const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+    return [...modifiers, key].join("+");
+  }
+
+  function on_record_keydown(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const result = buildShortcutFromEvent(e);
+    if (result) recorded_shortcut = result;
+  }
+
+  function start_recording() {
+    recorded_shortcut = null;
+    shortcut_error = false;
+    recording = true;
+  }
+
+  function cancel_recording() {
+    recorded_shortcut = null;
+    recording = false;
+    shortcut_error = false;
+  }
+
+  async function save_shortcut() {
+    if (!recorded_shortcut) return;
+    shortcut_error = false;
+    try {
+      const result = await api.setShortcut(recorded_shortcut);
+      shortcut_raw = result;
+      recording = false;
+      recorded_shortcut = null;
+    } catch {
+      shortcut_error = true;
+      recorded_shortcut = null;
+    }
+  }
+
   onMount(async () => {
     const val = await api.getSetting("close-behavior");
     close_behavior = val || "ask";
+
+    try {
+      shortcut_raw = await api.getShortcut();
+    } catch {
+      shortcut_raw = null;
+    }
+    shortcut_loaded = true;
     loaded = true;
   });
 
@@ -27,6 +100,7 @@
   }
 </script>
 
+<svelte:window onkeydown={handle_keydown} />
 <div class="modal-overlay" onclick={on_overlay_click}>
   <div class="modal">
     <div class="modal-header">
@@ -64,6 +138,73 @@
               {/if}
             </button>
           {/each}
+        </div>
+      {:else}
+        <div class="format-loading">加载中...</div>
+      {/if}
+
+      <div class="section-label" style="margin-top:16px">快捷键</div>
+      {#if loaded}
+        <div class="shortcut-card">
+          {#if recording}
+            <div class="shortcut-info">
+              {#if recorded_shortcut}
+                <span class="shortcut-keys">{formatShortcut(recorded_shortcut)}</span>
+              {:else}
+                <span class="shortcut-hint">按下新的快捷键组合...</span>
+              {/if}
+              {#if shortcut_error}
+                <span class="shortcut-error">{shortcut_error}</span>
+              {/if}
+            </div>
+            <div class="shortcut-actions">
+              {#if recorded_shortcut}
+                <button class="btn btn-primary btn-sm" onclick={save_shortcut}>保存</button>
+              {/if}
+              <button class="btn btn-secondary btn-sm" onclick={cancel_recording}>取消</button>
+            </div>
+          {:else}
+            <div class="shortcut-info">
+              <span class="shortcut-keys">{formatShortcut(current_shortcut)}</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick={start_recording}>修改</button>
+          {/if}
+        </div>
+      {:else}
+        <div class="format-loading">加载中...</div>
+      {/if}
+
+      <div class="section-label" style="margin-top: 20px;">快捷键</div>
+      {#if shortcut_loaded}
+        <div class="shortcut-section">
+          <div class="shortcut-row">
+            <div class="shortcut-info">
+              <span class="format-name">全局快捷键</span>
+              <span class="format-desc">用于唤起快速添加窗口</span>
+            </div>
+            {#if !recording}
+              <div class="shortcut-display">{formatShortcut(shortcut_raw) || "未设置"}</div>
+              <button class="btn btn-secondary btn-sm" onclick={start_recording}>修改</button>
+            {:else}
+              <div class="shortcut-display recording-area">
+                {#if recorded_shortcut}
+                  {formatShortcut(recorded_shortcut)}
+                {:else}
+                  请按下新的快捷键...
+                {/if}
+              </div>
+              {#if shortcut_error}
+                <span class="shortcut-error">快捷键设置失败，请重试</span>
+              {/if}
+              <div class="shortcut-actions">
+                <button class="btn btn-secondary btn-sm" onclick={cancel_recording}>取消</button>
+                <button class="btn btn-primary btn-sm" disabled={!recorded_shortcut} onclick={save_shortcut}>保存</button>
+              </div>
+            {/if}
+          </div>
+          {#if recording}
+            <svelte:window onkeydown={on_record_keydown} />
+          {/if}
         </div>
       {:else}
         <div class="format-loading">加载中...</div>
@@ -269,5 +410,69 @@
     color: var(--text-3);
     padding: 16px 0;
     text-align: center;
+  }
+
+  .shortcut-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .shortcut-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    background: var(--bg-1);
+    flex-wrap: wrap;
+  }
+
+  .shortcut-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .shortcut-display {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-1);
+    padding: 4px 10px;
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-sm);
+    background: var(--bg-2);
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+    font-family: var(--font);
+  }
+
+  .shortcut-display.recording-area {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    min-width: 140px;
+    text-align: center;
+  }
+
+  .shortcut-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .shortcut-error {
+    font-size: 11px;
+    color: var(--danger);
+    width: 100%;
+  }
+
+  .btn-sm {
+    padding: 4px 12px;
+    font-size: 12px;
   }
 </style>
