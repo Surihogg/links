@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::db::{
     AppError, CreateCategoryPayload, CreateLinkPayload, Db, ExportParams, ListLinksParams,
     PaginatedResult, SearchParams, UpdateCategoryPayload, UpdateLinkPayload,
@@ -199,11 +200,14 @@ pub fn import_bookmarks(db: State<'_, Db>) -> Result<u32, AppError> {
 }
 
 #[tauri::command]
-pub fn get_setting(db: State<'_, Db>, key: String) -> Result<Option<String>, AppError> {
-    db.get_setting(&key)
+pub fn get_setting(config: State<'_, Config>, key: String) -> Result<Option<String>, AppError> {
+    Ok(config.get(&key))
 }
 
 #[tauri::command]
-pub fn set_setting(db: State<'_, Db>, key: String, value: String) -> Result<(), AppError> {
-    db.set_setting(&key, &value)
+pub fn set_setting(app: AppHandle, config: State<'_, Config>, key: String, value: String) -> Result<(), AppError> {
+    config.set(&key, &value)?;
+    let dir = app.path().app_data_dir().expect("failed to resolve app data dir");
+    config.save(&dir)?;
+    Ok(())
 }

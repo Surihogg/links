@@ -39,14 +39,15 @@ src/
 ## 关键模式
 
 - **数据流**：组件 → store 方法（`stores/index.js`）→ `api.js` → `invoke("cmd", { params })` → Rust 命令。
-- **数据位置**（跨平台）：
-  - macOS: `~/Library/Application Support/com.links.desktop/links.db`
-  - Windows: `%APPDATA%\com.links.desktop\links.db`
-  - Linux: `~/.local/share/com.links.desktop/links.db`
-- **日志位置**（`tauri-plugin-log` 配置了 `LogDir` + `Stdout` + `Webview`）：
-  - Windows: `%LOCALAPPDATA%\com.links.desktop\logs\`（注意是 LocalAppData，不是 Roaming）
-  - macOS: `~/Library/Logs/com.links.desktop/`
-  - Linux: `~/.local/share/com.links.desktop/logs/`
+- **数据位置**（跨平台，DB + 配置 + 日志同一目录）：
+  - macOS: `~/Library/Application Support/com.links.desktop/`
+  - Windows: `%APPDATA%\com.links.desktop\`
+  - Linux: `~/.local/share/com.links.desktop/`
+  - `links.db` — SQLite 数据库
+  - `config.json` — 配置文件（窗口大小、暗色模式、关闭行为等）
+  - `links.log` — 日志文件（通过 `TargetKind::Folder` 写入数据目录）
+- **日志 target**（`Folder` + `Stdout` + `Webview`）：
+  - `Folder` target 写入与 DB 同目录的日志文件
   - Webview target 会把 Rust 日志同步到 DevTools Console
 - **全局快捷键**：`Cmd+Shift+L`（macOS）/ `Ctrl+Shift+L`（Windows）唤起快速添加。Rust 代码注册，**不是** `tauri.conf.json`。Handler 动态创建 `quick-add` WebviewWindow。
 - **深色模式**：CSS 变量 + `.dark` class 切换，持久化在 localStorage（key：`links-dark-mode`）。**所有模态框必须在 `.dark` div 内部**，否则暗色变量不生效。

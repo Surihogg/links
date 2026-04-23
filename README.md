@@ -145,13 +145,19 @@ npm run tauri build
 
 ## 数据存储
 
+所有数据（数据库、配置、日志）存放在同一目录：
+
 | 平台 | 路径 |
 |---|---|
-| macOS | `~/Library/Application Support/com.links.desktop/links.db` |
-| Windows | `%APPDATA%\com.links.desktop\links.db` |
-| Linux | `~/.local/share/com.links.desktop/links.db` |
+| macOS | `~/Library/Application Support/com.links.desktop/` |
+| Windows | `%APPDATA%\com.links.desktop\` |
+| Linux | `~/.local/share/com.links.desktop/` |
 
-WAL 模式，删除后重启自动重建。
+| 文件 | 说明 |
+|---|---|
+| `links.db` | SQLite 数据库（WAL 模式，删除后重启自动重建） |
+| `config.json` | 配置文件（窗口大小、暗色模式、关闭行为等） |
+| `links.log` | 日志文件 |
 
 ## 调试
 
@@ -170,11 +176,7 @@ await invoke("categories_list");
 
 ### Rust 日志
 
-| 平台 | 位置 |
-|---|---|
-| macOS | `~/Library/Logs/com.links.desktop/` |
-| Windows | `%APPDATA%\com.links.desktop\logs\` |
-| Linux | `~/.local/share/com.links.desktop/logs/` |
+日志文件位于数据存储目录（见上方），文件名为 `links.log`。
 
 ### 常见问题
 

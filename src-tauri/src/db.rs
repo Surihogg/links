@@ -74,32 +74,7 @@ impl Db {
                 INSERT INTO links_fts(rowid, title, description, notes, url)
                 VALUES (new.id, new.title, new.description, new.notes, new.url);
             END;
-            
-            CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );
             ",
-        )?;
-        Ok(())
-    }
-
-    // Settings helpers: get / set a simple key/value pair
-    pub fn get_setting(&self, key: &str) -> Result<Option<String>, AppError> {
-        let conn = self.0.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?")?;
-        let result = stmt
-            .query_row(rusqlite::params![key], |row| row.get::<_, String>(0))
-            .ok();
-        drop(stmt);
-        Ok(result)
-    }
-
-    pub fn set_setting(&self, key: &str, value: &str) -> Result<(), AppError> {
-        let conn = self.0.lock().unwrap();
-        conn.execute(
-            "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            rusqlite::params![key, value],
         )?;
         Ok(())
     }
