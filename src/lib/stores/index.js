@@ -8,6 +8,7 @@ function createLinksStore() {
     page: 1,
     per_page: 30,
     loading: false,
+    has_more: false,
   });
 
   return {
@@ -15,7 +16,11 @@ function createLinksStore() {
     async load(params = {}) {
       update((s) => ({ ...s, loading: true }));
       const result = await api.listLinks(params);
-      set({ ...result, loading: false });
+      set({
+        ...result,
+        loading: false,
+        has_more: result.items.length < result.total,
+      });
     },
     async loadMore(params = {}) {
       update((s) => ({ ...s, loading: true }));
@@ -24,6 +29,7 @@ function createLinksStore() {
         ...result,
         items: [...s.items, ...result.items],
         loading: false,
+        has_more: s.items.length + result.items.length < result.total,
       }));
     },
     async create(payload) {
@@ -51,11 +57,24 @@ function createLinksStore() {
         total: s.total - 1,
       }));
     },
-    async search(query) {
+    async search(params = {}, append = false) {
       update((s) => ({ ...s, loading: true }));
       try {
-        const items = await api.searchLinks(query);
-        update((s) => ({ ...s, items, total: items.length, loading: false }));
+        const result = await api.searchLinks(params);
+        if (append) {
+          update((s) => ({
+            ...result,
+            items: [...s.items, ...result.items],
+            loading: false,
+            has_more: s.items.length + result.items.length < result.total,
+          }));
+        } else {
+          set({
+            ...result,
+            loading: false,
+            has_more: result.items.length < result.total,
+          });
+        }
       } catch {
         update((s) => ({ ...s, loading: false }));
       }

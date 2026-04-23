@@ -160,6 +160,16 @@ pub struct ListLinksParams {
     pub favorite_only: Option<bool>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct SearchParams {
+    pub query: String,
+    pub page: Option<u32>,
+    pub per_page: Option<u32>,
+    pub category_id: Option<Option<i64>>,
+    pub tag: Option<String>,
+    pub favorite_only: Option<bool>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct PaginatedResult<T: Serialize> {
     pub items: Vec<T>,
@@ -421,43 +431,131 @@ impl Db {
         Ok(PaginatedResult { items, total, page, per_page })
     }
 
-    pub fn search_links(&self, query: &str) -> Result<Vec<Link>, AppError> {
+    pub fn search_links(&self, params: &SearchParams) -> Result<PaginatedResult<Link>, AppError> {
         let conn = self.0.lock().unwrap();
-        let like_pattern = format!("%{}%", query.replace('%', "\\%").replace('_', "\\_"));
+        let query = &params.query;
+        let page = params.page.unwrap_or(1).max(1);
+        let per_page = params.per_page.unwrap_or(30).min(100);
+        let offset = (page - 1) * per_page;
 
+        let like_pattern = format!("%{}%", query.replace('%', "\\%").replace('_', "\\_"));
         let fts_query = format!("{}*", query.replace('"', "\"\""));
+
         let fts_sql = format!("SELECT {} FROM links l JOIN links_fts fts ON fts.rowid = l.id WHERE links_fts MATCH ?", LINK_COLUMNS);
         let tag_sql = format!("SELECT DISTINCT {} FROM links l JOIN link_tags lt ON lt.link_id = l.id JOIN tags t ON t.id = lt.tag_id WHERE t.name LIKE ?", LINK_COLUMNS);
-        let like_sql = format!("SELECT {} FROM links l WHERE l.title LIKE ? OR l.description LIKE ? OR l.notes LIKE ?", LINK_COLUMNS);
+        let like_sql = format!("SELECT {} FROM links l WHERE l.title LIKE ? OR l.description LIKE ? OR l.notes LIKE ? OR l.url LIKE ?", LINK_COLUMNS);
 
-        let items: Vec<Link> = {
-            let full_sql = format!("{} UNION {} UNION {} ORDER BY updated_at DESC LIMIT 50", fts_sql, tag_sql, like_sql);
-            let fallback_sql = format!("{} UNION {} ORDER BY updated_at DESC LIMIT 50", tag_sql, like_sql);
-            let mut stmt = conn.prepare(&full_sql)?;
-            let res: Result<Vec<Link>, _> = stmt.query_map(
-                rusqlite::params![fts_query, like_pattern, like_pattern, like_pattern, like_pattern],
+        let base_union = format!("{} UNION {} UNION {}", fts_sql, tag_sql, like_sql);
+
+        let mut filter_parts: Vec<String> = Vec::new();
+        if let Some(Some(cid)) = params.category_id {
+            filter_parts.push("category_id = ?".into());
+        }
+        if let Some(ref tag) = params.tag {
+            filter_parts.push("EXISTS (SELECT 1 FROM link_tags lt2 JOIN tags t2 ON t2.id = lt2.tag_id WHERE lt2.link_id = sub.id AND t2.name = ?)".into());
+        }
+        if params.favorite_only.unwrap_or(false) {
+            filter_parts.push("is_favorite = 1".into());
+        }
+
+        let (union_sql, count_sql) = if filter_parts.is_empty() {
+            (format!("{} ORDER BY updated_at DESC", base_union), format!("SELECT COUNT(*) FROM ({})", base_union))
+        } else {
+            let w = filter_parts.join(" AND ");
+            (format!("SELECT * FROM ({}) AS sub WHERE {} ORDER BY updated_at DESC", base_union, w),
+             format!("SELECT COUNT(*) FROM ({}) AS sub WHERE {}", base_union, w))
+        };
+
+        let build_search_params = |search_q: &str, like_p: &str| -> Vec<Box<dyn rusqlite::types::ToSql>> {
+            let mut p: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
+                Box::new(search_q.to_string()),
+                Box::new(like_p.to_string()),
+                Box::new(like_p.to_string()),
+                Box::new(like_p.to_string()),
+                Box::new(like_p.to_string()),
+                Box::new(like_p.to_string()),
+            ];
+            if let Some(Some(cid)) = params.category_id { p.push(Box::new(cid)); }
+            if let Some(ref tag) = params.tag { p.push(Box::new(tag.clone())); }
+            p
+        };
+
+        let build_like_params = |like_p: &str| -> Vec<Box<dyn rusqlite::types::ToSql>> {
+            let mut p: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
+                Box::new(like_p.to_string()),
+                Box::new(like_p.to_string()),
+                Box::new(like_p.to_string()),
+                Box::new(like_p.to_string()),
+                Box::new(like_p.to_string()),
+            ];
+            if let Some(Some(cid)) = params.category_id { p.push(Box::new(cid)); }
+            if let Some(ref tag) = params.tag { p.push(Box::new(tag.clone())); }
+            p
+        };
+
+        let full_query = format!("{} LIMIT ? OFFSET ?", union_sql);
+        let query_p = build_search_params(&fts_query, &like_pattern);
+        let count_p = build_search_params(&fts_query, &like_pattern);
+
+        let mut all_p: Vec<Box<dyn rusqlite::types::ToSql>> = query_p;
+        all_p.push(Box::new(per_page));
+        all_p.push(Box::new(offset));
+
+        let res: Result<Vec<Link>, _> = {
+            let mut stmt = conn.prepare(&full_query)?;
+            let r = stmt.query_map(
+                rusqlite::params_from_iter(all_p.iter().map(|v| v.as_ref())),
                 row_to_link,
             )?.collect();
             drop(stmt);
-            match res {
-                Ok(v) => Ok(v),
-                Err(_) => {
-                    let mut fb = conn.prepare(&fallback_sql)?;
-                    let res: Result<Vec<Link>, _> = fb.query_map(
-                        rusqlite::params![like_pattern, like_pattern, like_pattern],
-                        row_to_link,
-                    )?.collect();
-                    drop(fb);
-                    res
-                }
-            }?
+            r
         };
 
-        let mut items = items;
-        for link in &mut items {
-            link.tags = load_tags_for_link(&conn, link.id);
+        match res {
+            Ok(items) => {
+                let total: u32 = conn.query_row(
+                    &count_sql,
+                    rusqlite::params_from_iter(count_p.iter().map(|v| v.as_ref())),
+                    |r| r.get(0),
+                ).unwrap_or(items.len() as u32);
+
+                let mut items = items;
+                for link in &mut items { link.tags = load_tags_for_link(&conn, link.id); }
+                Ok(PaginatedResult { items, total, page, per_page })
+            }
+            Err(_) => {
+                let fallback_union = format!("{} UNION {} ORDER BY updated_at DESC", tag_sql, like_sql);
+                let (fb_query, fb_count) = if filter_parts.is_empty() {
+                    (format!("{} LIMIT ? OFFSET ?", fallback_union), format!("SELECT COUNT(*) FROM ({})", fallback_union))
+                } else {
+                    let w = filter_parts.join(" AND ");
+                    (format!("SELECT * FROM ({}) AS sub WHERE {} ORDER BY updated_at DESC LIMIT ? OFFSET ?", fallback_union, w),
+                     format!("SELECT COUNT(*) FROM ({}) AS sub WHERE {}", fallback_union, w))
+                };
+
+                let mut fb_p = build_like_params(&like_pattern);
+                let fb_count_p = build_like_params(&like_pattern);
+                fb_p.push(Box::new(per_page));
+                fb_p.push(Box::new(offset));
+
+                let mut fb_stmt = conn.prepare(&fb_query)?;
+                let items: Vec<Link> = fb_stmt.query_map(
+                    rusqlite::params_from_iter(fb_p.iter().map(|v| v.as_ref())),
+                    row_to_link,
+                )?.collect::<Result<Vec<_>, _>>()?;
+                drop(fb_stmt);
+
+                let total: u32 = conn.query_row(
+                    &fb_count,
+                    rusqlite::params_from_iter(fb_count_p.iter().map(|v| v.as_ref())),
+                    |r| r.get(0),
+                ).unwrap_or(items.len() as u32);
+
+                let mut items = items;
+                for link in &mut items { link.tags = load_tags_for_link(&conn, link.id); }
+                Ok(PaginatedResult { items, total, page, per_page })
+            }
         }
-        Ok(items)
     }
 
     pub fn list_categories(&self) -> Result<Vec<Category>, AppError> {
@@ -1010,9 +1108,9 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Rust Programming Language", "A systems language", vec![])).unwrap();
 
-        let results = db.search_links("Rust").unwrap();
-        assert!(!results.is_empty());
-        assert!(results[0].title.contains("Rust"));
+        let results = db.search_links(&SearchParams { query: "Rust".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None }).unwrap();
+        assert!(!results.items.is_empty());
+        assert!(results.items[0].title.contains("Rust"));
     }
 
     #[test]
@@ -1020,8 +1118,8 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Rust 编程语言指南", "学习 Rust", vec![])).unwrap();
 
-        let results = db.search_links("编程").unwrap();
-        assert!(!results.is_empty());
+        let results = db.search_links(&SearchParams { query: "编程".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None }).unwrap();
+        assert!(!results.items.is_empty());
     }
 
     #[test]
@@ -1029,8 +1127,8 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Some Title", "desc", vec!["webassembly"])).unwrap();
 
-        let results = db.search_links("webassembly").unwrap();
-        assert!(!results.is_empty());
+        let results = db.search_links(&SearchParams { query: "webassembly".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None }).unwrap();
+        assert!(!results.items.is_empty());
     }
 
     #[test]
@@ -1038,8 +1136,8 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Hello World", "desc", vec![])).unwrap();
 
-        let results = db.search_links("ello").unwrap();
-        assert!(!results.is_empty());
+        let results = db.search_links(&SearchParams { query: "ello".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None }).unwrap();
+        assert!(!results.items.is_empty());
     }
 
     #[test]

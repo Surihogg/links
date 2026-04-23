@@ -1,7 +1,7 @@
 <script>
   import LinkCard from "./LinkCard.svelte";
 
-  let { links = [], categories = [], loading = false, highlight = "", onedit, ondelete, ontoggle_favorite } = $props();
+  let { links = [], categories = [], loading = false, highlight = "", has_more = false, onedit, ondelete, ontoggle_favorite, onloadmore } = $props();
 
   let cat_map = $derived(() => {
     const map = {};
@@ -15,15 +15,18 @@
     return map;
   });
 
+  function on_scroll(e) {
+    const el = e.target;
+    if (!has_more || loading) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) {
+      onloadmore?.();
+    }
+  }
+
 </script>
 
-<div class="link-list">
-  {#if loading}
-    <div class="empty-state">
-      <div class="spinner"></div>
-      <p class="empty-text">加载中...</p>
-    </div>
-  {:else if links.length === 0}
+<div class="link-list" onscroll={on_scroll}>
+  {#if links.length === 0 && !loading}
     <div class="empty-state">
       <div class="empty-icon">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
@@ -38,6 +41,12 @@
     {#each links as link (link.id)}
       <LinkCard {link} {highlight} category_name={link.category_id ? cat_map()[link.category_id] : null} onedit={onedit} ondelete={ondelete} ontoggle_favorite={ontoggle_favorite} />
     {/each}
+    {#if loading}
+      <div class="load-more-state">
+        <div class="spinner"></div>
+        <p class="empty-text">加载中...</p>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -60,6 +69,14 @@
 
   .empty-text { font-size: 14px; color: var(--text-2); font-weight: 500; }
   .empty-hint { font-size: 12px; color: var(--text-3); }
+
+  .load-more-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    gap: 4px;
+  }
 
   .spinner {
     width: 24px;

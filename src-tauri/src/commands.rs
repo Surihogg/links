@@ -1,6 +1,6 @@
 use crate::db::{
     AppError, CreateCategoryPayload, CreateLinkPayload, Db, ExportParams, ListLinksParams,
-    PaginatedResult, UpdateCategoryPayload, UpdateLinkPayload,
+    PaginatedResult, SearchParams, UpdateCategoryPayload, UpdateLinkPayload,
 };
 use rusqlite::params;
 use std::path::PathBuf;
@@ -72,8 +72,8 @@ pub fn links_delete(db: State<'_, Db>, id: i64) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-pub fn links_search(db: State<'_, Db>, query: String) -> Result<Vec<crate::db::Link>, AppError> {
-    db.search_links(&query)
+pub fn links_search(db: State<'_, Db>, params: SearchParams) -> Result<PaginatedResult<crate::db::Link>, AppError> {
+    db.search_links(&params)
 }
 
 #[tauri::command]

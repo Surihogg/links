@@ -16,8 +16,8 @@ export async function deleteLink(id) {
   return invoke("links_delete", { id });
 }
 
-export async function searchLinks(query) {
-  return invoke("links_search", { query });
+export async function searchLinks(params = {}) {
+  return invoke("links_search", { params });
 }
 
 export async function listCategories() {

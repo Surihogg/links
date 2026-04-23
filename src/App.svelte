@@ -66,7 +66,7 @@
 
   async function refresh_current_view() {
     if (search_query.trim()) {
-      await linksStore.search(search_query);
+      await linksStore.search({ query: search_query, per_page: 30, ...build_filter_params() });
     } else {
       await load_links();
     }
@@ -93,7 +93,7 @@
 
   async function on_search(query) {
     if (query.trim()) {
-      await linksStore.search(query);
+      await linksStore.search({ query, per_page: 30, ...build_filter_params() });
     } else {
       await load_links();
     }
@@ -147,10 +147,17 @@
     await tagsStore.create(name);
   }
 
+  let importing = $state(false);
+
   async function on_import_bookmarks() {
-    const count = await api.importBookmarks();
-    if (count > 0) {
-      await load_data();
+    importing = true;
+    try {
+      const count = await api.importBookmarks();
+      if (count > 0) {
+        await load_data();
+      }
+    } finally {
+      importing = false;
     }
   }
 
@@ -174,12 +181,38 @@
   }
 
   let filtered_links = $derived(links.items);
+  let has_more = $derived(links.has_more);
+  let current_page = $derived(links.page);
+  let total_count = $derived(links.total);
   let current_title = $derived(
+    search_query.trim() ? `搜索: ${search_query}` :
     selected_tag ? `标签: ${selected_tag}` :
     selected_category === "favorite" ? "特别关注" :
     selected_category != null ? categories.find(c => c.id === selected_category)?.name ?? "链接" :
     "全部链接"
   );
+
+  function build_filter_params() {
+    const params = {};
+    if (selected_tag) {
+      params.tag = selected_tag;
+    } else if (selected_category === "favorite") {
+      params.favorite_only = true;
+    } else if (selected_category != null) {
+      params.category_id = selected_category;
+    }
+    return params;
+  }
+
+  async function load_more() {
+    if (links.loading || !has_more) return;
+    const next_page = current_page + 1;
+    if (search_query.trim()) {
+      await linksStore.search({ query: search_query, page: next_page, per_page: 30, ...build_filter_params() }, true);
+    } else {
+      await linksStore.loadMore({ page: next_page, per_page: 30, ...build_filter_params() });
+    }
+  }
 </script>
 
 <div class={dark_mode ? "dark" : ""}>
@@ -202,13 +235,14 @@
       ontoggle_dark={toggle_dark}
       onexport={() => show_export = true}
       onimport={on_import_bookmarks}
+      {importing}
     />
 
     <main class="main-content">
       <header class="content-header">
         <div class="header-left">
           <h2 class="header-title">{current_title}</h2>
-          <span class="header-count">{filtered_links.length} 条</span>
+          <span class="header-count">{total_count} 条</span>
         </div>
         <div class="header-right">
           <SearchBar bind:query={search_query} onsearch={on_search} />
@@ -220,6 +254,8 @@
         {categories}
         loading={links.loading}
         highlight={search_query}
+        has_more={has_more}
+        onloadmore={load_more}
         onedit={(link) => edit_link = link}
         ondelete={on_delete_link}
         ontoggle_favorite={on_toggle_favorite}
