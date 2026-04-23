@@ -2,7 +2,11 @@ mod commands;
 mod db;
 mod fetcher;
 
-use tauri::Manager;
+use tauri::{
+    Manager,
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -39,6 +43,46 @@ pub fn run() {
         )
         .setup(|app| {
             commands::init_db(&app.handle().clone())?;
+
+            let show_i = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            let icon = app.default_window_icon().cloned().unwrap();
+            TrayIconBuilder::new()
+                .icon(icon)
+                .menu(&menu)
+                .tooltip("Links")
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "show" => {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.unminimize();
+                            let _ = w.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.unminimize();
+                            let _ = w.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
             let shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyL);
             app.global_shortcut().register(shortcut)?;
             Ok(())
@@ -53,14 +97,15 @@ pub fn run() {
             commands::categories_create,
             commands::categories_update,
             commands::categories_delete,
-  commands::tags_list,
-  commands::tags_create,
-  commands::tags_delete,
-  commands::tags_autocomplete,
+            commands::tags_list,
+            commands::tags_create,
+            commands::tags_delete,
+            commands::tags_autocomplete,
             commands::export_links,
             commands::open_url,
             commands::save_file,
             commands::fetch_metadata,
+            commands::import_bookmarks,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

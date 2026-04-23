@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { linksStore, categoriesStore, tagsStore } from "./lib/stores/index.js";
+  import * as api from "./lib/api.js";
   import SearchBar from "./lib/components/SearchBar.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import LinkList from "./lib/components/LinkList.svelte";
@@ -20,12 +21,27 @@
   let edit_link = $state(null);
   let show_export = $state(false);
   let dark_mode = $state(false);
+  let show_close_dialog = $state(false);
 
-  onMount(() => {
+  onMount(async () => {
     const saved = localStorage.getItem("links-dark-mode");
     dark_mode = saved === "true";
     is_macos = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
     load_data();
+
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const mainWindow = getCurrentWindow();
+    await mainWindow.onCloseRequested(async (event) => {
+      event.preventDefault();
+      const behavior = localStorage.getItem("links-close-behavior");
+      if (behavior === "exit") {
+        await mainWindow.destroy();
+      } else if (behavior === "tray") {
+        await mainWindow.hide();
+      } else {
+        show_close_dialog = true;
+      }
+    });
   });
 
   async function load_data() {
@@ -121,7 +137,6 @@
 
   async function on_delete_tag(id) {
     await tagsStore.remove(id);
-    // 如果当前正在查看被删除的标签，切回"全部链接"
     if (selected_tag) {
       selected_tag = null;
     }
@@ -130,6 +145,27 @@
 
   async function on_create_tag(name) {
     await tagsStore.create(name);
+  }
+
+  async function on_import_bookmarks() {
+    const count = await api.importBookmarks();
+    if (count > 0) {
+      await load_data();
+    }
+  }
+
+  async function close_to_tray() {
+    show_close_dialog = false;
+    localStorage.setItem("links-close-behavior", "tray");
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().hide();
+  }
+
+  async function close_exit() {
+    show_close_dialog = false;
+    localStorage.setItem("links-close-behavior", "exit");
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await getCurrentWindow().destroy();
   }
 
   function toggle_dark() {
@@ -165,6 +201,7 @@
       dark={dark_mode}
       ontoggle_dark={toggle_dark}
       onexport={() => show_export = true}
+      onimport={on_import_bookmarks}
     />
 
     <main class="main-content">
@@ -207,6 +244,19 @@
 
   {#if show_export}
     <ExportDialog onclose={() => show_export = false} />
+  {/if}
+
+  {#if show_close_dialog}
+    <div class="close-overlay" onclick={() => show_close_dialog = false}>
+      <div class="close-dialog" onclick={(e) => e.stopPropagation()}>
+        <p class="close-title">关闭窗口</p>
+        <p class="close-desc">你希望关闭时如何处理？</p>
+        <div class="close-actions">
+          <button class="close-btn tray" onclick={close_to_tray}>最小化到托盘</button>
+          <button class="close-btn exit" onclick={close_exit}>退出应用</button>
+        </div>
+      </div>
+    </div>
   {/if}
 </div>
 
@@ -308,5 +358,73 @@
 
   .dark .titlebar-drag {
     background: #0a0a0b;
+  }
+
+  .close-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+  }
+
+  .close-dialog {
+    background: var(--bg-0);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-0);
+    padding: 24px;
+    min-width: 300px;
+  }
+
+  .close-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-0);
+    margin-bottom: 4px;
+  }
+
+  .close-desc {
+    font-size: 13px;
+    color: var(--text-2);
+    margin-bottom: 20px;
+  }
+
+  .close-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .close-btn {
+    flex: 1;
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+
+  .close-btn.tray {
+    background: var(--accent);
+    color: white;
+  }
+
+  .close-btn.tray:hover {
+    background: var(--accent-hover);
+  }
+
+  .close-btn.exit {
+    background: var(--bg-2);
+    color: var(--text-2);
+  }
+
+  .close-btn.exit:hover {
+    background: var(--border-1);
+    color: var(--text-1);
   }
 </style>
