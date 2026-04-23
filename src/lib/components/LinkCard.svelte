@@ -5,6 +5,8 @@
   let show_confirm = $state(false);
 
   let show_full_url = $state(false);
+  let title_truncated = $state(false);
+  let desc_truncated = $state(false);
 
   let domain = $derived.by(() => {
     try { return new URL(link.url).hostname.replace('www.', ''); } catch { return ''; }
@@ -52,19 +54,29 @@
     e.preventDefault();
     onedit?.(link);
   }
+
+  function check_title_overflow(e) {
+    const el = e.target;
+    title_truncated = el.scrollWidth > el.clientWidth;
+  }
+
+  function check_desc_overflow(e) {
+    const el = e.target;
+    desc_truncated = el.scrollHeight > el.clientHeight;
+  }
 </script>
 
 <div class="link-card">
   <div class="card-main">
     <div class="card-content" onclick={card_click}>
       <div class="card-top">
-        <div class="card-title-row" data-tooltip={link.title || link.url}>
+        <div class="card-title-row" data-tooltip={title_truncated ? (link.title || link.url) : undefined}>
           {#if link.favicon_url}
             <img src={link.favicon_url} alt="" class="favicon" onerror={(e) => e.target.style.display = 'none'} />
           {:else}
             <div class="favicon-ph">🔗</div>
           {/if}
-          <div class="card-title">{@html hl(link.title || link.url)}</div>
+          <div class="card-title" onmouseenter={check_title_overflow}>{@html hl(link.title || link.url)}</div>
         </div>
       </div>
 
@@ -77,12 +89,12 @@
       </div>
 
       {#if link.description}
-        <div class="card-desc-wrap" data-tooltip={link.description}>
-          <p class="card-desc">{@html hl(link.description)}</p>
+        <div class="card-desc-wrap" data-tooltip={desc_truncated ? link.description : undefined}>
+          <p class="card-desc" onmouseenter={check_desc_overflow}>{@html hl(link.description)}</p>
         </div>
       {/if}
 
-      {#if category_name || link.tags.length > 0}
+      {#if category_name || link.tags.length > 0 || link.notes}
         <div class="card-tags">
           {#if category_name}
             <span class="cat-chip">{category_name}</span>
@@ -92,6 +104,9 @@
           {/each}
           {#if link.tags.length > 5}
             <span class="tag-more">+{link.tags.length - 5}</span>
+          {/if}
+          {#if link.notes}
+            <span class="note-chip">📝 {@html hl(link.notes)}</span>
           {/if}
         </div>
       {/if}
@@ -303,6 +318,24 @@
   }
 
   .tag-more { font-size: 11px; color: var(--text-3); padding: 1px 4px; }
+
+  .note-chip {
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: #fef2f2;
+    color: #dc2626;
+    font-weight: 500;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.dark) .note-chip {
+    background: #3b1c1c;
+    color: #f87171;
+  }
 
   .card-actions {
     display: flex;

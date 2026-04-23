@@ -74,6 +74,14 @@
     }
   }
 
+  function reset_cat_delete() {
+    deleting_id = null;
+  }
+
+  function reset_tag_delete() {
+    deleting_tag_id = null;
+  }
+
   function submit_tag() {
     if (!new_tag_name.trim()) return;
     oncreate_tag?.(new_tag_name.trim());
@@ -86,6 +94,12 @@
   <div class="sidebar-brand">
     <span class="brand-icon">◈</span>
     <span class="brand-text">Links</span>
+    <button class="brand-settings" onclick={onsettings} title="设置">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+      </svg>
+    </button>
   </div>
 
   <nav class="sidebar-nav">
@@ -133,41 +147,6 @@
     </div>
 
     {#if !collapsed.has('categories')}
-    {#if flat_categories.length > 10}
-    <div class="section-search">
-      <input type="text" bind:value={cat_search} placeholder="找找你的分组~" class="section-search-input" />
-    </div>
-    {/if}
-    <div class="category-list">
-      {#each filtered_categories as cat (cat.id)}
-        <button
-          class="nav-item cat-item"
-          class:active={selected_id === cat.id}
-          style="padding-left: {12 + cat.depth * 16}px"
-          onclick={() => onselect?.(cat.id)}
-        >
-          {#if cat.children?.length > 0}
-            <span class="cat-toggle" onclick={(e) => { e.stopPropagation(); toggle(cat.id); }}>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({expanded.has(cat.id) ? 90 : 0}deg); transition: transform var(--transition);">
-                <path d="M3 1l4 4-4 4"/>
-              </svg>
-            </span>
-          {:else}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
-          {/if}
-          <span class="cat-name">{cat.name}</span>
-          {#if deleting_id === cat.id}
-            <span class="cat-delete-hint">真的要删吗?</span>
-          {/if}
-          <span class="cat-delete-btn" onclick={(e) => handle_delete_cat(e, cat.id)} title="删除分组">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </span>
-        </button>
-      {/each}
-    </div>
-
     {#if show_new}
       <form class="new-cat-form" onsubmit={(e) => { e.preventDefault(); submit_category(); }}>
         <input
@@ -183,6 +162,41 @@
         </div>
       </form>
     {/if}
+    {#if flat_categories.length > 10}
+    <div class="section-search">
+      <input type="text" bind:value={cat_search} placeholder="找找你的分组~" class="section-search-input" />
+    </div>
+    {/if}
+    <div class="category-list">
+      {#each filtered_categories as cat (cat.id)}
+        <button
+          class="nav-item cat-item"
+          class:active={selected_id === cat.id}
+          style="padding-left: {12 + cat.depth * 16}px"
+          onclick={() => onselect?.(cat.id)}
+          onmouseleave={reset_cat_delete}
+        >
+          {#if cat.children?.length > 0}
+            <span class="cat-toggle" onclick={(e) => { e.stopPropagation(); toggle(cat.id); }}>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({expanded.has(cat.id) ? 90 : 0}deg); transition: transform var(--transition);">
+                <path d="M3 1l4 4-4 4"/>
+              </svg>
+            </span>
+          {:else}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
+          {/if}
+          <span class="cat-name">{cat.name}</span>
+          {#if deleting_id === cat.id}
+            <span class="cat-delete-hint">再点一下~</span>
+          {/if}
+          <span class="cat-delete-btn" onclick={(e) => handle_delete_cat(e, cat.id)} title="删除分组">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </span>
+        </button>
+      {/each}
+    </div>
     {/if}
 
     <div class="section-header" onclick={() => toggle_section('tags')}>
@@ -227,11 +241,12 @@
           class="nav-item tag-item"
           class:active={selected_tag === tag.name}
           onclick={() => onselect_tag?.(tag.name)}
+          onmouseleave={reset_tag_delete}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tag-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
           <span class="cat-name">{tag.name}</span>
           {#if deleting_tag_id === tag.id}
-            <span class="cat-delete-hint">真的要删吗?</span>
+            <span class="cat-delete-hint">再点一下~</span>
           {/if}
           <span class="tag-delete-btn" onclick={(e) => handle_delete_tag(e, tag.id)} title="删除标签">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
@@ -256,13 +271,6 @@
           <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
         </svg>
       {/if}
-    </button>
-
-    <button class="footer-btn" onclick={onsettings} title="设置">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-      </svg>
     </button>
 
     <button class="footer-btn" onclick={onexport} title="导出">
@@ -311,6 +319,26 @@
     font-weight: 700;
     color: var(--text-0);
     letter-spacing: -0.3px;
+  }
+
+  .brand-settings {
+    margin-left: auto;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: none;
+    color: var(--text-3);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+  }
+
+  .brand-settings:hover {
+    color: var(--text-1);
+    background: var(--bg-hover);
   }
 
   .sidebar-nav {
@@ -553,6 +581,7 @@
   }
 
   .new-cat-btn {
+    flex: 1;
     padding: 3px 10px;
     border: none;
     border-radius: var(--radius-sm);

@@ -251,7 +251,7 @@
     padding: 7px 10px;
     border: 1px solid var(--border-1);
     border-radius: var(--radius-md);
-    background: var(--bg-1);
+    background: var(--bg-0);
     color: var(--text-0);
     font-size: 13px;
     outline: none;
@@ -261,7 +261,6 @@
   .field-input:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-soft);
-    background: var(--bg-0);
   }
 
   .field-input::placeholder {
