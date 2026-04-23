@@ -47,10 +47,14 @@
     window.addEventListener("resize", () => {
       clearTimeout(resize_timer);
       resize_timer = setTimeout(async () => {
-        await api.setSetting("window-size", JSON.stringify({
-          width: window.innerWidth,
-          height: window.innerHeight
-        }));
+        try {
+          const { getCurrentWindow, LogicalSize } = await import("@tauri-apps/api/window");
+          const size = await getCurrentWindow().innerSize();
+          await api.setSetting("window-size", JSON.stringify({
+            width: size.width,
+            height: size.height
+          }));
+        } catch (e) {}
       }, 500);
     });
 
@@ -186,14 +190,12 @@
 
   async function close_to_tray() {
     show_close_dialog = false;
-    await api.setSetting("close-behavior", "tray");
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     await getCurrentWindow().hide();
   }
 
   async function close_exit() {
     show_close_dialog = false;
-    await api.setSetting("close-behavior", "exit");
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     await getCurrentWindow().destroy();
   }

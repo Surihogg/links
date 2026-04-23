@@ -97,10 +97,16 @@
       {#if category_name || link.tags.length > 0 || link.notes}
         <div class="card-tags">
           {#if category_name}
-            <span class="cat-chip">{category_name}</span>
+            <span class="cat-chip">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
+              {category_name}
+            </span>
           {/if}
           {#each link.tags.slice(0, 5) as tag}
-            <span class="tag-chip">{@html hl(tag)}</span>
+            <span class="tag-chip">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+              {@html hl(tag)}
+            </span>
           {/each}
           {#if link.tags.length > 5}
             <span class="tag-more">+{link.tags.length - 5}</span>
@@ -295,6 +301,9 @@
   }
 
   .cat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 11px;
@@ -309,6 +318,9 @@
   }
 
   .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 11px;

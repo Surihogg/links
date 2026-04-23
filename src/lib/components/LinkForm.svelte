@@ -77,7 +77,6 @@
     saving ? "保存中..." : "保存"
   );
   let btn_disabled = $derived(saving);
-  let disabled = $derived(!!link);
 
   async function refresh_meta() {
     const u = url.trim();
@@ -102,7 +101,7 @@
       <div class="field">
         <label class="field-label">URL <span class="required">*</span></label>
         <div class="url-input-wrap">
-          <input type="url" bind:value={url} oninput={on_url_input} required placeholder="https://..." class="field-input" {disabled} />
+          <input type="url" bind:value={url} oninput={on_url_input} required placeholder="https://..." class="field-input" />
           <button type="button" class="refresh-btn" onclick={refresh_meta} disabled={fetching || !url.trim()} title="重新抓取元数据">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class={fetching ? 'spin-anim' : ''}>
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>

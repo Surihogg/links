@@ -2,11 +2,13 @@
   import { onMount } from "svelte";
   import * as api from "../api.js";
   let { onclose } = $props();
-  let close_behavior = $state("ask");
+  let close_behavior = $state(null);
+  let loaded = $state(false);
 
   onMount(async () => {
     const val = await api.getSetting("close-behavior");
-    if (val) close_behavior = val;
+    close_behavior = val || "ask";
+    loaded = true;
   });
 
   const behaviors = [
@@ -38,30 +40,34 @@
 
     <div class="modal-body">
       <div class="section-label">关闭行为</div>
-      <div class="format-list">
-        {#each behaviors as b (b.id)}
-          <button
-            class="format-option"
-            class:active={close_behavior === b.id}
-            onclick={() => close_behavior = b.id}
-          >
-            <div class="format-radio">
+      {#if loaded}
+        <div class="format-list">
+          {#each behaviors as b (b.id)}
+            <button
+              class="format-option"
+              class:active={close_behavior === b.id}
+              onclick={() => close_behavior = b.id}
+            >
+              <div class="format-radio">
+                {#if close_behavior === b.id}
+                  <div class="format-dot"></div>
+                {/if}
+              </div>
+              <div class="format-info">
+                <span class="format-name">{b.name}</span>
+                <span class="format-desc">{b.desc}</span>
+              </div>
               {#if close_behavior === b.id}
-                <div class="format-dot"></div>
+                <svg class="format-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 8l3.5 3.5L13 5"/>
+                </svg>
               {/if}
-            </div>
-            <div class="format-info">
-              <span class="format-name">{b.name}</span>
-              <span class="format-desc">{b.desc}</span>
-            </div>
-            {#if close_behavior === b.id}
-              <svg class="format-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 8l3.5 3.5L13 5"/>
-              </svg>
-            {/if}
-          </button>
-        {/each}
-      </div>
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <div class="format-loading">加载中...</div>
+      {/if}
 
       <div class="modal-footer">
         <button onclick={onclose} class="btn btn-secondary">取消</button>
@@ -256,5 +262,12 @@
   .btn-secondary:hover {
     background: var(--border-1);
     color: var(--text-1);
+  }
+
+  .format-loading {
+    font-size: 13px;
+    color: var(--text-3);
+    padding: 16px 0;
+    text-align: center;
   }
 </style>
