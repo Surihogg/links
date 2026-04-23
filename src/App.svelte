@@ -273,10 +273,17 @@
 
     <main class="main-content">
       <header class="content-header">
-        <div class="header-left">
-          <h2 class="header-title">{current_title}</h2>
-          <span class="header-count">{total_count} 条</span>
-        </div>
+        {#if importing}
+          <div class="import-banner">
+            <span class="spinner-sm"></span>
+            正在导入书签，请稍等...
+          </div>
+        {:else}
+          <div class="header-left">
+            <h2 class="header-title">{current_title}</h2>
+            <span class="header-count">{total_count} 条</span>
+          </div>
+        {/if}
         <div class="header-right">
           <SearchBar bind:query={search_query} onsearch={on_search} />
         </div>
@@ -500,4 +507,23 @@
     background: var(--border-1);
     color: var(--text-1);
   }
+
+  .import-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+
+  .spinner-sm {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--border-1);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
