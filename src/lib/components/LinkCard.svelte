@@ -1,8 +1,11 @@
 <script>
   import { openUrl } from "../api.js";
+  import { copyToClipboard } from "../api.js";
 
   let { link, highlight = "", category_name = null, onedit, ondelete, ontoggle_favorite } = $props();
   let show_confirm = $state(false);
+  let show_share_menu = $state(false);
+  let copy_success = $state(false);
 
   let show_full_url = $state(false);
   let title_truncated = $state(false);
@@ -55,6 +58,36 @@
     onedit?.(link);
   }
 
+  function toggle_share() {
+    show_share_menu = !show_share_menu;
+  }
+
+  function close_share() {
+    show_share_menu = false;
+  }
+
+  async function copy_as(format) {
+    const title = link.title || link.url;
+    let content = "";
+    function escMarkdown(text) {
+      return text.replace(/[\[\]]/g, '\\$&').replace(/[*_`~]/g, '\\$&');
+    }
+    function escHtml(text) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    if (format === 'url') {
+      content = link.url;
+    } else if (format === 'markdown') {
+      content = `[${escMarkdown(title)}](${link.url})`;
+    } else {
+      content = `<a href="${escHtml(link.url)}">${escHtml(title)}</a>`;
+    }
+    await copyToClipboard(content);
+    show_share_menu = false;
+    copy_success = true;
+    setTimeout(() => copy_success = false, 1500);
+  }
+
   function check_title_overflow(e) {
     const el = e.target;
     title_truncated = el.scrollWidth > el.clientWidth;
@@ -77,6 +110,14 @@
             <div class="favicon-ph">🔗</div>
           {/if}
           <div class="card-title" onmouseenter={check_title_overflow}>{@html hl(link.title || link.url)}</div>
+          {#if link.is_broken}
+            <span class="broken-badge" title="链接可能已失效">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </span>
+          {/if}
         </div>
       </div>
 
@@ -122,11 +163,29 @@
     </div>
 
     <div class="card-actions">
-      <button class="action-btn" class:active-fav={link.is_favorite} onclick={toggle_fav} title={link.is_favorite ? '取消特别关注' : '特别关注'}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill={link.is_favorite ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.5">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/>
-        </svg>
-      </button>
+      <!-- Share button and dropdown -->
+      <div class="share-wrap" style="position:relative;">
+        <button class="action-btn" onclick={toggle_share} title="分享">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+        </button>
+        {#if show_share_menu}
+          <div class="share-menu" style="position:absolute; top: calc(100% + 6px); left:0; z-index:40;">
+            <button class="share-option" onclick={() => copy_as('url')}>复制链接</button>
+            <button class="share-option" onclick={() => copy_as('markdown')}>复制 Markdown</button>
+            <button class="share-option" onclick={() => copy_as('html')}>复制 HTML</button>
+          </div>
+        {/if}
+        {#if show_share_menu}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="share-overlay" onclick={close_share}></div>
+        {/if}
+        {#if copy_success}
+          <span class="copy-feedback">已复制!</span>
+        {/if}
+      </div>
       <button class="action-btn" onclick={edit_link} title="编辑">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M17 3l4 4L7 21H3v-4z"/>
@@ -435,4 +494,55 @@
   .confirm-btn.delete:hover {
     opacity: 0.9;
   }
+
+  /* Share dropdown styles */
+  .share-wrap { position: relative; display: inline-block; }
+  .share-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--bg-0);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 150px;
+    z-index: 40;
+  }
+  .share-option {
+    background: transparent;
+    border: none;
+    color: var(--text-0);
+    text-align: left;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .share-option:hover {
+    background: var(--bg-2);
+  }
+  .copy-feedback {
+    color: #16a34a;
+    font-size: 12px;
+    margin-left: 6px;
+    align-self: center;
+  }
+  .share-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: transparent;
+  }
+  /* Broken link badge */
+  .broken-badge {
+    display: inline-flex;
+    align-items: center;
+    color: #f59e0b;
+    margin-left: 6px;
+    flex-shrink: 0;
+  }
+  :global(.dark) .broken-badge { color: #fbbf24; }
 </style>

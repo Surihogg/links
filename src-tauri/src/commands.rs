@@ -44,7 +44,21 @@ pub fn links_create(
     let url_for_fetch = link.url.clone();
     let link_id = link.id;
     let app_clone = app.clone();
+    // Spawn link status check after metadata fetch is attempted
+    let url_for_check = link.url.clone();
+    let link_id_check = link.id;
+    let app_clone_check = app.clone();
     tauri::async_runtime::spawn(async move {
+        // Check reachability in background and mark is_broken if needed
+        let reachable = do_check_link(&url_for_check).await.unwrap_or(false);
+        if !reachable {
+            if let Ok(mut db_guard) = app_clone_check.state::<Db>().0.lock() {
+                let _ = db_guard.execute(
+                    "UPDATE links SET is_broken = 1 WHERE id = ?",
+                    rusqlite::params![link_id_check],
+                );
+            }
+        }
         match crate::fetcher::fetch_metadata(&url_for_fetch).await {
             Ok(meta) => {
                 let db_state = app_clone.state::<Db>();
@@ -236,4 +250,40 @@ pub fn set_shortcut(app: AppHandle, config: State<'_, Config>, shortcut: String)
     config.save(&dir)?;
 
     Ok(parsed.to_string())
+}
+use arboard::Clipboard;
+#[tauri::command]
+pub fn copy_to_clipboard(content: String) -> Result<(), AppError> {
+    let mut clipboard = Clipboard::new().map_err(|e| AppError::General(e.to_string()))?;
+    clipboard
+        .set_text(content)
+        .map_err(|e| AppError::General(e.to_string()))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn check_duplicate(db: State<'_, Db>, url: String, exclude_id: Option<i64>) -> Result<Option<crate::db::Link>, AppError> {
+    db.find_by_url(&url, exclude_id)
+}
+
+async fn do_check_link(url: &str) -> Result<bool, AppError> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .map_err(|e| AppError::General(e.to_string()))?;
+
+    if let Ok(resp) = client.head(url).send().await {
+        return Ok(resp.status().is_success());
+    }
+    // Head failed, try GET
+    if let Ok(resp) = client.get(url).send().await {
+        return Ok(resp.status().is_success());
+    }
+    log::warn!("link status check failed for {}", url);
+    Ok(false)
+}
+
+#[tauri::command]
+pub async fn check_link_status(url: String) -> Result<bool, AppError> {
+    do_check_link(&url).await
 }

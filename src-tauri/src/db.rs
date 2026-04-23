@@ -6,6 +6,25 @@ use std::sync::Mutex;
 pub struct Db(pub Mutex<Connection>);
 
 impl Db {
+    pub fn find_by_url(&self, url: &str, exclude_id: Option<i64>) -> Result<Option<Link>, AppError> {
+        let conn = self.0.lock().unwrap();
+        let sql = if exclude_id.is_some() {
+            format!("SELECT {} FROM links l WHERE l.url = ? AND l.id != ?", LINK_COLUMNS)
+        } else {
+            format!("SELECT {} FROM links l WHERE l.url = ?", LINK_COLUMNS)
+        };
+        let mut stmt = conn.prepare(&sql)?;
+        let mut rows = if let Some(ex) = exclude_id {
+            stmt.query(rusqlite::params![url, ex])?
+        } else {
+            stmt.query(rusqlite::params![url])?
+        };
+        if let Some(row) = rows.next()? {
+            Ok(Some(row_to_link(row)?))
+        } else {
+            Ok(None)
+        }
+    }
     pub fn open(path: &Path) -> SqlResult<Self> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).ok();
@@ -76,6 +95,8 @@ impl Db {
             END;
             ",
         )?;
+        // Ensure is_broken column exists for existing databases
+        conn.execute_batch("ALTER TABLE links ADD COLUMN is_broken INTEGER NOT NULL DEFAULT 0").ok();
         Ok(())
     }
 }
@@ -91,6 +112,7 @@ pub struct Link {
     pub og_image_url: String,
     pub category_id: Option<i64>,
     pub is_favorite: bool,
+    pub is_broken: bool,
     pub tags: Vec<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -118,6 +140,7 @@ pub struct UpdateLinkPayload {
     pub category_id: Option<i64>,
     pub tags: Option<Vec<String>>,
     pub is_favorite: Option<bool>,
+    pub is_broken: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -217,9 +240,10 @@ pub(crate) fn row_to_link(row: &rusqlite::Row) -> rusqlite::Result<Link> {
         og_image_url: row.get(6)?,
         category_id: row.get(7)?,
         is_favorite: row.get::<_, i32>(8)? != 0,
+        is_broken: row.get::<_, i32>(9)? != 0,
         tags: vec![],
-        created_at: row.get(9)?,
-        updated_at: row.get(10)?,
+        created_at: row.get(10)?,
+        updated_at: row.get(11)?,
     })
 }
 
@@ -253,7 +277,7 @@ pub(crate) fn ensure_tags(conn: &Connection, tags: &[String]) -> Vec<i64> {
     ids
 }
 
-const LINK_COLUMNS: &str = "l.id, l.url, l.title, l.description, l.notes, l.favicon_url, l.og_image_url, l.category_id, l.is_favorite, l.created_at, l.updated_at";
+const LINK_COLUMNS: &str = "l.id, l.url, l.title, l.description, l.notes, l.favicon_url, l.og_image_url, l.category_id, l.is_favorite, l.is_broken, l.created_at, l.updated_at";
 
 impl Db {
     pub fn create_link(&self, payload: &CreateLinkPayload) -> Result<Link, AppError> {
@@ -321,6 +345,10 @@ impl Db {
         }
         if let Some(v) = payload.is_favorite {
             sets.push("is_favorite = ?".to_string());
+            p.push(Box::new(v as i32));
+        }
+        if let Some(v) = payload.is_broken {
+            sets.push("is_broken = ?".to_string());
             p.push(Box::new(v as i32));
         }
 
@@ -1189,6 +1217,7 @@ impl Default for UpdateLinkPayload {
             category_id: None,
             tags: None,
             is_favorite: None,
+            is_broken: None,
         }
     }
 }

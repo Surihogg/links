@@ -88,3 +88,16 @@ export async function getShortcut() {
 export async function setShortcut(shortcut) {
   return invoke("set_shortcut", { shortcut });
 }
+
+// Frontend helpers for link sharing and status checks
+export async function copyToClipboard(content) {
+  return invoke("copy_to_clipboard", { content });
+}
+
+export async function checkDuplicate(url, excludeId = null) {
+  return invoke("check_duplicate", { url, exclude_id: excludeId });
+}
+
+export async function checkLinkStatus(url) {
+  return invoke("check_link_status", { url });
+}

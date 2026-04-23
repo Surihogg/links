@@ -1,6 +1,7 @@
 <script>
   import TagInput from "./TagInput.svelte";
   import { fetchMeta } from "../api.js";
+  import { checkDuplicate } from "../api.js";
 
   let { link = null, categories = [], onsave, oncancel } = $props();
 
@@ -14,6 +15,7 @@
   let fetching = $state(false);
   let fetch_error = $state("");
   let fetch_timer = null;
+  let duplicate_warning = $state("");
   let user_edited = $state({ title: false, description: false });
   let fetched_meta = $state({ favicon_url: "", og_image_url: "" });
   let fetched_url = "";
@@ -47,11 +49,22 @@
     pending_fetch = null;
   }
 
+  async function check_dup(u) {
+    const existing = await checkDuplicate(u, link?.id ?? null);
+    if (existing) {
+      duplicate_warning = `已有相同链接：${existing.title || existing.url}`;
+    } else {
+      duplicate_warning = "";
+    }
+  }
+
   function on_url_input() {
     clearTimeout(fetch_timer);
     fetch_error = "";
     const u = url.trim();
     if (!u || !/^https?:\/\//.test(u)) return;
+    // Duplicate check (debounced 300ms)
+    setTimeout(() => check_dup(u), 300);
     fetch_timer = setTimeout(() => {
       pending_fetch = do_fetch(u);
     }, 500);
@@ -111,9 +124,12 @@
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
             </svg>
           </button>
-          {#if fetch_error}
-            <span class="fetch-error">{fetch_error}</span>
-          {/if}
+        {#if fetch_error}
+          <span class="fetch-error">{fetch_error}</span>
+        {/if}
+        {#if duplicate_warning}
+          <span class="dup-warning">{duplicate_warning}</span>
+        {/if}
         </div>
       </div>
 
@@ -333,6 +349,15 @@
 
   .fetch-error {
     right: 42px;
+  }
+
+  .dup-warning {
+    font-size: 11px;
+    color: #d97706;
+    margin-top: 2px;
+  }
+  :global(.dark) .dup-warning {
+    color: #fbbf24;
   }
 
   .field-textarea {
