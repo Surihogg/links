@@ -6,6 +6,7 @@ pub struct PageMeta {
     pub description: String,
     pub favicon_url: String,
     pub og_image_url: String,
+    pub keywords: Vec<String>,
 }
 
 pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
@@ -27,6 +28,7 @@ pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
             description: String::new(),
             favicon_url: String::new(),
             og_image_url: String::new(),
+            keywords: vec![],
         });
     }
 
@@ -58,6 +60,14 @@ pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
 
     let og_image_url = select_meta_content(&doc, "meta[property=\"og:image\"]").unwrap_or_default();
 
+    let keywords: Vec<String> = select_meta_content(&doc, "meta[name=\"keywords\"]")
+        .unwrap_or_default()
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .take(8)
+        .collect();
+
     let base_url = url::Url::parse(url).ok();
     let favicon_url = select_link_href(&doc, "link[rel~=\"icon\"]")
         .or_else(|| select_link_href(&doc, "link[rel~=\"shortcut icon\"]"))
@@ -74,6 +84,7 @@ pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
         description,
         favicon_url,
         og_image_url,
+        keywords,
     })
 }
 

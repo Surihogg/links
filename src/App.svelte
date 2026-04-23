@@ -43,16 +43,23 @@
       } catch (e) {}
     }
 
+    let resize_restore_done = false;
+    setTimeout(() => { resize_restore_done = true; }, 2000);
+
     let resize_timer;
     window.addEventListener("resize", () => {
       clearTimeout(resize_timer);
+      if (!resize_restore_done) return;
       resize_timer = setTimeout(async () => {
         try {
-          const { getCurrentWindow, LogicalSize } = await import("@tauri-apps/api/window");
-          const size = await getCurrentWindow().innerSize();
+          const { getCurrentWindow } = await import("@tauri-apps/api/window");
+          const win = getCurrentWindow();
+          const physicalSize = await win.innerSize();
+          const scaleFactor = await win.scaleFactor();
+          const logical = physicalSize.toLogical(scaleFactor);
           await api.setSetting("window-size", JSON.stringify({
-            width: size.width,
-            height: size.height
+            width: Math.round(logical.width),
+            height: Math.round(logical.height)
           }));
         } catch (e) {}
       }, 500);

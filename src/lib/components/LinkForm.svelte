@@ -36,6 +36,10 @@
       }
       fetched_meta = { favicon_url: meta.favicon_url || "", og_image_url: meta.og_image_url || "" };
       fetched_url = u;
+      // Auto-suggest tags from keywords when creating a new link with no user tags yet
+      if (!link && tags.length === 0 && meta.keywords && meta.keywords.length > 0) {
+        tags = meta.keywords.slice(0, 5);
+      }
     } catch {
       fetch_error = "抓取失败了，手动填一下标题吧~";
     }
