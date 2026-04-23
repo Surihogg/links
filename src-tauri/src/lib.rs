@@ -44,6 +44,18 @@ pub fn run() {
         .setup(|app| {
             commands::init_db(&app.handle().clone())?;
 
+            if let Some(db) = app.try_state::<db::Db>() {
+                if let Ok(Some(size_json)) = db.get_setting("window-size") {
+                    if let Ok(size) = serde_json::from_str::<serde_json::Value>(&size_json) {
+                        if let (Some(w), Some(h)) = (size["width"].as_f64(), size["height"].as_f64()) {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.set_size(tauri::LogicalSize::new(w, h));
+                            }
+                        }
+                    }
+                }
+            }
+
             let show_i = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
