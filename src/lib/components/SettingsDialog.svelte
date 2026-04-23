@@ -98,9 +98,13 @@
   function on_overlay_click(e) {
     if (e.target === e.currentTarget) onclose?.();
   }
+
+  function handle_window_keydown(e) {
+    if (recording) on_record_keydown(e);
+  }
 </script>
 
-<svelte:window onkeydown={handle_keydown} />
+<svelte:window onkeydown={handle_window_keydown} />
 <div class="modal-overlay" onclick={on_overlay_click}>
   <div class="modal">
     <div class="modal-header">
@@ -143,37 +147,6 @@
         <div class="format-loading">加载中...</div>
       {/if}
 
-      <div class="section-label" style="margin-top:16px">快捷键</div>
-      {#if loaded}
-        <div class="shortcut-card">
-          {#if recording}
-            <div class="shortcut-info">
-              {#if recorded_shortcut}
-                <span class="shortcut-keys">{formatShortcut(recorded_shortcut)}</span>
-              {:else}
-                <span class="shortcut-hint">按下新的快捷键组合...</span>
-              {/if}
-              {#if shortcut_error}
-                <span class="shortcut-error">{shortcut_error}</span>
-              {/if}
-            </div>
-            <div class="shortcut-actions">
-              {#if recorded_shortcut}
-                <button class="btn btn-primary btn-sm" onclick={save_shortcut}>保存</button>
-              {/if}
-              <button class="btn btn-secondary btn-sm" onclick={cancel_recording}>取消</button>
-            </div>
-          {:else}
-            <div class="shortcut-info">
-              <span class="shortcut-keys">{formatShortcut(current_shortcut)}</span>
-            </div>
-            <button class="btn btn-secondary btn-sm" onclick={start_recording}>修改</button>
-          {/if}
-        </div>
-      {:else}
-        <div class="format-loading">加载中...</div>
-      {/if}
-
       <div class="section-label" style="margin-top: 20px;">快捷键</div>
       {#if shortcut_loaded}
         <div class="shortcut-section">
@@ -202,9 +175,6 @@
               </div>
             {/if}
           </div>
-          {#if recording}
-            <svelte:window onkeydown={on_record_keydown} />
-          {/if}
         </div>
       {:else}
         <div class="format-loading">加载中...</div>
