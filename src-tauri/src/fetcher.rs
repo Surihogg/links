@@ -11,6 +11,7 @@ pub struct PageMeta {
 pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(8))
+        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
         .build()?;
 
     let resp = client.get(url).send().await?;
