@@ -189,11 +189,11 @@
           {#if deleting_id === cat.id}
             <span class="cat-delete-hint">再点一下~</span>
           {/if}
-          <span class="cat-delete-btn" onclick={(e) => handle_delete_cat(e, cat.id)} title="删除分组">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </span>
+           <span class="cat-delete-btn" onclick={(e) => handle_delete_cat(e, cat.id)}>
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+               <path d="M18 6L6 18"/><path d="M6 6l12 12"/>
+             </svg>
+           </span>
         </button>
       {/each}
     </div>
@@ -248,11 +248,11 @@
           {#if deleting_tag_id === tag.id}
             <span class="cat-delete-hint">再点一下~</span>
           {/if}
-          <span class="tag-delete-btn" onclick={(e) => handle_delete_tag(e, tag.id)} title="删除标签">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </span>
+           <span class="tag-delete-btn" onclick={(e) => handle_delete_tag(e, tag.id)}>
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+               <path d="M18 6L6 18"/><path d="M6 6l12 12"/>
+             </svg>
+           </span>
         </button>
       {/each}
     </div>
@@ -505,14 +505,6 @@
   .cat-delete-btn:hover {
     color: var(--danger);
     background: var(--danger-soft);
-  }
-
-  .delete-hint {
-    font-size: 10px;
-    color: var(--danger);
-    margin-left: auto;
-    margin-right: 2px;
-    flex-shrink: 0;
   }
 
   .section-search {
