@@ -1,12 +1,13 @@
 # UI 组件
 
-7 个 Svelte 5 组件，纯展示 + 回调 props，不直接持有 store。
+8 个 Svelte 5 组件，纯展示 + 回调 props，不直接持有 store。
 
 ## 文件一览
 
 | 文件 | 行数 | 职责 |
 |---|---|---|
 | `Sidebar.svelte` | 520 | 分组树（树形嵌套）+ 标签列表 + 分组/标签 CRUD + 暗色切换 + 导出入口 |
+| `SettingsDialog.svelte` | 360 | 设置弹窗：关闭行为选择 + 全局快捷键录制（支持平台差异格式） |
 | `LinkForm.svelte` | 323 | 添加/编辑链接弹窗（模态框），含 URL 输入自动抓取 |
 | `LinkCard.svelte` | 283 | 单条链接卡片，点击整卡 → `openUrl`，右上角编辑/收藏/删除 |
 | `ExportDialog.svelte` | 231 | 导出格式选择 → 调 `exportLinks` → `saveFile`（rfd 原生对话框） |
@@ -55,7 +56,15 @@ function toggle_section(key) {
 
 ## 模态框必须在 `.dark` div 内部
 
-`LinkForm` 和 `ExportDialog` 都是 `position: fixed` 的 overlay。它们在 `App.svelte` 里是**根级** `{#if}` 渲染的，但放在 `<div class={dark_mode ? "dark" : ""}>` **内部**——这样 CSS 变量才从父级继承。改位置会导致暗色下模态框变白。
+`LinkForm`、`ExportDialog` 和 `SettingsDialog` 都是 `position: fixed` 的 overlay。它们在 `App.svelte` 里是**根级** `{#if}` 渲染的，但放在 `<div class={dark_mode ? "dark" : ""}>` **内部**——这样 CSS 变量才从父级继承。改位置会导致暗色下模态框变白。
+
+## `SettingsDialog.svelte` 快捷键录制
+
+- 快捷键通过 `keydown` 事件录制，`preventDefault()` 阻止默认行为
+- `buildShortcutFromEvent` 提取修饰键 + 字母键，格式：`CmdOrCtrl+Shift+L`
+- `formatShortcut` 按平台渲染：macOS 用 `⌘ ⇧ L`，Windows 用 `Ctrl+Shift+L`
+- 录制状态用 `$state(recording)` 控制，监听 `window` 级键盘事件
+- 空快捷键（仅修饰键）返回 `null`，通过 `setShortcut(null)` 清除
 
 ## 反模式
 
