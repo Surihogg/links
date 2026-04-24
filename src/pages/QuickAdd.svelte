@@ -33,11 +33,19 @@
     const handle_focus = () => {
       has_focused = true;
     };
+    const handle_keydown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close_window();
+      }
+    };
     window.addEventListener("blur", handle_blur);
     window.addEventListener("focus", handle_focus);
+    window.addEventListener("keydown", handle_keydown);
     return () => {
       window.removeEventListener("blur", handle_blur);
       window.removeEventListener("focus", handle_focus);
+      window.removeEventListener("keydown", handle_keydown);
     };
   });
 
