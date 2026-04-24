@@ -95,7 +95,7 @@
 
   function check_desc_overflow(e) {
     const el = e.target;
-    desc_truncated = el.scrollHeight > el.clientHeight;
+    desc_truncated = el.scrollWidth > el.clientWidth;
   }
 </script>
 
@@ -103,15 +103,15 @@
   <div class="card-main">
     <div class="card-content" onclick={card_click}>
       <div class="card-top">
-        <div class="card-title-row" data-tooltip={title_truncated ? (link.title || link.url) : undefined}>
           {#if link.is_broken}
             <span class="broken-badge" data-tooltip="链接可能已失效">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                 <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
               </svg>
             </span>
           {/if}
+        <div class="card-title-row" data-tooltip={title_truncated ? (link.title || link.url) : undefined}>
           {#if link.favicon_url}
             <img src={link.favicon_url} alt="" class="favicon" onerror={(e) => e.target.style.display = 'none'} />
           {:else}
@@ -130,7 +130,7 @@
       </div>
 
       {#if link.description}
-        <div class="card-desc-wrap" data-tooltip={desc_truncated ? link.description : undefined}>
+        <div class="card-desc-row" data-tooltip={desc_truncated ? link.description : undefined}>
           <p class="card-desc" onmouseenter={check_desc_overflow}>{@html hl(link.description)}</p>
         </div>
       {/if}
@@ -154,8 +154,8 @@
           {/if}
           {#if link.notes}
             <span class="note-chip">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-              {@html hl(link.notes)}
+              <svg class="note-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <span class="note-text">{@html hl(link.notes)}</span>
             </span>
           {/if}
         </div>
@@ -282,12 +282,12 @@
   }
 
   .card-title-row[data-tooltip]:hover::after,
-  .card-desc-wrap[data-tooltip]:hover::after {
+  .card-desc-row[data-tooltip]:hover::after {
     content: attr(data-tooltip);
     position: absolute;
     left: 0;
     top: 100%;
-    z-index: 30;
+    z-index: 50;
     max-width: 360px;
     padding: 6px 10px;
     background: var(--bg-0);
@@ -305,10 +305,13 @@
 
   .card-title-row {
     position: relative;
+    min-width: 0;
+    flex: 1;
   }
 
-  .card-desc-wrap {
+  .card-desc-row {
     position: relative;
+    min-width: 0;
   }
 
   .card-meta {
@@ -334,12 +337,11 @@
     font-size: 12px;
     color: var(--text-2);
     line-height: 1.5;
-    margin-top: 4px;
+    margin-top: 2px;
     padding-left: 22px;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
 
@@ -393,9 +395,17 @@
     color: #dc2626;
     font-weight: 500;
     max-width: 200px;
+  }
+
+  .note-icon {
+    flex-shrink: 0;
+  }
+
+  .note-text {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
   }
 
   :global(.dark) .note-chip {
@@ -556,7 +566,6 @@
   :global(.dark) .copy-toast {
     color: #4ade80;
   }
-  /* Broken link badge */
   .broken-badge {
     position: relative;
     display: inline-flex;
@@ -571,7 +580,7 @@
     left: 50%;
     top: 100%;
     transform: translateX(-50%);
-    z-index: 30;
+    z-index: 50;
     white-space: nowrap;
     padding: 4px 8px;
     background: var(--bg-0);
