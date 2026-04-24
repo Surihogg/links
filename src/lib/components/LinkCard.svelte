@@ -163,32 +163,20 @@
     </div>
 
     <div class="card-actions">
-      <!-- Share button and dropdown -->
-      <div class="share-wrap" style="position:relative;">
-        <button class="action-btn" onclick={toggle_share} title="分享">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-          </svg>
-        </button>
-        {#if show_share_menu}
-          <div class="share-menu" style="position:absolute; top: calc(100% + 6px); left:0; z-index:40;">
-            <button class="share-option" onclick={() => copy_as('url')}>复制链接</button>
-            <button class="share-option" onclick={() => copy_as('markdown')}>复制 Markdown</button>
-            <button class="share-option" onclick={() => copy_as('html')}>复制 HTML</button>
-          </div>
-        {/if}
-        {#if show_share_menu}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div class="share-overlay" onclick={close_share}></div>
-        {/if}
-        {#if copy_success}
-          <span class="copy-feedback">已复制!</span>
-        {/if}
-      </div>
+      <button class="action-btn" class:active-fav={link.is_favorite} onclick={toggle_fav} title={link.is_favorite ? '取消特别关注' : '特别关注'}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill={link.is_favorite ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.5">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/>
+        </svg>
+      </button>
       <button class="action-btn" onclick={edit_link} title="编辑">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M17 3l4 4L7 21H3v-4z"/>
+        </svg>
+      </button>
+      <button class="action-btn" onclick={toggle_share} title="分享">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
         </svg>
       </button>
       <button class="action-btn danger" onclick={delete_link} title="删除">
@@ -198,6 +186,20 @@
       </button>
     </div>
   </div>
+
+  {#if show_share_menu}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="share-overlay" onclick={close_share}></div>
+    <div class="share-menu">
+      <button class="share-option" onclick={() => copy_as('url')}>复制链接</button>
+      <button class="share-option" onclick={() => copy_as('markdown')}>复制 Markdown</button>
+      <button class="share-option" onclick={() => copy_as('html')}>复制 HTML</button>
+    </div>
+  {/if}
+
+  {#if copy_success}
+    <span class="copy-toast">已复制!</span>
+  {/if}
 
   {#if show_confirm}
     <div class="confirm-overlay" onclick={() => show_confirm = false}>
@@ -214,6 +216,7 @@
 
 <style>
   .link-card {
+    position: relative;
     padding: 0 24px;
     transition: background var(--transition);
   }
@@ -496,45 +499,62 @@
   }
 
   /* Share dropdown styles */
-  .share-wrap { position: relative; display: inline-block; }
+  .share-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+  }
+
   .share-menu {
     position: absolute;
-    top: 100%;
-    left: 0;
+    right: 24px;
+    top: 0;
+    z-index: 50;
+    background: var(--bg-0);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    min-width: 140px;
+  }
+
+  .share-option {
+    background: none;
+    border: none;
+    color: var(--text-1);
+    font-size: 12px;
+    font-weight: 500;
+    text-align: left;
+    padding: 7px 12px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition);
+  }
+
+  .share-option:hover {
+    background: var(--bg-2);
+    color: var(--text-0);
+  }
+
+  .copy-toast {
+    position: absolute;
+    right: 24px;
+    top: 0;
+    z-index: 50;
     background: var(--bg-0);
     border: 1px solid var(--border-1);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
-    padding: 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 150px;
-    z-index: 40;
-  }
-  .share-option {
-    background: transparent;
-    border: none;
-    color: var(--text-0);
-    text-align: left;
-    padding: 6px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  .share-option:hover {
-    background: var(--bg-2);
-  }
-  .copy-feedback {
-    color: #16a34a;
+    padding: 6px 12px;
     font-size: 12px;
-    margin-left: 6px;
-    align-self: center;
+    color: #16a34a;
+    pointer-events: none;
   }
-  .share-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 39;
-    background: transparent;
+
+  :global(.dark) .copy-toast {
+    color: #4ade80;
   }
   /* Broken link badge */
   .broken-badge {
