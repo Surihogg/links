@@ -315,10 +315,11 @@
   }
 
   .brand-text {
-    font-size: 15px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--text-0);
-    letter-spacing: -0.3px;
+    letter-spacing: -0.5px;
+    font-family: "Georgia", "Times New Roman", serif;
   }
 
   .brand-settings {

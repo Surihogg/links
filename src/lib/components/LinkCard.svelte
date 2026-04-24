@@ -256,6 +256,53 @@
     position: relative;
   }
 
+  .favicon, .favicon-ph {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .favicon-ph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    background: var(--bg-2);
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    position: relative;
+  }
+
+  .card-title-row[data-tooltip]:hover::after,
+  .card-desc-row[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 0;
+    top: 100%;
+    z-index: 50;
+    max-width: 360px;
+    padding: 6px 10px;
+    background: var(--bg-0);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-1);
+    line-height: 1.5;
+    white-space: normal;
+    word-break: break-all;
+    pointer-events: none;
+  }
+
   .card-desc-row {
     position: relative;
     min-width: 0;
@@ -390,7 +437,7 @@
     text-decoration: none;
   }
 
-  .action-btn:hover { background: var(--bg-2); color: var(--text-1); }
+  .action-btn:hover { background: var(--border-1); color: var(--text-1); }
   .action-btn.danger:hover { background: var(--danger-soft); color: var(--danger); }
 
   .confirm-overlay {
