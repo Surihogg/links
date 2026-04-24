@@ -8,16 +8,18 @@ pub struct Db(pub Mutex<Connection>);
 impl Db {
     pub fn find_by_url(&self, url: &str, exclude_id: Option<i64>) -> Result<Option<Link>, AppError> {
         let conn = self.0.lock().unwrap();
+        let normalized = url.trim_end_matches('/');
+        let with_slash = format!("{}/", normalized);
         let sql = if exclude_id.is_some() {
-            format!("SELECT {} FROM links l WHERE l.url = ? AND l.id != ?", LINK_COLUMNS)
+            format!("SELECT {} FROM links l WHERE (l.url = ?1 OR l.url = ?2) AND l.id != ?3 LIMIT 1", LINK_COLUMNS)
         } else {
-            format!("SELECT {} FROM links l WHERE l.url = ?", LINK_COLUMNS)
+            format!("SELECT {} FROM links l WHERE l.url = ?1 OR l.url = ?2 LIMIT 1", LINK_COLUMNS)
         };
         let mut stmt = conn.prepare(&sql)?;
         let mut rows = if let Some(ex) = exclude_id {
-            stmt.query(rusqlite::params![url, ex])?
+            stmt.query(rusqlite::params![normalized, with_slash, ex])?
         } else {
-            stmt.query(rusqlite::params![url])?
+            stmt.query(rusqlite::params![normalized, with_slash])?
         };
         if let Some(row) = rows.next()? {
             Ok(Some(row_to_link(row)?))

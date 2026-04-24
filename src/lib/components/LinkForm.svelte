@@ -52,7 +52,7 @@
   async function check_dup(u) {
     const existing = await checkDuplicate(u, link?.id ?? null);
     if (existing) {
-      duplicate_warning = `已有相同链接：${existing.title || existing.url}`;
+      duplicate_warning = existing.title ? `已有相同链接：${existing.title}` : "已有相同链接";
     } else {
       duplicate_warning = "";
     }
@@ -115,7 +115,7 @@
     </div>
 
     <form class="modal-body" onsubmit={(e) => { e.preventDefault(); submit(); }}>
-      <div class="field">
+      <div class="field url-field">
         <label class="field-label">URL <span class="required">*</span></label>
         <div class="url-input-wrap">
           <input type="url" bind:value={url} oninput={on_url_input} required placeholder="https://..." class="field-input" />
@@ -125,14 +125,14 @@
             </svg>
           </button>
         </div>
-      </div>
-
-      <div class="field title-field">
-        <label class="field-label">标题</label>
-        <input type="text" bind:value={title} oninput={mark_edited("title")} placeholder="会自动帮你抓取哦" class="field-input" />
         {#if duplicate_warning}
           <span class="dup-warning">{duplicate_warning}</span>
         {/if}
+      </div>
+
+      <div class="field">
+        <label class="field-label">标题</label>
+        <input type="text" bind:value={title} oninput={mark_edited("title")} placeholder="会自动帮你抓取哦" class="field-input" />
       </div>
 
       <div class="field">
@@ -343,7 +343,7 @@
     padding-right: 42px;
   }
 
-  .title-field {
+  .url-field {
     position: relative;
   }
 
