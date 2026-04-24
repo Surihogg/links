@@ -7,7 +7,7 @@ from PIL import Image
 SRC = "app-icon.png"
 OUT_DIR = "src-tauri/icons"
 MACOS_ICONSET = "AppIcon.iconset"
-CONTENT_RATIO = 0.90
+CONTENT_RATIO = 0.80
 
 MACOS_SIZES = [
     ("icon_16x16", 16),
