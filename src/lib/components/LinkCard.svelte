@@ -206,8 +206,8 @@
       <div class="confirm-box" onclick={(e) => e.stopPropagation()}>
         <p class="confirm-text">确定要和这个链接说再见吗？</p>
         <div class="confirm-actions">
-          <button class="confirm-btn cancel" onclick={() => show_confirm = false}>取消</button>
-          <button class="confirm-btn delete" onclick={confirm_delete}>删除</button>
+          <button class="btn btn-secondary btn-sm" onclick={() => show_confirm = false}>取消</button>
+          <button class="btn btn-danger btn-sm" onclick={confirm_delete}>删除</button>
         </div>
       </div>
     </div>
@@ -254,59 +254,6 @@
     min-width: 0;
     flex: 1;
     position: relative;
-  }
-
-  .favicon, .favicon-ph {
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
-    flex-shrink: 0;
-  }
-
-  .favicon-ph {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    background: var(--bg-2);
-  }
-
-  .card-title {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-0);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    position: relative;
-  }
-
-  .card-title-row[data-tooltip]:hover::after,
-  .card-desc-row[data-tooltip]:hover::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    left: 0;
-    top: 100%;
-    z-index: 50;
-    max-width: 360px;
-    padding: 6px 10px;
-    background: var(--bg-0);
-    border: 1px solid var(--border-1);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--text-1);
-    line-height: 1.5;
-    white-space: normal;
-    word-break: break-all;
-    pointer-events: none;
-  }
-
-  .card-title-row {
-    position: relative;
-    min-width: 0;
-    flex: 1;
   }
 
   .card-desc-row {
@@ -360,14 +307,14 @@
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 11px;
-    background: #f0fdf4;
-    color: #15803d;
+    background: var(--cat-soft);
+    color: var(--cat-text);
     font-weight: 500;
   }
 
   :global(.dark) .cat-chip {
-    background: #14532d;
-    color: #86efac;
+    background: var(--cat-soft);
+    color: var(--cat-text);
   }
 
   .tag-chip {
@@ -391,8 +338,8 @@
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 11px;
-    background: #fef2f2;
-    color: #dc2626;
+    background: var(--danger-soft);
+    color: var(--danger);
     font-weight: 500;
     max-width: 200px;
   }
@@ -409,8 +356,8 @@
   }
 
   :global(.dark) .note-chip {
-    background: #3b1c1c;
-    color: #f87171;
+    background: var(--danger-soft);
+    color: var(--danger);
   }
 
   .card-actions {
@@ -426,7 +373,7 @@
   }
 
   .link-card:hover .card-actions .action-btn { opacity: 1; }
-  .card-actions .action-btn.active-fav { opacity: 1; color: #f59e0b; }
+  .card-actions .action-btn.active-fav { opacity: 1; color: var(--star); }
 
   .action-btn {
     width: 28px;
@@ -477,35 +424,6 @@
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-  }
-
-  .confirm-btn {
-    padding: 6px 14px;
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-
-  .confirm-btn.cancel {
-    background: var(--bg-2);
-    color: var(--text-2);
-  }
-
-  .confirm-btn.cancel:hover {
-    background: var(--border-1);
-    color: var(--text-1);
-  }
-
-  .confirm-btn.delete {
-    background: var(--danger);
-    color: white;
-  }
-
-  .confirm-btn.delete:hover {
-    opacity: 0.9;
   }
 
   /* Share dropdown styles */
@@ -559,21 +477,18 @@
     box-shadow: var(--shadow-md);
     padding: 6px 12px;
     font-size: 12px;
-    color: #16a34a;
+    color: var(--success);
     pointer-events: none;
   }
 
-  :global(.dark) .copy-toast {
-    color: #4ade80;
-  }
   .broken-badge {
     position: relative;
     display: inline-flex;
     align-items: center;
-    color: #f59e0b;
+    color: var(--star);
     flex-shrink: 0;
   }
-  :global(.dark) .broken-badge { color: #fbbf24; }
+  :global(.dark) .broken-badge { color: var(--star); }
   .broken-badge[data-tooltip]:hover::after {
     content: attr(data-tooltip);
     position: absolute;

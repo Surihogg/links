@@ -33,6 +33,13 @@
   --cat-text: #15803d;
   --cat-idle: #22c55e;
 
+  /* Star / Warning */
+  --star: #f59e0b;
+  --warning: #d97706;
+
+  /* Success */
+  --success: #16a34a;
+
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
@@ -78,6 +85,11 @@
   --cat-soft: #14532d;
   --cat-text: #86efac;
   --cat-idle: #4ade80;
+
+  --star: #fbbf24;
+  --warning: #fbbf24;
+
+  --success: #4ade80;
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
@@ -129,4 +141,111 @@ html, body {
 
 input, textarea, select, button {
   font-family: inherit;
+}
+
+/* ===== Global Button Styles ===== */
+.btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: var(--bg-2);
+  color: var(--text-2);
+}
+
+.btn-secondary:hover {
+  background: var(--border-1);
+  color: var(--text-1);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+/* ===== Global Modal Styles ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.modal {
+  width: 100%;
+  background: var(--bg-0);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-0);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+}
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+
+.modal-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+
+.modal-close:hover {
+  background: var(--bg-2);
+  color: var(--text-1);
+}
+
+.modal-body {
+  padding: 0 20px 20px;
 }

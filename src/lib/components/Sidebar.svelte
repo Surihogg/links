@@ -461,7 +461,7 @@
   }
 
   .tag-item {
-    font-size: 12px;
+    font-size: 13px;
     position: relative;
   }
 
@@ -506,7 +506,7 @@
     background: var(--danger-soft);
   }
 
-  .cat-delete-hint {
+  .delete-hint {
     font-size: 10px;
     color: var(--danger);
     margin-left: auto;
@@ -532,7 +532,7 @@
 
   .section-search-input:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent-soft);
+    box-shadow: 0 0 0 3px var(--accent-soft);
   }
 
   .cat-toggle {
@@ -651,7 +651,7 @@
   }
 
   .footer-btn:hover {
-    background: var(--bg-2);
+    background: var(--border-1);
     color: var(--text-1);
   }
 

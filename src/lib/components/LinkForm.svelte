@@ -183,65 +183,14 @@
 </div>
 
 <style>
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-
   .modal {
-    width: 100%;
     max-width: 480px;
     max-height: 90vh;
-    background: var(--bg-0);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-xl);
-    border: 1px solid var(--border-0);
-    overflow: hidden;
     display: flex;
     flex-direction: column;
   }
 
-  .modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px 12px;
-  }
-
-  .modal-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text-0);
-  }
-
-  .modal-close {
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: none;
-    color: var(--text-3);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all var(--transition);
-  }
-
-  .modal-close:hover {
-    background: var(--bg-2);
-    color: var(--text-1);
-  }
-
   .modal-body {
-    padding: 0 20px 20px;
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -293,15 +242,7 @@
 
   .url-input-wrap .field-input {
     flex: 1;
-    padding-right: 70px;
-  }
-
-  .fetch-hint {
-    position: absolute;
-    right: 10px;
-    font-size: 11px;
-    color: var(--accent);
-    pointer-events: none;
+    padding-right: 42px;
   }
 
   .fetch-error {
@@ -339,10 +280,6 @@
     animation: spin 0.6s linear infinite;
   }
 
-  .url-input-wrap .field-input {
-    padding-right: 42px;
-  }
-
   .url-field {
     position: relative;
   }
@@ -352,12 +289,9 @@
     right: 0;
     top: 100%;
     font-size: 11px;
-    color: #d97706;
+    color: var(--warning);
     margin-top: 2px;
     pointer-events: none;
-  }
-  :global(.dark) .dup-warning {
-    color: #fbbf24;
   }
 
   .field-textarea {
@@ -409,38 +343,4 @@
   }
 
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  .btn {
-    padding: 7px 16px;
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .btn-primary {
-    background: var(--accent);
-    color: white;
-  }
-
-  .btn-primary:hover:not(:disabled) {
-    background: var(--accent-hover);
-  }
-
-  .btn-secondary {
-    background: var(--bg-2);
-    color: var(--text-2);
-  }
-
-  .btn-secondary:hover {
-    background: var(--border-1);
-    color: var(--text-1);
-  }
 </style>

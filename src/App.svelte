@@ -337,8 +337,8 @@
         <p class="close-title">要走了吗？</p>
         <p class="close-desc">选择一下你希望的离开方式~</p>
         <div class="close-actions">
-          <button class="close-btn tray" onclick={close_to_tray}>最小化到托盘</button>
-          <button class="close-btn exit" onclick={close_exit}>退出应用</button>
+          <button class="btn btn-primary" style="flex:1" onclick={close_to_tray}>最小化到托盘</button>
+          <button class="btn btn-secondary" style="flex:1" onclick={close_exit}>退出应用</button>
         </div>
       </div>
     </div>
@@ -455,6 +455,7 @@
     justify-content: center;
     background: rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
 
   .close-dialog {
@@ -482,36 +483,6 @@
   .close-actions {
     display: flex;
     gap: 8px;
-  }
-
-  .close-btn {
-    flex: 1;
-    padding: 8px 16px;
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-
-  .close-btn.tray {
-    background: var(--accent);
-    color: white;
-  }
-
-  .close-btn.tray:hover {
-    background: var(--accent-hover);
-  }
-
-  .close-btn.exit {
-    background: var(--bg-2);
-    color: var(--text-2);
-  }
-
-  .close-btn.exit:hover {
-    background: var(--border-1);
-    color: var(--text-1);
   }
 
   .import-banner {

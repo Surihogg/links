@@ -189,62 +189,8 @@
 </div>
 
 <style>
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-
   .modal {
-    width: 100%;
     max-width: 400px;
-    background: var(--bg-0);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-xl);
-    border: 1px solid var(--border-0);
-    overflow: hidden;
-  }
-
-  .modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px 12px;
-  }
-
-  .modal-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text-0);
-  }
-
-  .modal-close {
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: none;
-    color: var(--text-3);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all var(--transition);
-  }
-
-  .modal-close:hover {
-    background: var(--bg-2);
-    color: var(--text-1);
-  }
-
-  .modal-body {
-    padding: 0 20px 20px;
   }
 
   .section-label {
@@ -346,35 +292,6 @@
     gap: 8px;
   }
 
-  .btn {
-    padding: 7px 16px;
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-
-  .btn-primary {
-    background: var(--accent);
-    color: white;
-  }
-
-  .btn-primary:hover {
-    background: var(--accent-hover);
-  }
-
-  .btn-secondary {
-    background: var(--bg-2);
-    color: var(--text-2);
-  }
-
-  .btn-secondary:hover {
-    background: var(--border-1);
-    color: var(--text-1);
-  }
-
   .format-loading {
     font-size: 13px;
     color: var(--text-3);
@@ -439,10 +356,5 @@
     font-size: 11px;
     color: var(--danger);
     width: 100%;
-  }
-
-  .btn-sm {
-    padding: 4px 12px;
-    font-size: 12px;
   }
 </style>
