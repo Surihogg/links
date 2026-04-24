@@ -170,14 +170,14 @@
     </div>
 
     <div class="card-actions">
-      <button class="action-btn no-color" onclick={toggle_fav}>
+      <button class="action-btn" onclick={toggle_fav}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
         </svg>
       </button>
-       <button class="action-btn" onclick={edit_link}>
+      <button class="action-btn" onclick={edit_link}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z" fill="currentColor" fill-opacity="0.2"/>
+          <path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z"/>
           <path d="M14.5 7.5l3 3"/>
         </svg>
       </button>
@@ -476,7 +476,6 @@
   }
 
   .action-btn:hover { background: var(--border-1); color: var(--text-1); }
-  .action-btn.no-color:hover { background: var(--border-1); color: var(--text-3); }
   .action-btn.danger:hover { background: var(--danger-soft); color: var(--danger); }
 
   .confirm-overlay {
