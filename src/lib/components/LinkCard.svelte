@@ -113,7 +113,7 @@
           {/if}
         <div class="card-title-row" data-tooltip={title_truncated ? (link.title || link.url) : undefined}>
           {#if link.favicon_url}
-            <img src={link.favicon_url} alt="" class="favicon" onerror={(e) => e.target.style.display = 'none'} />
+            <img src={link.favicon_url} alt="" class="favicon" referrerpolicy="no-referrer" onerror={(e) => e.target.style.display = 'none'} />
           {:else}
             <div class="favicon-ph">🔗</div>
           {/if}
@@ -417,7 +417,7 @@
     display: flex;
     gap: 2px;
     flex-shrink: 0;
-    padding-top: 2px;
+    align-self: center;
   }
 
   .card-actions .action-btn {

@@ -290,4 +290,20 @@ mod tests {
         let (_, _, favicon, _) = parse_html_meta(html, "https://example.com");
         assert_eq!(favicon, "https://example.com/sfavicon.ico");
     }
+
+    #[test]
+    fn test_bilibili_like_favicon() {
+        // Simulate Bilibili's exact HTML structure with apple-touch-icon and shortcut icon
+        let html = r#"<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <title>哔哩哔哩 (゜-゜)つロ 干杯~-bilibili</title>
+    <link rel="dns-prefetch" href="//s1.hdslb.com" />
+    <link rel="apple-touch-icon" href="https://i0.hdslb.com/bfs/static/jinkela/long/images/512.png" />
+    <link rel="shortcut icon" href="https://i0.hdslb.com/bfs/static/jinkela/long/images/favicon.ico" />
+</head><body></body></html>"#;
+        let (_, _, favicon, _) = parse_html_meta(html, "https://www.bilibili.com/");
+        assert_eq!(favicon, "https://i0.hdslb.com/bfs/static/jinkela/long/images/favicon.ico");
+    }
 }

@@ -87,6 +87,11 @@ pub fn links_create(
     let url_for_fetch = link.url.clone();
     let link_id = link.id;
     let app_clone = app.clone();
+    // Only re-fetch metadata if frontend didn't already provide it.
+    // Frontend fetches title/description/favicon via fetchMeta before submit;
+    // if title is already populated, skip the redundant backend fetch.
+    let needs_meta_fetch = link.title.is_empty() && link.description.is_empty() && link.favicon_url.is_empty();
+
     // Spawn link status check after metadata fetch is attempted
     let url_for_check = link.url.clone();
     let link_id_check = link.id;
@@ -95,13 +100,14 @@ pub fn links_create(
         // Check reachability in background and mark is_broken if needed
         let reachable = do_check_link(&url_for_check).await.unwrap_or(false);
         if !reachable {
-            if let Ok(mut db_guard) = app_clone_check.state::<Db>().0.lock() {
+            if let Ok(db_guard) = app_clone_check.state::<Db>().0.lock() {
                 let _ = db_guard.execute(
                     "UPDATE links SET is_broken = 1 WHERE id = ?",
                     rusqlite::params![link_id_check],
                 );
             }
         }
+        if !needs_meta_fetch { return; }
         match crate::fetcher::fetch_metadata(&url_for_fetch).await {
             Ok(meta) => {
                 let db_state = app_clone.state::<Db>();

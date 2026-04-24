@@ -2,6 +2,8 @@ mod commands;
 mod config;
 mod db;
 mod fetcher;
+#[allow(dead_code)]
+mod normalize;
 
 use std::path::PathBuf;
 use tauri::{

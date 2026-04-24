@@ -4,14 +4,31 @@
 
 ### 缓存区
 
-- [ ] 快捷键功能改为类似spotlight一样的全局搜索框，搜索框支持搜索和添加连接
+- [ ] 删除快速添加，快捷键功能改为类似spotlight一样的全局搜索框，搜索框支持搜索和添加连接。按esc键退出
+  - [ ] 搜索功能：搜索出的结果只展示标题、分组、标签，点击可以跳转
+  - [ ] 添加链接：当搜索框内出现url时候，展示添加链接的
 - [ ] 链接支持拖拽到分组和标签和特别关注
 
 ### 工作区
 
-
+_（当前无任务）_
 
 ### 已完成
+
+#### 2026-04-24 (3)
+
+- [x] 在添加链接时，就算已经抓取成功，点击保存后还会抓取一次
+- [x] 链接卡片的按钮应该上下居中
+- [x] 重新审视一下所有地方的样式是否统一和谐，将识别出来的不符合要求的地方列举出来
+  - **① 按钮样式重复定义 4 处**：`.btn` / `.btn-primary` / `.btn-secondary` 在 `LinkForm`、`ExportDialog`、`SettingsDialog` 各写一遍（完全相同），`LinkCard` 的 `.confirm-btn` 也是同一套样式，`App.svelte` 的 `.close-btn` 同理 → 建议提取到 `app.css` 全局样式
+  - **② 模态框样式重复 3 处**：`.modal-overlay`、`.modal`、`.modal-header`、`.modal-title`、`.modal-close` 在 `LinkForm`、`ExportDialog`、`SettingsDialog` 各写一遍（完全相同） → 同上，提取到全局
+  - **③ Sidebar 标签字号比分组小**：`.cat-item` 是 `13px`，`.tag-item` 是 `12px`，两者并列视觉不统一 → 建议统一为 `13px`
+  - **④ Sidebar 底栏按钮 hover 无变化**：`.sidebar-footer` 背景 `var(--bg-2)`，`.footer-btn:hover` 也是 `var(--bg-2)` → 建议改为 `var(--bg-hover)` 或 `var(--border-1)`
+  - **⑤ LinkCard `.card-title-row` 定义了两次**：line 250-257 和 line 306-310 是同一个选择器的两个块 → 应合并
+  - **⑥ 硬编码颜色代替 CSS 变量**：`.cat-chip` 用 `#f0fdf4`/`#15803d`（等于 `--cat-soft`/`--cat-text`），`.note-chip` 用 `#fef2f2`/`#dc2626`，`.copy-toast` 用 `#16a34a`，`.active-fav`/`.broken-badge` 用 `#f59e0b`，`.dup-warning` 用 `#d97706` → 建议统一使用 CSS 变量
+  - **⑦ 输入框 focus ring 不一致**：Sidebar `.section-search-input:focus` 用 `2px`，其余所有输入框用 `3px` → 建议统一 `3px`
+  - **⑧ `App.svelte` 的 `.close-overlay` 缺少 `-webkit-backdrop-filter`**：其他 3 个 overlay 都有，Safari 兼容性需要
+  - **⑨ Sidebar 标签删除提示复用了 `.cat-delete-hint`**：标签条目里的"再点一下~"用的是 `.cat-delete-hint`（分类的类名） → 建议改为通用命名如 `.delete-hint`
 
 #### 2026-04-24 (2)
 
@@ -57,6 +74,7 @@
 - [x] 提供常用的配置项（如关闭程序是托盘还是退出）
   - [x] 功能实现不正确。应该把配置也用json持久化到db的位置
 - [x] 程序第一次启动应该默认是最小的，用户可以根据需要调整大小，这个也隐藏在配置里
+
 - [x] 系统托盘（最小化到托盘，后台运行）
 - [x] 支持导入书签（Chrome / Firefox / Safari 书签 HTML）
 - [x] 重构侧边栏分组和标签管理的样式，条目颜色与链接卡片上保持一致（蓝色、绿色）
@@ -69,10 +87,10 @@
 
 - [ ] 链接备注支持 Markdown 渲染
 - [ ] 自动备份（定期导出数据库备份）
+- [ ] 支持导入 JSON / CSV / markdown 格式的链接
 
 ## 体验优化（待定）
 
-- [ ] 链接列表虚拟滚动（大量链接时保持流畅）造2000条数据做性能测试看看有没有必要
 - [ ] 侧边栏分组支持右键菜单（重命名、删除、新建子分组）
 - [ ] 搜索支持快捷键聚焦（Cmd/Ctrl+K）
 - [ ] 搜索历史记录
