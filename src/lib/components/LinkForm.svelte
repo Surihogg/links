@@ -124,15 +124,15 @@
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
             </svg>
           </button>
-        {#if duplicate_warning}
-          <span class="dup-warning">{duplicate_warning}</span>
-        {/if}
         </div>
       </div>
 
-      <div class="field">
+      <div class="field title-field">
         <label class="field-label">标题</label>
         <input type="text" bind:value={title} oninput={mark_edited("title")} placeholder="会自动帮你抓取哦" class="field-input" />
+        {#if duplicate_warning}
+          <span class="dup-warning">{duplicate_warning}</span>
+        {/if}
       </div>
 
       <div class="field">
@@ -289,7 +289,6 @@
     position: relative;
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
   }
 
   .url-input-wrap .field-input {
@@ -344,11 +343,18 @@
     padding-right: 42px;
   }
 
+  .title-field {
+    position: relative;
+  }
+
   .dup-warning {
-    width: 100%;
+    position: absolute;
+    right: 0;
+    top: 100%;
     font-size: 11px;
     color: #d97706;
     margin-top: 2px;
+    pointer-events: none;
   }
   :global(.dark) .dup-warning {
     color: #fbbf24;
