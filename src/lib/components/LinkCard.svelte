@@ -104,20 +104,20 @@
     <div class="card-content" onclick={card_click}>
       <div class="card-top">
         <div class="card-title-row" data-tooltip={title_truncated ? (link.title || link.url) : undefined}>
-          {#if link.favicon_url}
-            <img src={link.favicon_url} alt="" class="favicon" onerror={(e) => e.target.style.display = 'none'} />
-          {:else}
-            <div class="favicon-ph">🔗</div>
-          {/if}
-          <div class="card-title" onmouseenter={check_title_overflow}>{@html hl(link.title || link.url)}</div>
           {#if link.is_broken}
-            <span class="broken-badge" title="链接可能已失效">
+            <span class="broken-badge" data-tooltip="链接可能已失效">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                 <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
               </svg>
             </span>
           {/if}
+          {#if link.favicon_url}
+            <img src={link.favicon_url} alt="" class="favicon" onerror={(e) => e.target.style.display = 'none'} />
+          {:else}
+            <div class="favicon-ph">🔗</div>
+          {/if}
+          <div class="card-title" onmouseenter={check_title_overflow}>{@html hl(link.title || link.url)}</div>
         </div>
       </div>
 
@@ -558,11 +558,29 @@
   }
   /* Broken link badge */
   .broken-badge {
+    position: relative;
     display: inline-flex;
     align-items: center;
     color: #f59e0b;
-    margin-left: 6px;
     flex-shrink: 0;
   }
   :global(.dark) .broken-badge { color: #fbbf24; }
+  .broken-badge[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    z-index: 30;
+    white-space: nowrap;
+    padding: 4px 8px;
+    background: var(--bg-0);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-2);
+    pointer-events: none;
+  }
 </style>
