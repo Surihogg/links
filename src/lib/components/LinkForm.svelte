@@ -124,9 +124,6 @@
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
             </svg>
           </button>
-        {#if fetch_error}
-          <span class="fetch-error">{fetch_error}</span>
-        {/if}
         {#if duplicate_warning}
           <span class="dup-warning">{duplicate_warning}</span>
         {/if}
@@ -170,6 +167,8 @@
               <span class="spinner-sm"></span>
               抓取中...
             </span>
+          {:else if fetch_error}
+            <span class="fetch-error">{fetch_error}</span>
           {/if}
         </div>
         <div class="footer-right">
@@ -290,6 +289,7 @@
     position: relative;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
   }
 
   .url-input-wrap .field-input {
@@ -306,11 +306,8 @@
   }
 
   .fetch-error {
-    position: absolute;
-    right: 10px;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text-3);
-    pointer-events: none;
   }
 
   .refresh-btn {
@@ -347,11 +344,8 @@
     padding-right: 42px;
   }
 
-  .fetch-error {
-    right: 42px;
-  }
-
   .dup-warning {
+    width: 100%;
     font-size: 11px;
     color: #d97706;
     margin-top: 2px;
