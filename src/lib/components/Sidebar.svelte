@@ -190,8 +190,8 @@
             <span class="cat-delete-hint">再点一下~</span>
           {/if}
            <span class="cat-delete-btn" onclick={(e) => handle_delete_cat(e, cat.id)}>
-             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-               <path d="M18 6L6 18"/><path d="M6 6l12 12"/>
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+               <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
              </svg>
            </span>
         </button>
@@ -249,8 +249,8 @@
             <span class="cat-delete-hint">再点一下~</span>
           {/if}
            <span class="tag-delete-btn" onclick={(e) => handle_delete_tag(e, tag.id)}>
-             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-               <path d="M18 6L6 18"/><path d="M6 6l12 12"/>
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+               <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
              </svg>
            </span>
         </button>
