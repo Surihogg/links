@@ -57,7 +57,8 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "bundleName": "Links"
     }
   }
 }
