@@ -9,15 +9,13 @@
 
 ### 工作区
 
-- [ ] 如果直接把db等文件删除，mac下重新打开程序可以正常运行，windows程序会卡死
-- [ ] 启动时后应该给一个加载的动画；mac现在是一片空白，windows是一个透明的窗口
 
-- [ ] CI/CD 配置（GitHub Actions 自动构建 macOS / Windows 安装包）
 
 ### 已完成
 
 #### 2026-04-24 (2)
 
+- [x] CI/CD 配置（GitHub Actions 自动构建 macOS / Windows 安装包）
 - [x] 如果直接把db等文件删除，mac下重新打开程序可以正常运行，windows程序会卡死
 - [x] 启动时后应该给一个加载的动画；mac现在是一片空白，windows是一个透明的窗口
 

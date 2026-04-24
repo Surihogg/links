@@ -4,9 +4,39 @@ use crate::db::{
     PaginatedResult, SearchParams, UpdateCategoryPayload, UpdateLinkPayload,
 };
 use rusqlite::params;
+use std::io::Write;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
+fn log_fetch_failure(app: &AppHandle, url: &str, error: &str) {
+    let Ok(dir) = app.path().app_data_dir() else { return };
+    let _ = std::fs::create_dir_all(&dir);
+    let path = dir.join("fail_links.log");
+
+    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+    let os = format!("{} {}", std::env::consts::OS, std::env::consts::ARCH);
+    let proxy_info = [
+        ("HTTP_PROXY", std::env::var("HTTP_PROXY").ok()),
+        ("HTTPS_PROXY", std::env::var("HTTPS_PROXY").ok()),
+        ("ALL_PROXY", std::env::var("ALL_PROXY").ok()),
+        ("NO_PROXY", std::env::var("NO_PROXY").ok()),
+    ]
+    .iter()
+    .filter_map(|(k, v)| v.as_ref().map(|val| format!("{}={}", k, val)))
+    .collect::<Vec<_>>()
+    .join(", ");
+    let proxy_line = if proxy_info.is_empty() { "None".into() } else { proxy_info };
+
+    let entry = format!(
+        "[{}] {}\n  URL: {}\n  OS: {}\n  Proxy: {}\n---\n",
+        timestamp, error, url, os, proxy_line
+    );
+
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = f.write_all(entry.as_bytes());
+    }
+}
 
 fn get_db_path(app: &AppHandle) -> PathBuf {
     let dir = app
@@ -83,6 +113,7 @@ pub fn links_create(
             }
             Err(e) => {
                 log::warn!("metadata fetch failed for {}: {}", url_for_fetch, e);
+                log_fetch_failure(&app_clone, &url_for_fetch, &e.to_string());
             }
         }
     });
@@ -146,12 +177,14 @@ pub fn tags_autocomplete(db: State<'_, Db>, prefix: String) -> Result<Vec<crate:
 }
 
 #[tauri::command]
-pub async fn fetch_metadata(url: String) -> Result<crate::fetcher::PageMeta, AppError> {
+pub async fn fetch_metadata(app: AppHandle, url: String) -> Result<crate::fetcher::PageMeta, AppError> {
     crate::fetcher::fetch_metadata(&url)
         .await
         .map_err(|e| {
-            log::warn!("metadata fetch failed for {}: {}", url, e);
-            AppError::General(e.to_string())
+            let msg = e.to_string();
+            log::warn!("metadata fetch failed for {}: {}", url, msg);
+            log_fetch_failure(&app, &url, &msg);
+            AppError::General(msg)
         })
 }
 
@@ -297,6 +330,10 @@ async fn do_check_link(url: &str) -> Result<bool, AppError> {
 }
 
 #[tauri::command]
-pub async fn check_link_status(url: String) -> Result<bool, AppError> {
-    do_check_link(&url).await
+pub async fn check_link_status(app: AppHandle, url: String) -> Result<bool, AppError> {
+    let result = do_check_link(&url).await;
+    if let Ok(false) | Err(_) = &result {
+        log_fetch_failure(&app, &url, "link status check failed");
+    }
+    result
 }
