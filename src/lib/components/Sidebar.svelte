@@ -11,6 +11,8 @@
   let deleting_tag_id = $state(null);
   let show_new_tag = $state(false);
   let new_tag_name = $state("");
+  let cat_placeholder = $state("给我一点输入");
+  let tag_placeholder = $state("给我一点输入");
 
   function toggle_section(key) {
     const next = new Set(collapsed);
@@ -25,10 +27,13 @@
   }
 
   function submit_category() {
-    if (!new_name.trim()) return;
+    if (!new_name.trim()) {
+      cat_placeholder = cat_placeholder === "给我一点输入" ? "你是认真的吗？" : "给我一点输入";
+      return;
+    }
     oncreate?.({ name: new_name.trim(), parent_id: new_parent_id });
     new_name = "";
-    show_new = false;
+    cat_placeholder = "给我一点输入";
   }
 
   function flatten_categories(cats, depth = 0) {
@@ -83,10 +88,13 @@
   }
 
   function submit_tag() {
-    if (!new_tag_name.trim()) return;
+    if (!new_tag_name.trim()) {
+      tag_placeholder = tag_placeholder === "给我一点输入" ? "你是认真的吗？" : "给我一点输入";
+      return;
+    }
     oncreate_tag?.(new_tag_name.trim());
     new_tag_name = "";
-    show_new_tag = false;
+    tag_placeholder = "给我一点输入";
   }
 </script>
 
@@ -148,18 +156,14 @@
 
     {#if !collapsed.has('categories')}
     {#if show_new}
-      <form class="new-cat-form" onsubmit={(e) => { e.preventDefault(); submit_category(); }}>
+      <form class="new-cat-form" onsubmit={(e) => { e.preventDefault(); submit_category(); }} onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { show_new = false; new_name = ""; cat_placeholder = "给我一点输入"; } }}>
         <input
           type="text"
           bind:value={new_name}
-          placeholder="分组名称"
+          placeholder={cat_placeholder}
           class="new-cat-input"
           autofocus
         />
-        <div class="new-cat-actions">
-          <button type="submit" class="new-cat-btn primary">确定</button>
-          <button type="button" class="new-cat-btn" onclick={() => { show_new = false; new_name = ""; }}>取消</button>
-        </div>
       </form>
     {/if}
     {#if flat_categories.length > 10}
@@ -185,9 +189,10 @@
           {:else}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
           {/if}
-          <span class="cat-name">{cat.name}</span>
           {#if deleting_id === cat.id}
-            <span class="cat-delete-hint">再点一下~</span>
+            <span class="cat-delete-hint">再点一下就删除</span>
+          {:else}
+            <span class="cat-name">{cat.name}</span>
           {/if}
            <span class="cat-delete-btn" onclick={(e) => handle_delete_cat(e, cat.id)}>
              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -216,18 +221,14 @@
     </div>
     {#if !collapsed.has('tags')}
     {#if show_new_tag}
-      <form class="new-cat-form" onsubmit={(e) => { e.preventDefault(); submit_tag(); }}>
+      <form class="new-cat-form" onsubmit={(e) => { e.preventDefault(); submit_tag(); }} onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { show_new_tag = false; new_tag_name = ""; tag_placeholder = "给我一点输入"; } }}>
         <input
           type="text"
           bind:value={new_tag_name}
-          placeholder="标签名称"
+          placeholder={tag_placeholder}
           class="new-cat-input"
           autofocus
         />
-        <div class="new-cat-actions">
-          <button type="submit" class="new-cat-btn primary">确定</button>
-          <button type="button" class="new-cat-btn" onclick={() => { show_new_tag = false; new_tag_name = ""; }}>取消</button>
-        </div>
       </form>
     {/if}
     {#if tags.length > 10}
@@ -244,9 +245,10 @@
           onmouseleave={reset_tag_delete}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tag-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-          <span class="cat-name">{tag.name}</span>
           {#if deleting_tag_id === tag.id}
-            <span class="cat-delete-hint">再点一下~</span>
+            <span class="cat-delete-hint">再点一下就删除</span>
+          {:else}
+            <span class="cat-name">{tag.name}</span>
           {/if}
            <span class="tag-delete-btn" onclick={(e) => handle_delete_tag(e, tag.id)}>
              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -538,10 +540,17 @@
     color: var(--text-3);
   }
 
-  .cat-name {
+  .cat-name, .cat-delete-hint {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 13px;
+  }
+
+  .cat-delete-hint {
+    color: var(--danger);
+    flex: 1;
+    text-align: left;
   }
 
   .new-cat-form {
@@ -553,45 +562,20 @@
 
   .new-cat-input {
     width: 100%;
-    padding: 5px 8px;
+    padding: 7px 10px;
     border: 1px solid var(--border-1);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     background: var(--bg-0);
     color: var(--text-0);
-    font-size: 12px;
+    font-size: 13px;
     outline: none;
-    transition: border-color var(--transition);
+    transition: all var(--transition);
   }
 
   .new-cat-input:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-soft);
   }
-
-  .new-cat-actions {
-    display: flex;
-    gap: 4px;
-  }
-
-  .new-cat-btn {
-    flex: 1;
-    padding: 3px 10px;
-    border: none;
-    border-radius: var(--radius-sm);
-    font-size: 11px;
-    cursor: pointer;
-    color: var(--text-2);
-    background: var(--bg-2);
-    transition: all var(--transition);
-  }
-
-  .new-cat-btn.primary {
-    background: var(--accent);
-    color: white;
-  }
-
-  .new-cat-btn.primary:hover { background: var(--accent-hover); }
-  .new-cat-btn:not(.primary):hover { background: var(--border-1); }
 
   .tag-list {
     display: flex;

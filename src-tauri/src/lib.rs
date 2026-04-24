@@ -45,22 +45,17 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, _event, _shortcut| {
-                    if let Some(window) = app.get_webview_window("quick-add") {
-                        let _ = window.show();
-                        let _ = window.unminimize();
-                        let _ = window.set_focus();
+                    let window = if let Some(w) = app.get_webview_window("quick-add") {
+                        w
                     } else {
-                        let _ = tauri::WebviewWindowBuilder::new(
-                            app,
-                            "quick-add",
-                            tauri::WebviewUrl::App("index.html".into()),
-                        )
-                        .title("快速添加")
-                        .inner_size(400.0, 350.0)
-                        .center()
-                        .focused(true)
-                        .build();
-                    }
+                        let config = app.config().app.windows.iter().find(|w| w.label == "quick-add").unwrap();
+                        tauri::WebviewWindowBuilder::from_config(app, config)
+                            .unwrap()
+                            .build()
+                            .unwrap()
+                    };
+                    let _ = window.show();
+                    let _ = window.set_focus();
                 })
                 .build(),
         )

@@ -81,6 +81,17 @@
         show_close_dialog = true;
       }
     });
+
+    // 监听 quick-add 窗口的保存事件
+    try {
+      const { listen } = await import("@tauri-apps/api/event");
+      const unlisten = await listen("links-changed", () => {
+        refresh_current_view();
+      });
+      return () => {
+        unlisten();
+      };
+    } catch (e) {}
   });
 
   async function load_data() {
@@ -408,7 +419,7 @@
     right: 24px;
     width: 44px;
     height: 44px;
-    border-radius: var(--radius-lg);
+    border-radius: 50%;
     background: var(--accent);
     color: white;
     border: none;

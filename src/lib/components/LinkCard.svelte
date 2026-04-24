@@ -214,8 +214,8 @@
       <div class="confirm-box" onclick={(e) => e.stopPropagation()}>
         <p class="confirm-text">确定要和这个链接说再见吗？</p>
         <div class="confirm-actions">
-          <button class="btn btn-secondary btn-sm" onclick={() => show_confirm = false}>取消</button>
-          <button class="btn btn-danger btn-sm" onclick={confirm_delete}>删除</button>
+          <button class="btn btn-secondary btn-sm" onclick={() => show_confirm = false}>算了</button>
+          <button class="btn btn-danger btn-sm" onclick={confirm_delete}>没错</button>
         </div>
       </div>
     </div>
@@ -251,7 +251,7 @@
     cursor: pointer;
     display: flex;
     align-items: flex-start;
-    padding: 2px 3px;
+    padding: 0 3px 2px;
     border-radius: 0 0 3px 3px;
     transition: opacity var(--transition);
   }

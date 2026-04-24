@@ -18,9 +18,28 @@
         "height": 600,
         "minWidth": 800,
         "minHeight": 600,
+        "center": true,
         "decorations": true,
         "transparent": true,
         "titleBarStyle": "Overlay"
+      },
+      {
+        "label": "quick-add",
+        "url": "quick-add.html",
+        "width": 480,
+        "height": 500,
+        "center": true,
+        "visible": false,
+        "decorations": true,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "titleBarStyle": "Overlay",
+        "resizable": false,
+        "closable": false,
+        "minimizable": false,
+        "maximizable": false,
+        "hiddenTitle": true,
+        "skipTaskbar": true
       }
     ],
     "security": {

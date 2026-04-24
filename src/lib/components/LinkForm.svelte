@@ -136,16 +136,6 @@
       </div>
 
       <div class="field">
-        <label class="field-label">描述</label>
-        <textarea bind:value={description} oninput={mark_edited("description")} rows="2" placeholder="会自动帮你抓取哦" class="field-input field-textarea"></textarea>
-      </div>
-
-      <div class="field">
-        <label class="field-label">备注</label>
-        <textarea bind:value={notes} rows="2" placeholder="说说你的想法吧" class="field-input field-textarea"></textarea>
-      </div>
-
-      <div class="field">
         <label class="field-label">分组</label>
         <select bind:value={category_id} placeholder="确定不分个组吗" class="field-input" onchange={() => { if (category_id === "") category_id = null; }}>
           <option value="">无分组</option>
@@ -155,9 +145,19 @@
         </select>
       </div>
 
-      <div class="field">
+      <div class="field tag-field">
         <label class="field-label">标签</label>
         <TagInput bind:tags />
+      </div>
+
+      <div class="field desc-field">
+        <label class="field-label">描述</label>
+        <textarea bind:value={description} oninput={mark_edited("description")} rows="2" placeholder="会自动帮你抓取哦" class="field-input field-textarea"></textarea>
+      </div>
+
+      <div class="field notes-field">
+        <label class="field-label">备注</label>
+        <textarea bind:value={notes} rows="2" placeholder="说说你的想法吧" class="field-input field-textarea"></textarea>
       </div>
 
       <div class="modal-footer">
@@ -191,9 +191,9 @@
   }
 
   .modal-body {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 16px;
     overflow-y: auto;
   }
 
@@ -306,6 +306,14 @@
     background-repeat: no-repeat;
     background-position: right 10px center;
     padding-right: 28px;
+  }
+
+  .url-field,
+  .tag-field,
+  .desc-field,
+  .notes-field,
+  .modal-footer {
+    grid-column: span 2;
   }
 
   .modal-footer {
