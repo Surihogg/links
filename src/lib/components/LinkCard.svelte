@@ -101,7 +101,7 @@
 
 <div class="link-card">
   {#if link.is_favorite}
-    <div class="bookmark-corner" data-tooltip="已标记" onclick={toggle_fav}>
+    <div class="bookmark-corner" data-tooltip="取消标记" onclick={toggle_fav}>
       <svg width="10" height="14" viewBox="0 0 10 14" fill="var(--star)" stroke="none">
         <path d="M1 0H9V14L5 10L1 14Z"/>
       </svg>
@@ -170,25 +170,25 @@
     </div>
 
     <div class="card-actions">
-      <button class="action-btn" class:active-fav={link.is_favorite} onclick={toggle_fav} title={link.is_favorite ? '取消标记' : '标记'}>
+      <button class="action-btn" class:active-fav={link.is_favorite} onclick={toggle_fav}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill={link.is_favorite ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
         </svg>
       </button>
-      <button class="action-btn" onclick={edit_link} title="编辑">
+      <button class="action-btn" onclick={edit_link}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17 3l4 4L7 21H3v-4z"/>
+          <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
         </svg>
       </button>
-      <button class="action-btn" onclick={toggle_share} title="分享">
+      <button class="action-btn" onclick={toggle_share}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
         </svg>
       </button>
-      <button class="action-btn danger" onclick={delete_link} title="删除">
+      <button class="action-btn danger" onclick={delete_link}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
+          <path d="M17 3l4 4L7 21H3v-4z"/>
         </svg>
       </button>
     </div>
@@ -459,7 +459,7 @@
 
   .link-card:hover .card-actions .action-btn { opacity: 1; }
   .card-actions .action-btn.active-fav { opacity: 1; color: var(--star); }
-  .card-actions .action-btn:not(.active-fav).action-btn:hover { color: var(--star); }
+  .card-actions .action-btn.active-fav:hover { color: var(--star); }
 
   .action-btn {
     width: 28px;
