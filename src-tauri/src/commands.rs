@@ -18,10 +18,23 @@ fn get_db_path(app: &AppHandle) -> PathBuf {
 
 pub fn init_db(app: &AppHandle) -> Result<(), AppError> {
     let path = get_db_path(app);
-    let db = Db::open(&path)?;
-    db.migrate()?;
-    app.manage(db);
-    Ok(())
+    match Db::open(&path) {
+        Ok(db) => {
+            db.migrate()?;
+            app.manage(db);
+            Ok(())
+        }
+        Err(_) => {
+            // DB file is missing or corrupt — remove stale files and recreate.
+            let _ = std::fs::remove_file(&path);
+            let _ = std::fs::remove_file(path.with_extension("db-wal"));
+            let _ = std::fs::remove_file(path.with_extension("db-shm"));
+            let db = Db::open(&path)?;
+            db.migrate()?;
+            app.manage(db);
+            Ok(())
+        }
+    }
 }
 
 #[tauri::command]

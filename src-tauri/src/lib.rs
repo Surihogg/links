@@ -24,6 +24,12 @@ fn data_dir(app: &tauri::AppHandle) -> PathBuf {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Ensure data directory exists before any plugin tries to write to it.
+    // On Windows, missing directory during log plugin init can cause a hang.
+    if let Some(dir) = dirs::data_dir() {
+        let _ = std::fs::create_dir_all(dir.join("com.links.desktop"));
+    }
+
     tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -60,7 +66,7 @@ pub fn run() {
             let dir = data_dir(&app.handle().clone());
             commands::init_db(&app.handle().clone())?;
 
-            let cfg = config::Config::load(&dir)?;
+            let cfg = config::Config::load(&dir).unwrap_or_else(|_| config::Config::empty());
             if let Some(size_val) = cfg.get_value("window-size") {
                 if let (Some(w), Some(h)) = (size_val["width"].as_f64(), size_val["height"].as_f64()) {
                     if let Some(window) = app.get_webview_window("main") {

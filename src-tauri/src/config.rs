@@ -6,6 +6,10 @@ use std::sync::Mutex;
 pub struct Config(pub Mutex<HashMap<String, serde_json::Value>>);
 
 impl Config {
+    pub fn empty() -> Self {
+        Config(Mutex::new(HashMap::new()))
+    }
+
     pub fn load(dir: &Path) -> Result<Self, crate::db::AppError> {
         fs::create_dir_all(dir)?;
         let path = dir.join("config.json");

@@ -26,7 +26,6 @@
   let show_close_dialog = $state(false);
 
   onMount(async () => {
-    // Load settings from SQLite via API
     const darkVal = await api.getSetting("dark-mode");
     dark_mode = darkVal === "true";
     is_macos = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
@@ -41,6 +40,12 @@
         const { width, height } = JSON.parse(savedSize);
         await mainWindow.setSize(new LogicalSize(width, height));
       } catch (e) {}
+    }
+
+    const splash = document.getElementById("splash");
+    if (splash) {
+      splash.classList.add("fade-out");
+      setTimeout(() => splash.remove(), 300);
     }
 
     let resize_restore_done = false;

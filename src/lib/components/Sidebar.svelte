@@ -164,7 +164,7 @@
     {/if}
     {#if flat_categories.length > 10}
     <div class="section-search">
-      <input type="text" bind:value={cat_search} placeholder="找找你的分组~" class="section-search-input" />
+      <input type="text" bind:value={cat_search} placeholder="翻翻你的分组" class="section-search-input" />
     </div>
     {/if}
     <div class="category-list">
@@ -232,7 +232,7 @@
     {/if}
     {#if tags.length > 10}
     <div class="section-search">
-      <input type="text" bind:value={tag_search} placeholder="找找你的标签~" class="section-search-input" />
+      <input type="text" bind:value={tag_search} placeholder="找找你的标签" class="section-search-input" />
     </div>
     {/if}
     <div class="tag-list">
