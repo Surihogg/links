@@ -34,7 +34,7 @@
         if (!user_edited.title && meta.title) title = meta.title;
         if (!user_edited.description && meta.description) description = meta.description;
       } else {
-        fetch_error = "这个小站不想被抓取呢，手动填写标题吧~";
+        fetch_error = "这个小站不想被抓取呢，手动填写信息吧~";
       }
       fetched_meta = { favicon_url: meta.favicon_url || "", og_image_url: meta.og_image_url || "" };
       fetched_url = u;
@@ -43,7 +43,7 @@
         tags = meta.keywords.slice(0, 5);
       }
     } catch {
-      fetch_error = "抓取失败了，手动填一下标题吧~";
+      fetch_error = "抓取失败了，手动填一下信息吧~";
     }
     fetching = false;
     pending_fetch = null;
@@ -132,12 +132,12 @@
 
       <div class="field">
         <label class="field-label">标题</label>
-        <input type="text" bind:value={title} oninput={mark_edited("title")} placeholder="会自动帮你抓取哦" class="field-input" />
+        <input type="text" bind:value={title} oninput={mark_edited("title")} placeholder="会自动帮你抓取哦！除非，除非臣妾做不到~" class="field-input" />
       </div>
 
       <div class="field">
         <label class="field-label">描述</label>
-        <textarea bind:value={description} oninput={mark_edited("description")} rows="2" placeholder="会自动帮你抓取哦" class="field-input field-textarea"></textarea>
+        <textarea bind:value={description} oninput={mark_edited("description")} rows="2" placeholder="会自动帮你抓取哦！除非，除非臣妾做不到~" class="field-input field-textarea"></textarea>
       </div>
 
       <div class="field">

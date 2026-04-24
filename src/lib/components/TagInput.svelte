@@ -69,7 +69,7 @@
       oninput={oninput}
       onkeydown={onkeydown}
       onblur={() => setTimeout(() => show_suggestions = false, 150)}
-      placeholder={tags.length === 0 ? "输入标签，回车添加..." : ""}
+      placeholder={tags.length === 0 ? "快到碗里来！" : ""}
       class="tag-text-input"
     />
   </div>

@@ -21,7 +21,7 @@
   </svg>
   <input
     type="text"
-    placeholder="找找看有什么好链接~"
+    placeholder="找找看~"
     bind:value={query}
     {oninput}
     class="search-input"
