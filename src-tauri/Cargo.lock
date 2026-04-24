@@ -3,6 +3,30 @@
 version = 3
 
 [[package]]
+name = "Links"
+version = "0.1.0"
+dependencies = [
+ "arboard",
+ "chrono",
+ "dirs",
+ "log",
+ "open",
+ "reqwest 0.12.28",
+ "rfd",
+ "rusqlite",
+ "scraper",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-log",
+ "thiserror 2.0.18",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2407,30 +2431,6 @@ dependencies = [
  "cc",
  "pkg-config",
  "vcpkg",
-]
-
-[[package]]
-name = "links"
-version = "0.1.0"
-dependencies = [
- "arboard",
- "chrono",
- "dirs",
- "log",
- "open",
- "reqwest 0.12.28",
- "rfd",
- "rusqlite",
- "scraper",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-log",
- "thiserror 2.0.18",
- "tokio",
- "url",
 ]
 
 [[package]]
