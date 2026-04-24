@@ -100,6 +100,13 @@
 </script>
 
 <div class="link-card">
+  {#if link.is_favorite}
+    <div class="bookmark-corner" data-tooltip="已标记" onclick={toggle_fav}>
+      <svg width="10" height="14" viewBox="0 0 10 14" fill="var(--star)" stroke="none">
+        <path d="M1 0H9V14L5 10L1 14Z"/>
+      </svg>
+    </div>
+  {/if}
   <div class="card-main">
     <div class="card-content" onclick={card_click}>
       <div class="card-top">
@@ -163,9 +170,9 @@
     </div>
 
     <div class="card-actions">
-      <button class="action-btn" class:active-fav={link.is_favorite} onclick={toggle_fav} title={link.is_favorite ? '取消特别关注' : '特别关注'}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill={link.is_favorite ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.5">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/>
+      <button class="action-btn" class:active-fav={link.is_favorite} onclick={toggle_fav} title={link.is_favorite ? '取消标记' : '标记'}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill={link.is_favorite ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
         </svg>
       </button>
       <button class="action-btn" onclick={edit_link} title="编辑">
@@ -234,6 +241,37 @@
   }
 
   .link-card:hover .card-main { border-top-color: transparent; }
+
+  .bookmark-corner {
+    position: absolute;
+    top: 0;
+    right: 24px;
+    z-index: 5;
+    cursor: pointer;
+    display: flex;
+    align-items: flex-start;
+    padding: 2px 3px;
+    border-radius: 0 0 3px 3px;
+    transition: opacity var(--transition);
+  }
+
+  .bookmark-corner[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    right: 0;
+    top: 100%;
+    z-index: 50;
+    white-space: nowrap;
+    padding: 4px 8px;
+    background: var(--bg-0);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-2);
+    pointer-events: none;
+  }
 
   .card-content {
     flex: 1;
@@ -421,6 +459,7 @@
 
   .link-card:hover .card-actions .action-btn { opacity: 1; }
   .card-actions .action-btn.active-fav { opacity: 1; color: var(--star); }
+  .card-actions .action-btn:not(.active-fav).action-btn:hover { color: var(--star); }
 
   .action-btn {
     width: 28px;
