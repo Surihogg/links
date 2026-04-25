@@ -51,7 +51,9 @@ pub fn run() {
                         let config = app.config().app.windows.iter().find(|w| w.label == "quick-add").unwrap();
                         let builder = tauri::WebviewWindowBuilder::from_config(app, config).unwrap();
                         #[cfg(target_os = "macos")]
-                        let builder = builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).title("\u{200B}");
+                        let builder = builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).title(" ");
+                        #[cfg(target_os = "windows")]
+                        let builder = builder.decorations(false);
                         builder.build().unwrap()
                     };
                     let _ = window.show();
@@ -64,10 +66,41 @@ pub fn run() {
             log::info!("[startup] data_dir = {:?}", dir);
 
             let cfg = config::Config::load(&dir).unwrap_or_else(|_| config::Config::empty());
+            let mut window_width: f64 = 900.0;
+            let mut window_height: f64 = 600.0;
             if let Some(size_val) = cfg.get_value("window-size") {
                 if let (Some(w), Some(h)) = (size_val["width"].as_f64(), size_val["height"].as_f64()) {
+                    window_width = w;
+                    window_height = h;
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.set_size(tauri::LogicalSize::new(w, h));
+                    }
+                }
+            }
+            if let Some(pos_val) = cfg.get_value("window-position") {
+                if let (Some(x), Some(y)) = (pos_val["x"].as_f64(), pos_val["y"].as_f64()) {
+                    let x = x as i32;
+                    let y = y as i32;
+                    let w = window_width as i32;
+                    let h = window_height as i32;
+                    let mut visible = false;
+                    if let Ok(monitors) = app.available_monitors() {
+                        for monitor in monitors {
+                            let area = monitor.work_area();
+                            let ax = area.position.x;
+                            let ay = area.position.y;
+                            let aw = area.size.width as i32;
+                            let ah = area.size.height as i32;
+                            if x + w > ax && x < ax + aw && y + h > ay && y < ay + ah {
+                                visible = true;
+                                break;
+                            }
+                        }
+                    }
+                    if visible {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(x, y)));
+                        }
                     }
                 }
             }
@@ -90,6 +123,7 @@ pub fn run() {
                 .icon(icon)
                 .menu(&menu)
                 .tooltip("Links")
+                .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("main") {

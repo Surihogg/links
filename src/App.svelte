@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { linksStore, categoriesStore, tagsStore } from "./lib/stores/index.js";
   import * as api from "./lib/api.js";
   import { waitForBackendReady } from "./lib/ready.js";
@@ -37,7 +37,7 @@
     await load_data();
     console.log("[startup] data loaded");
 
-    const { getCurrentWindow, LogicalSize } = await import("@tauri-apps/api/window");
+    const { getCurrentWindow, LogicalSize, PhysicalPosition } = await import("@tauri-apps/api/window");
     const mainWindow = getCurrentWindow();
 
     const savedSize = await api.getSetting("window-size");
@@ -48,6 +48,14 @@
       } catch (e) {}
     }
 
+    const savedPos = await api.getSetting("window-position");
+    if (savedPos) {
+      try {
+        const { x, y } = JSON.parse(savedPos);
+        await mainWindow.setPosition(new PhysicalPosition(x, y));
+      } catch (e) {}
+    }
+
     const splash = document.getElementById("splash");
     if (splash) {
       splash.classList.add("fade-out");
@@ -55,26 +63,43 @@
     }
 
     let resize_restore_done = false;
-    setTimeout(() => { resize_restore_done = true; }, 2000);
+    const resize_restore_timeout = setTimeout(() => { resize_restore_done = true; }, 2000);
 
     let resize_timer;
-    window.addEventListener("resize", () => {
+    async function save_window_state() {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const win = getCurrentWindow();
+        const physicalSize = await win.innerSize();
+        const scaleFactor = await win.scaleFactor();
+        const logical = physicalSize.toLogical(scaleFactor);
+        await api.setSetting("window-size", JSON.stringify({
+          width: Math.round(logical.width),
+          height: Math.round(logical.height)
+        }));
+        const pos = await win.outerPosition();
+        await api.setSetting("window-position", JSON.stringify({
+          x: pos.x,
+          y: pos.y
+        }));
+      } catch (e) {}
+    }
+    function on_resize() {
       clearTimeout(resize_timer);
       if (!resize_restore_done) return;
-      resize_timer = setTimeout(async () => {
-        try {
-          const { getCurrentWindow } = await import("@tauri-apps/api/window");
-          const win = getCurrentWindow();
-          const physicalSize = await win.innerSize();
-          const scaleFactor = await win.scaleFactor();
-          const logical = physicalSize.toLogical(scaleFactor);
-          await api.setSetting("window-size", JSON.stringify({
-            width: Math.round(logical.width),
-            height: Math.round(logical.height)
-          }));
-        } catch (e) {}
-      }, 500);
-    });
+      resize_timer = setTimeout(save_window_state, 500);
+    }
+    window.addEventListener("resize", on_resize);
+    let unlistenMoved;
+    try {
+      unlistenMoved = await mainWindow.onMoved(() => {
+        clearTimeout(resize_timer);
+        if (!resize_restore_done) return;
+        resize_timer = setTimeout(save_window_state, 500);
+      });
+    } catch (e) {
+      console.warn("[window] onMoved not available:", e);
+    }
 
     await mainWindow.onCloseRequested(async (event) => {
       event.preventDefault();
@@ -89,15 +114,21 @@
     });
 
     // 监听 quick-add 窗口的保存事件
+    let unlistenLinksChanged;
     try {
       const { listen } = await import("@tauri-apps/api/event");
-      const unlisten = await listen("links-changed", () => {
+      unlistenLinksChanged = await listen("links-changed", () => {
         refresh_current_view();
       });
-      return () => {
-        unlisten();
-      };
     } catch (e) {}
+
+    return () => {
+      clearTimeout(resize_restore_timeout);
+      clearTimeout(resize_timer);
+      window.removeEventListener("resize", on_resize);
+      if (unlistenLinksChanged) unlistenLinksChanged();
+      if (unlistenMoved) unlistenMoved();
+    };
   });
 
   async function load_data() {
@@ -137,10 +168,10 @@
     const el = get_scroll_el();
     const scroll_top = el?.scrollTop ?? 0;
     await fn();
-    requestAnimationFrame(() => {
-      const el2 = get_scroll_el();
-      if (el2) el2.scrollTop = scroll_top;
-    });
+    await tick();
+    await new Promise(r => requestAnimationFrame(r));
+    const el2 = get_scroll_el();
+    if (el2) el2.scrollTop = scroll_top;
   }
 
   async function refresh_current_view() {
