@@ -101,3 +101,7 @@ export async function checkDuplicate(url, excludeId = null) {
 export async function checkLinkStatus(url) {
   return invoke("check_link_status", { url });
 }
+
+export async function exitApp() {
+  return invoke("exit_app");
+}

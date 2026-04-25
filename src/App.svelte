@@ -105,7 +105,7 @@
       event.preventDefault();
       const behavior = (await api.getSetting("close-behavior")) || "ask";
       if (behavior === "exit") {
-        await mainWindow.destroy();
+        await api.exitApp();
       } else if (behavior === "tray") {
         await mainWindow.hide();
       } else {
@@ -281,8 +281,7 @@
 
   async function close_exit() {
     show_close_dialog = false;
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    await getCurrentWindow().destroy();
+    await api.exitApp();
   }
 
   async function toggle_dark() {
