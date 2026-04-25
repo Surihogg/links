@@ -35,6 +35,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::default()
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+                .max_file_size(10 * 1024 * 1024)
                 .targets([
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder { path: static_data_dir(), file_name: None }),
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),

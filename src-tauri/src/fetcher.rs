@@ -10,12 +10,34 @@ pub struct PageMeta {
 }
 
 pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
+    log::info!("[fetch_metadata] start url={}", url);
+
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(8))
         .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+        .proxy(reqwest::Proxy::custom(|url| {
+            let proxy_env = if url.scheme() == "https" {
+                std::env::var("HTTPS_PROXY")
+                    .or_else(|_| std::env::var("https_proxy"))
+                    .or_else(|_| std::env::var("ALL_PROXY"))
+                    .or_else(|_| std::env::var("all_proxy"))
+            } else {
+                std::env::var("HTTP_PROXY")
+                    .or_else(|_| std::env::var("http_proxy"))
+                    .or_else(|_| std::env::var("ALL_PROXY"))
+                    .or_else(|_| std::env::var("all_proxy"))
+            };
+            proxy_env.ok()
+        }))
         .build()?;
 
-    let resp = client.get(url).send().await?;
+    let resp = match client.get(url).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("[fetch_metadata] request failed url={} error={:?}", url, e);
+            return Err(e);
+        }
+    };
 
     let content_type = resp
         .headers()
@@ -23,6 +45,7 @@ pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
     if !content_type.starts_with("text/html") {
+        log::info!("[fetch_metadata] non-html content-type={} url={}", content_type, url);
         return Ok(PageMeta {
             title: String::new(),
             description: String::new(),
@@ -33,7 +56,7 @@ pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
     }
 
     let bytes = resp.bytes().await?;
-    let cap = 512 * 1024;
+    let cap = 2 * 1024 * 1024;
     let html = if bytes.len() > cap {
         String::from_utf8_lossy(&bytes[..cap]).to_string()
     } else {
@@ -79,13 +102,23 @@ pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
                 .unwrap_or_default()
         });
 
-    Ok(PageMeta {
-        title,
-        description,
+    let result = PageMeta {
+        title: title.clone(),
+        description: description.clone(),
+        favicon_url: favicon_url.clone(),
+        og_image_url: og_image_url.clone(),
+        keywords: keywords.clone(),
+    };
+    log::info!(
+        "[fetch_metadata] success url={} title_len={} desc_len={} favicon={} og={} keywords={:?}",
+        url,
+        title.len(),
+        description.len(),
         favicon_url,
         og_image_url,
-        keywords,
-    })
+        keywords
+    );
+    Ok(result)
 }
 
 fn select_meta_content(doc: &scraper::Html, selector: &str) -> Option<String> {
