@@ -158,6 +158,8 @@
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
     overflow: hidden;
+    max-height: 200px;
+    overflow-y: auto;
   }
 
   .suggestion-item {

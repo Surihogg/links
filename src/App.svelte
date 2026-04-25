@@ -115,23 +115,43 @@
 
   async function load_links() {
     const params = {};
-    if (selected_tag) {
+    if (selected_tag === "__untagged__") {
+      params.untagged_only = true;
+    } else if (selected_tag) {
       params.tag = selected_tag;
     } else if (selected_category === "favorite") {
       params.favorite_only = true;
+    } else if (selected_category === "uncategorized") {
+      params.category_id = null;
     } else if (selected_category != null) {
       params.category_id = selected_category;
     }
     await linksStore.load(params);
   }
 
+  function get_scroll_el() {
+    return document.querySelector('.link-list');
+  }
+
+  async function with_scroll_preserve(fn) {
+    const el = get_scroll_el();
+    const scroll_top = el?.scrollTop ?? 0;
+    await fn();
+    requestAnimationFrame(() => {
+      const el2 = get_scroll_el();
+      if (el2) el2.scrollTop = scroll_top;
+    });
+  }
+
   async function refresh_current_view() {
-    if (search_query.trim()) {
-      await linksStore.search({ query: search_query, per_page: 30, ...build_filter_params() });
-    } else {
-      await load_links();
-    }
-    await categoriesStore.load();
+    await with_scroll_preserve(async () => {
+      if (search_query.trim()) {
+        await linksStore.search({ query: search_query, per_page: 30, ...build_filter_params() });
+      } else {
+        await load_links();
+      }
+      await categoriesStore.load();
+    });
   }
 
   function on_category_select(id) {
@@ -245,18 +265,24 @@
   let total_count = $derived(links.total);
   let current_title = $derived(
     search_query.trim() ? `搜索: ${search_query}` :
+    selected_tag === "__untagged__" ? "没标签的链接" :
     selected_tag ? `标签: ${selected_tag}` :
     selected_category === "favorite" ? "特别关注" :
+    selected_category === "uncategorized" ? "未分组" :
     selected_category != null ? categories.find(c => c.id === selected_category)?.name ?? "链接" :
     "全部链接"
   );
 
   function build_filter_params() {
     const params = {};
-    if (selected_tag) {
+    if (selected_tag === "__untagged__") {
+      params.untagged_only = true;
+    } else if (selected_tag) {
       params.tag = selected_tag;
     } else if (selected_category === "favorite") {
       params.favorite_only = true;
+    } else if (selected_category === "uncategorized") {
+      params.category_id = null;
     } else if (selected_category != null) {
       params.category_id = selected_category;
     }

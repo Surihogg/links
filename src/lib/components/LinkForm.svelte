@@ -101,9 +101,53 @@
     user_edited = { title: false, description: false };
     await do_fetch(u);
   }
+
+  let is_dragging = false;
+
+  function on_modal_mousedown(e) {
+    if (e.target.closest('.modal')) {
+      is_dragging = true;
+    }
+  }
+
+  function on_window_mouseup(e) {
+    if (is_dragging) {
+      const modal = e.currentTarget.querySelector('.modal');
+      if (modal && !modal.contains(e.target)) {
+        oncancel?.();
+      }
+      is_dragging = false;
+    }
+  }
+
+  let show_cat_dropdown = $state(false);
+  let cat_dropdown_ref = $state(null);
+
+  function select_category(id) {
+    category_id = id;
+    show_cat_dropdown = false;
+  }
+
+  function on_cat_dropdown_click(e) {
+    e.stopPropagation();
+  }
+
+  $effect(() => {
+    function close_dropdown(e) {
+      if (cat_dropdown_ref && !cat_dropdown_ref.contains(e.target)) {
+        show_cat_dropdown = false;
+      }
+    }
+    if (show_cat_dropdown) {
+      document.addEventListener('click', close_dropdown);
+      return () => document.removeEventListener('click', close_dropdown);
+    }
+  });
 </script>
 
-<div class="modal-overlay" onclick={on_overlay_click}>
+<svelte:window onmouseup={on_window_mouseup} />
+
+<div class="modal-overlay" onclick={on_overlay_click} onmousedown={on_modal_mousedown}>
   <div class="modal">
     <div class="modal-header">
       <h2 class="modal-title">{link ? "编辑链接" : "添加链接"}</h2>
@@ -137,12 +181,22 @@
 
       <div class="field">
         <label class="field-label">分组</label>
-        <select bind:value={category_id} placeholder="确定不分个组吗" class="field-input" onchange={() => { if (category_id === "") category_id = null; }}>
-          <option value="">无分组</option>
-          {#each categories as cat}
-            <option value={cat.id}>{cat.name}</option>
-          {/each}
-        </select>
+        <div class="dropdown-wrap" bind:this={cat_dropdown_ref}>
+          <button type="button" class="field-input dropdown-trigger" onclick={() => show_cat_dropdown = !show_cat_dropdown}>
+            <span>{categories.find(c => c.id === category_id)?.name ?? "无分组"}</span>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="transform: rotate({show_cat_dropdown ? 180 : 0}deg); transition: transform var(--transition);">
+              <path d="M1 1l4 4 4-4"/>
+            </svg>
+          </button>
+          {#if show_cat_dropdown}
+            <div class="dropdown-menu" onclick={on_cat_dropdown_click}>
+              <button type="button" class="dropdown-item" class:active={category_id == null} onclick={() => select_category(null)}>无分组</button>
+              {#each categories as cat}
+                <button type="button" class="dropdown-item" class:active={category_id === cat.id} onclick={() => select_category(cat.id)}>{cat.name}</button>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
 
       <div class="field tag-field">
@@ -299,13 +353,56 @@
     line-height: 1.5;
   }
 
-  select.field-input {
+  .dropdown-wrap {
+    position: relative;
+  }
+
+  .dropdown-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     cursor: pointer;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    padding-right: 28px;
+    text-align: left;
+    padding-right: 10px;
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--bg-0);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 4px;
+  }
+
+  .dropdown-item {
+    padding: 7px 10px;
+    border: none;
+    background: none;
+    color: var(--text-1);
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    text-align: left;
+    transition: background var(--transition);
+  }
+
+  .dropdown-item:hover {
+    background: var(--bg-hover);
+  }
+
+  .dropdown-item.active {
+    background: var(--accent-soft);
+    color: var(--accent);
   }
 
   .url-field,

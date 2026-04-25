@@ -183,6 +183,7 @@ pub struct ListLinksParams {
     pub tag: Option<String>,
     pub query: Option<String>,
     pub favorite_only: Option<bool>,
+    pub untagged_only: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -193,6 +194,7 @@ pub struct SearchParams {
     pub category_id: Option<Option<i64>>,
     pub tag: Option<String>,
     pub favorite_only: Option<bool>,
+    pub untagged_only: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -401,11 +403,19 @@ impl Db {
         let mut p: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
         let mut cp: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
 
-        if let Some(Some(cid)) = params.category_id {
-            sql_parts.push("l.category_id = ?".into());
-            count_parts.push("l.category_id = ?".into());
-            p.push(Box::new(cid));
-            cp.push(Box::new(cid));
+        if let Some(ref cid_opt) = params.category_id {
+            match cid_opt {
+                Some(cid) => {
+                    sql_parts.push("l.category_id = ?".into());
+                    count_parts.push("l.category_id = ?".into());
+                    p.push(Box::new(*cid));
+                    cp.push(Box::new(*cid));
+                }
+                None => {
+                    sql_parts.push("l.category_id IS NULL".into());
+                    count_parts.push("l.category_id IS NULL".into());
+                }
+            }
         }
         if let Some(ref tag) = params.tag {
             let clause = "EXISTS (SELECT 1 FROM link_tags lt JOIN tags t ON t.id = lt.tag_id WHERE lt.link_id = l.id AND t.name = ?)".to_string();
@@ -413,6 +423,10 @@ impl Db {
             count_parts.push(clause);
             p.push(Box::new(tag.clone()));
             cp.push(Box::new(tag.clone()));
+        }
+        if params.untagged_only.unwrap_or(false) {
+            sql_parts.push("NOT EXISTS (SELECT 1 FROM link_tags lt WHERE lt.link_id = l.id)".into());
+            count_parts.push("NOT EXISTS (SELECT 1 FROM link_tags lt WHERE lt.link_id = l.id)".into());
         }
         if params.favorite_only.unwrap_or(false) {
             sql_parts.push("l.is_favorite = 1".into());
@@ -478,11 +492,17 @@ impl Db {
         let base_union = format!("{} UNION {} UNION {}", fts_sql, tag_sql, like_sql);
 
         let mut filter_parts: Vec<String> = Vec::new();
-        if let Some(Some(cid)) = params.category_id {
-            filter_parts.push("category_id = ?".into());
+        if let Some(ref cid_opt) = params.category_id {
+            match cid_opt {
+                Some(_) => filter_parts.push("category_id = ?".into()),
+                None => filter_parts.push("category_id IS NULL".into()),
+            }
         }
         if let Some(ref tag) = params.tag {
             filter_parts.push("EXISTS (SELECT 1 FROM link_tags lt2 JOIN tags t2 ON t2.id = lt2.tag_id WHERE lt2.link_id = sub.id AND t2.name = ?)".into());
+        }
+        if params.untagged_only.unwrap_or(false) {
+            filter_parts.push("NOT EXISTS (SELECT 1 FROM link_tags lt WHERE lt.link_id = sub.id)".into());
         }
         if params.favorite_only.unwrap_or(false) {
             filter_parts.push("is_favorite = 1".into());
