@@ -287,6 +287,11 @@ pub fn set_setting(app: AppHandle, config: State<'_, Config>, key: String, value
     Ok(())
 }
 
+#[tauri::command]
+pub fn exit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 pub const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+L";
 
 #[tauri::command]
