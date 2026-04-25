@@ -10,26 +10,21 @@ pub struct PageMeta {
 }
 
 pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
-    log::info!("[fetch_metadata] start url={}", url);
-
-    let client = reqwest::Client::builder()
+    let mut builder = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(8))
-        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-        .proxy(reqwest::Proxy::custom(|url| {
-            let proxy_env = if url.scheme() == "https" {
-                std::env::var("HTTPS_PROXY")
-                    .or_else(|_| std::env::var("https_proxy"))
-                    .or_else(|_| std::env::var("ALL_PROXY"))
-                    .or_else(|_| std::env::var("all_proxy"))
-            } else {
-                std::env::var("HTTP_PROXY")
-                    .or_else(|_| std::env::var("http_proxy"))
-                    .or_else(|_| std::env::var("ALL_PROXY"))
-                    .or_else(|_| std::env::var("all_proxy"))
-            };
-            proxy_env.ok()
-        }))
-        .build()?;
+        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+
+    // Try to use system proxy on Windows (read from registry)
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(proxy_url) = get_windows_system_proxy() {
+            log::info!("[fetcher] using system proxy: {}", proxy_url);
+            let proxy = reqwest::Proxy::all(&proxy_url)?;
+            builder = builder.proxy(proxy);
+        }
+    }
+
+    let client = builder.build()?;
 
     let resp = match client.get(url).send().await {
         Ok(r) => r,
@@ -140,6 +135,86 @@ pub(crate) fn resolve_url(base: Option<&url::Url>, href: &str) -> String {
         Some(base) => base.join(href).map(|u| u.to_string()).unwrap_or_else(|_| href.to_string()),
         None => href.to_string(),
     }
+}
+
+/// Read system proxy settings from Windows registry
+/// Returns proxy URL like "http://localhost:8080" if configured
+#[cfg(target_os = "windows")]
+pub fn get_windows_system_proxy() -> Option<String> {
+    use std::process::Command;
+
+    log::info!("[fetcher] checking Windows system proxy...");
+
+    // Try to read proxy from registry using reg query
+    let output = Command::new("reg")
+        .args([
+            "query",
+            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
+            "/v",
+            "ProxyEnable",
+        ])
+        .output();
+
+    match output {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            log::info!("[fetcher] ProxyEnable output: {}", stdout.trim());
+            // Check if proxy is enabled - look for 0x1 in the output (more flexible matching)
+            let proxy_enabled = stdout.split_whitespace().any(|part| part == "0x1");
+            if !proxy_enabled {
+                log::info!("[fetcher] proxy not enabled");
+                return None;
+            }
+        }
+        Err(e) => {
+            log::warn!("[fetcher] failed to query ProxyEnable: {}", e);
+            return None;
+        }
+    }
+
+    // Get proxy server
+    let output = Command::new("reg")
+        .args([
+            "query",
+            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
+            "/v",
+            "ProxyServer",
+        ])
+        .output();
+
+    match output {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            log::info!("[fetcher] ProxyServer output: {}", stdout.trim());
+            // Parse proxy server - find the value after REG_SZ
+            for line in stdout.lines() {
+                if line.contains("ProxyServer") {
+                    // Split by whitespace and find the actual proxy address
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    // The proxy address is typically the last part or after REG_SZ
+                    for part in parts.iter().rev() {
+                        // Skip registry metadata keywords
+                        if !["ProxyServer", "REG_SZ", "REG_DWORD", ""].contains(part) && part.contains(".") || part.contains(":") {
+                            log::info!("[fetcher] found proxy address: {}", part);
+                            return Some(format!("http://{}", part));
+                        }
+                    }
+                    // Fallback: take the 4th element if standard format
+                    if parts.len() >= 4 {
+                        let proxy_addr = parts[3];
+                        if !proxy_addr.is_empty() {
+                            return Some(format!("http://{}", proxy_addr));
+                        }
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            log::warn!("[fetcher] failed to query ProxyServer: {}", e);
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]
