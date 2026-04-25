@@ -218,8 +218,6 @@
   :global(body) {
     margin: 0;
     padding: 0;
-    background: var(--bg-0);
-    border-radius: var(--radius-xl);
     overflow: hidden;
     height: 100vh;
     width: 100vw;
@@ -230,6 +228,8 @@
     flex-direction: column;
     height: 100%;
     overflow: hidden;
+    background: var(--bg-0);
+    border-radius: var(--radius-xl);
   }
 
   .modal-header {
