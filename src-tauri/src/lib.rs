@@ -51,7 +51,7 @@ pub fn run() {
                         let config = app.config().app.windows.iter().find(|w| w.label == "quick-add").unwrap();
                         let builder = tauri::WebviewWindowBuilder::from_config(app, config).unwrap();
                         #[cfg(target_os = "macos")]
-                        let builder = builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay);
+                        let builder = builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).title("");
                         builder.build().unwrap()
                     };
                     let _ = window.show();
