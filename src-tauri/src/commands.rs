@@ -48,19 +48,24 @@ fn get_db_path(app: &AppHandle) -> PathBuf {
 
 pub fn init_db(app: &AppHandle) -> Result<(), AppError> {
     let path = get_db_path(app);
+    log::info!("[init_db] opening database at {:?}", path);
     match Db::open(&path) {
         Ok(db) => {
+            log::info!("[init_db] database opened, running migrations...");
             db.migrate()?;
+            log::info!("[init_db] migrations done");
             app.manage(db);
             Ok(())
         }
-        Err(_) => {
+        Err(e) => {
+            log::warn!("[init_db] failed to open database: {}, recreating...", e);
             // DB file is missing or corrupt — remove stale files and recreate.
             let _ = std::fs::remove_file(&path);
             let _ = std::fs::remove_file(path.with_extension("db-wal"));
             let _ = std::fs::remove_file(path.with_extension("db-shm"));
             let db = Db::open(&path)?;
             db.migrate()?;
+            log::info!("[init_db] database recreated and migrated");
             app.manage(db);
             Ok(())
         }
@@ -73,6 +78,7 @@ pub fn links_list(
     db: State<'_, Db>,
     params: ListLinksParams,
 ) -> Result<PaginatedResult<crate::db::Link>, AppError> {
+    log::info!("[cmd] links_list called");
     db.list_links(&params)
 }
 
@@ -144,6 +150,7 @@ pub fn links_search(db: State<'_, Db>, params: SearchParams) -> Result<Paginated
 
 #[tauri::command]
 pub fn categories_list(db: State<'_, Db>) -> Result<Vec<crate::db::Category>, AppError> {
+    log::info!("[cmd] categories_list called");
     db.list_categories()
 }
 
@@ -164,6 +171,7 @@ pub fn categories_delete(db: State<'_, Db>, id: i64) -> Result<(), AppError> {
 
 #[tauri::command]
 pub fn tags_list(db: State<'_, Db>) -> Result<Vec<crate::db::Tag>, AppError> {
+    log::info!("[cmd] tags_list called");
     db.list_tags()
 }
 

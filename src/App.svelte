@@ -26,10 +26,13 @@
   let show_close_dialog = $state(false);
 
   onMount(async () => {
+    console.log("[startup] App onMount start");
     const darkVal = await api.getSetting("dark-mode");
     dark_mode = darkVal === "true";
     is_macos = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
-    load_data();
+    console.log("[startup] loading data...");
+    await load_data();
+    console.log("[startup] data loaded");
 
     const { getCurrentWindow, LogicalSize } = await import("@tauri-apps/api/window");
     const mainWindow = getCurrentWindow();
@@ -95,11 +98,16 @@
   });
 
   async function load_data() {
-    await Promise.all([
-      categoriesStore.load(),
-      tagsStore.load(),
-      load_links(),
-    ]);
+    try {
+      await Promise.all([
+        categoriesStore.load(),
+        tagsStore.load(),
+        load_links(),
+      ]);
+      console.log("[startup] load_data done");
+    } catch (e) {
+      console.error("[startup] load_data failed:", e);
+    }
   }
 
   async function load_links() {

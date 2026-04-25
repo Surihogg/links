@@ -61,7 +61,10 @@ pub fn run() {
         )
         .setup(|app| {
             let dir = data_dir(&app.handle().clone());
+            log::info!("[startup] data_dir = {:?}", dir);
+            log::info!("[startup] initializing database...");
             commands::init_db(&app.handle().clone())?;
+            log::info!("[startup] database initialized");
 
             let cfg = config::Config::load(&dir).unwrap_or_else(|_| config::Config::empty());
             if let Some(size_val) = cfg.get_value("window-size") {

@@ -15,12 +15,17 @@ function createLinksStore() {
     subscribe,
     async load(params = {}) {
       update((s) => ({ ...s, loading: true }));
-      const result = await api.listLinks(params);
-      set({
-        ...result,
-        loading: false,
-        has_more: result.items.length < result.total,
-      });
+      try {
+        const result = await api.listLinks(params);
+        set({
+          ...result,
+          loading: false,
+          has_more: result.items.length < result.total,
+        });
+      } catch (e) {
+        console.error("[store] linksStore.load failed:", e);
+        update((s) => ({ ...s, loading: false, items: [], total: 0, has_more: false }));
+      }
     },
     async loadMore(params = {}) {
       update((s) => ({ ...s, loading: true }));
@@ -88,8 +93,13 @@ function createCategoriesStore() {
   return {
     subscribe,
     async load() {
-      const cats = await api.listCategories();
-      set(cats);
+      try {
+        const cats = await api.listCategories();
+        set(cats);
+      } catch (e) {
+        console.error("[store] categoriesStore.load failed:", e);
+        set([]);
+      }
     },
     async create(payload) {
       const cat = await api.createCategory(payload);
@@ -113,8 +123,13 @@ function createTagsStore() {
   return {
     subscribe,
     async load() {
-      const tags = await api.listTags();
-      set(tags);
+      try {
+        const tags = await api.listTags();
+        set(tags);
+      } catch (e) {
+        console.error("[store] tagsStore.load failed:", e);
+        set([]);
+      }
     },
     async remove(id) {
       await api.deleteTag(id);

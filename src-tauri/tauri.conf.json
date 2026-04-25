@@ -59,6 +59,12 @@
     "macOS": {
       "signingIdentity": "-",
       "bundleName": "Links"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "allowDowngrades": true
     }
   }
 }
