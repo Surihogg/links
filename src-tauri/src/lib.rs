@@ -62,9 +62,6 @@ pub fn run() {
         .setup(|app| {
             let dir = data_dir(&app.handle().clone());
             log::info!("[startup] data_dir = {:?}", dir);
-            log::info!("[startup] initializing database...");
-            commands::init_db(&app.handle().clone())?;
-            log::info!("[startup] database initialized");
 
             let cfg = config::Config::load(&dir).unwrap_or_else(|_| config::Config::empty());
             if let Some(size_val) = cfg.get_value("window-size") {
@@ -76,6 +73,13 @@ pub fn run() {
             }
             let shortcut_str = cfg.get("global-shortcut").unwrap_or_else(|| commands::DEFAULT_SHORTCUT.to_string());
             app.manage(cfg);
+
+            log::info!("[startup] initializing database...");
+            if let Err(e) = commands::init_db(&app.handle().clone()) {
+                log::error!("[startup] database initialization failed: {}. App will run without database.", e);
+            } else {
+                log::info!("[startup] database initialized");
+            }
 
             let show_i = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
