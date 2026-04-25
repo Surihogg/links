@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [tailwindcss(), svelte()],
   clearScreen: false,
   build: {
+    target: "chrome80",
     rollupOptions: {
       input: {
         main: "index.html",
