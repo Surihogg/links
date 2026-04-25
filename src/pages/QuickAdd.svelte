@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import TagInput from "../lib/components/TagInput.svelte";
   import { fetchMeta, checkDuplicate, createLink, listCategories } from "../lib/api.js";
+  import { waitForBackendReady } from "../lib/ready.js";
   import { emit } from "@tauri-apps/api/event";
 
   let url = $state("");
@@ -22,11 +23,9 @@
   let pending_fetch = null;
   let has_focused = $state(false);
 
-  $effect(() => {
+  onMount(async () => {
+    await waitForBackendReady();
     listCategories().then(c => categories = c);
-  });
-
-  onMount(() => {
     const handle_blur = () => {
       if (has_focused) close_window();
     };

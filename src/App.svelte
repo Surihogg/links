@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { linksStore, categoriesStore, tagsStore } from "./lib/stores/index.js";
   import * as api from "./lib/api.js";
+  import { waitForBackendReady } from "./lib/ready.js";
   import SearchBar from "./lib/components/SearchBar.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import LinkList from "./lib/components/LinkList.svelte";
@@ -27,6 +28,8 @@
 
   onMount(async () => {
     console.log("[startup] App onMount start");
+    await waitForBackendReady();
+    console.log("[startup] backend ready");
     const darkVal = await api.getSetting("dark-mode");
     dark_mode = darkVal === "true";
     is_macos = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
