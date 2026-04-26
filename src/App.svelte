@@ -153,7 +153,7 @@
     } else if (selected_category === "favorite") {
       params.favorite_only = true;
     } else if (selected_category === "uncategorized") {
-      params.category_id = null;
+      params.uncategorized_only = true;
     } else if (selected_category != null) {
       params.category_id = selected_category;
     }
@@ -322,7 +322,7 @@
     } else if (selected_category === "favorite") {
       params.favorite_only = true;
     } else if (selected_category === "uncategorized") {
-      params.category_id = null;
+      params.uncategorized_only = true;
     } else if (selected_category != null) {
       params.category_id = selected_category;
     }

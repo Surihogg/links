@@ -193,6 +193,7 @@ pub struct ListLinksParams {
     pub query: Option<String>,
     pub favorite_only: Option<bool>,
     pub untagged_only: Option<bool>,
+    pub uncategorized_only: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -436,6 +437,10 @@ impl Db {
         if params.untagged_only.unwrap_or(false) {
             sql_parts.push("NOT EXISTS (SELECT 1 FROM link_tags lt WHERE lt.link_id = l.id)".into());
             count_parts.push("NOT EXISTS (SELECT 1 FROM link_tags lt WHERE lt.link_id = l.id)".into());
+        }
+        if params.uncategorized_only.unwrap_or(false) {
+            sql_parts.push("l.category_id IS NULL".into());
+            count_parts.push("l.category_id IS NULL".into());
         }
         if params.favorite_only.unwrap_or(false) {
             sql_parts.push("l.is_favorite = 1".into());
