@@ -198,8 +198,7 @@
   let btn_disabled = $derived(saving);
 </script>
 
-<div class={dark_mode ? "dark" : ""}>
-<div class="quick-add">
+<div class="quick-add {dark_mode ? 'dark' : ''}">
   <div class="modal-header">
     <h2 class="modal-title">添加链接</h2>
     <button class="modal-close" onclick={close_window}>
@@ -272,7 +271,6 @@
     </div>
   </form>
 </div>
-</div>
 
 <style>
   :global(body) {
@@ -289,7 +287,6 @@
     height: 100%;
     overflow: hidden;
     background: var(--bg-0);
-    border-radius: var(--radius-xl);
   }
 
   .modal-header {

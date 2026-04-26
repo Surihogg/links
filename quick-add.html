@@ -5,20 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>快速添加链接</title>
     <style>
-      html {
-        background: transparent !important;
-      }
-      body {
+      html, body {
         margin: 0;
         padding: 0;
         overflow: hidden;
         height: 100%;
         width: 100%;
-        background: transparent !important;
+        background: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        html, body { background: #0a0a0b; }
       }
       #app {
         height: 100%;
+        background: #ffffff;
+        overflow: hidden;
         opacity: 0;
+      }
+      @media (prefers-color-scheme: dark) {
+        #app { background: #0a0a0b; }
       }
       html.theme-ready #app {
         opacity: 1;
