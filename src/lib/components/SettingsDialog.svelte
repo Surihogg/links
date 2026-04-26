@@ -1,15 +1,20 @@
 <script>
   import { onMount } from "svelte";
   import * as api from "../api.js";
-  let { onclose } = $props();
+  let { onclose, onthemechange } = $props();
   let close_behavior = $state(null);
   let loaded = $state(false);
+  // Appearance (theme) state for the dialog
+  let appearance = $state("system");
 
   let shortcut_raw = $state(null);
   let shortcut_loaded = $state(false);
   let recording = $state(false);
   let recorded_shortcut = $state(null);
   let shortcut_error = $state(false);
+  let autostart_enabled = $state(false);
+  let autostart_loaded = $state(false);
+  
 
   const isMac = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
 
@@ -81,7 +86,21 @@
       shortcut_raw = null;
     }
     shortcut_loaded = true;
+    // Load autostart state
+    try {
+      autostart_enabled = await api.isAutostartEnabled();
+    } catch {
+      autostart_enabled = false;
+    }
+    autostart_loaded = true;
     loaded = true;
+    // Load appearance/theme setting with fallback
+    try {
+      const t = await api.getSetting("theme-mode");
+      appearance = t || "system";
+    } catch {
+      appearance = "system";
+    }
   });
 
   const behaviors = [
@@ -90,9 +109,39 @@
     { id: "exit", name: "直接退出", desc: "关闭窗口时直接退出应用" },
   ];
 
+  // Appearance options (theme mode)
+  const appearances = [
+    { id: "light", name: "亮色", desc: "始终使用亮色主题" },
+    { id: "dark", name: "暗色", desc: "始终使用暗色主题" },
+    { id: "system", name: "跟随系统", desc: "自动匹配系统外观设置" },
+  ];
+
+  async function on_theme_select(mode) {
+    appearance = mode;
+    await api.setSetting("theme-mode", mode);
+    onthemechange?.(mode);
+  }
+
   async function save() {
     await api.setSetting("close-behavior", close_behavior);
     onclose?.();
+  }
+
+  async function toggleAutostart() {
+    if (!autostart_loaded) return;
+    try {
+      if (autostart_enabled) {
+        await api.disableAutostart();
+        autostart_enabled = false;
+      } else {
+        await api.enableAutostart();
+        autostart_enabled = true;
+      }
+      // Persist the autostart state to config.json for consistency
+      await api.setSetting("autostart-enabled", autostart_enabled);
+    } catch {
+      // swallow errors; user can retry
+    }
   }
 
   function on_overlay_click(e) {
@@ -116,81 +165,144 @@
       </button>
     </div>
 
-    <div class="modal-body">
-      <div class="section-label">关闭行为</div>
-      {#if loaded}
-        <div class="format-list">
-          {#each behaviors as b (b.id)}
-            <button
-              class="format-option"
-              class:active={close_behavior === b.id}
-              onclick={() => close_behavior = b.id}
-            >
-              <div class="format-radio">
+      <div class="modal-body">
+        <div class="section-label">关闭行为</div>
+        {#if loaded}
+          <div class="format-list">
+            {#each behaviors as b (b.id)}
+              <button
+                class="format-option"
+                class:active={close_behavior === b.id}
+                onclick={() => close_behavior = b.id}
+              >
+                <div class="format-radio">
+                  {#if close_behavior === b.id}
+                    <div class="format-dot"></div>
+                  {/if}
+                </div>
+                <div class="format-info">
+                  <span class="format-name">{b.name}</span>
+                  <span class="format-desc">{b.desc}</span>
+                </div>
                 {#if close_behavior === b.id}
-                  <div class="format-dot"></div>
+                  <svg class="format-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 8l3.5 3.5L13 5"/>
+                  </svg>
                 {/if}
-              </div>
-              <div class="format-info">
-                <span class="format-name">{b.name}</span>
-                <span class="format-desc">{b.desc}</span>
-              </div>
-              {#if close_behavior === b.id}
-                <svg class="format-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 8l3.5 3.5L13 5"/>
-                </svg>
-              {/if}
-            </button>
-          {/each}
-        </div>
-      {:else}
-        <div class="format-loading">加载中...</div>
-      {/if}
-
-      <div class="section-label" style="margin-top: 20px;">快捷键</div>
-      {#if shortcut_loaded}
-        <div class="shortcut-section">
-          <div class="shortcut-row">
-            <div class="shortcut-info">
-              <span class="format-name">全局快捷键</span>
-              <span class="format-desc">用于唤起快速添加窗口</span>
-            </div>
-            {#if !recording}
-              <div class="shortcut-display">{formatShortcut(shortcut_raw) || "未设置"}</div>
-              <button class="btn btn-secondary btn-sm" onclick={start_recording}>修改</button>
-            {:else}
-              <div class="shortcut-display recording-area">
-                {#if recorded_shortcut}
-                  {formatShortcut(recorded_shortcut)}
-                {:else}
-                  请按下新的快捷键...
-                {/if}
-              </div>
-              {#if shortcut_error}
-                <span class="shortcut-error">快捷键设置失败，请重试</span>
-              {/if}
-              <div class="shortcut-actions">
-                <button class="btn btn-secondary btn-sm" onclick={cancel_recording}>取消</button>
-                <button class="btn btn-primary btn-sm" disabled={!recorded_shortcut} onclick={save_shortcut}>保存</button>
-              </div>
-            {/if}
+              </button>
+            {/each}
           </div>
-        </div>
-      {:else}
-        <div class="format-loading">加载中...</div>
-      {/if}
+        {:else}
+          <div class="format-loading">加载中...</div>
+        {/if}
+
+        <div class="section-label" style="margin-top: 20px;">外观</div>
+        {#if loaded}
+          <div class="format-list">
+            {#each appearances as a}
+              <button
+                class="format-option"
+                class:active={appearance === a.id}
+                onclick={() => on_theme_select(a.id)}
+              >
+                <div class="format-radio">
+                  {#if appearance === a.id}
+                    <div class="format-dot"></div>
+                  {/if}
+                </div>
+                <div class="format-info">
+                  <span class="format-name">{a.name}</span>
+                  <span class="format-desc">{a.desc}</span>
+                </div>
+                {#if appearance === a.id}
+                  <svg class="format-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 8l3.5 3.5L13 5"/>
+                  </svg>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        {:else}
+          <div class="format-loading">加载中...</div>
+        {/if}
+
+        <div class="section-label" style="margin-top: 20px;">通用</div>
+        {#if autostart_loaded}
+          <div class="format-option autostart-row" style="justify-content: space-between; align-items: center;">
+            <div class="autostart-info" style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+              <span class="format-name">开机自启动</span>
+              <span class="format-desc">系统启动时自动运行 Links</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick={toggleAutostart}>
+              {autostart_enabled ? '禁用' : '启用'}
+            </button>
+          </div>
+        {:else}
+          <div class="format-loading">加载中...</div>
+        {/if}
+        
+        <div class="section-label" style="margin-top: 16px;">快捷键</div>
+        {#if shortcut_loaded}
+          <div class="shortcut-section">
+            <div class="shortcut-row">
+              <div class="shortcut-info">
+                <span class="format-name">全局快捷键</span>
+                <span class="format-desc">用于唤起快速添加窗口</span>
+              </div>
+              {#if !recording}
+                <div class="shortcut-display">{formatShortcut(shortcut_raw) || "未设置"}</div>
+                <button class="btn btn-secondary btn-sm" onclick={start_recording}>修改</button>
+              {:else}
+                <div class="shortcut-display recording-area">
+                  {#if recorded_shortcut}
+                    {formatShortcut(recorded_shortcut)}
+                  {:else}
+                    请按下新的快捷键...
+                  {/if}
+                </div>
+                {#if shortcut_error}
+                  <span class="shortcut-error">快捷键设置失败，请重试</span>
+                {/if}
+                <div class="shortcut-actions">
+                  <button class="btn btn-secondary btn-sm" onclick={cancel_recording}>取消</button>
+                  <button class="btn btn-primary btn-sm" disabled={!recorded_shortcut} onclick={save_shortcut}>保存</button>
+                </div>
+              {/if}
+            </div>
+          </div>
+        {:else}
+          <div class="format-loading">加载中...</div>
+        {/if}
+      </div>
 
       <div class="modal-footer">
         <button onclick={onclose} class="btn btn-secondary">取消</button>
         <button onclick={save} class="btn btn-primary">保存</button>
       </div>
     </div>
-  </div>
 </div>
 
 <style>
   .modal {
     max-width: 400px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-body {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px 20px;
+    border-top: 1px solid var(--border-0);
+    flex-shrink: 0;
   }
 
   .section-label {
