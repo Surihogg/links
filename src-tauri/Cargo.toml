@@ -31,3 +31,6 @@ url = "2"
 open = "5"
 rfd = "0.15"
 dirs = "6"
+
+# Autostart plugin for auto-start on boot
+tauri-plugin-autostart = "2"
