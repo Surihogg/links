@@ -439,6 +439,38 @@
     display: inline;
   }
 
+  .card-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  .card-actions .action-btn {
+    opacity: 0;
+    transition: opacity var(--transition);
+  }
+
+  .link-card:hover .card-actions .action-btn { opacity: 1; }
+
+  .action-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-3);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+    text-decoration: none;
+  }
+
+  .action-btn:hover { background: var(--border-1); color: var(--text-1); }
+  .action-btn.danger:hover { background: var(--danger-soft); color: var(--danger); }
+
   .confirm-overlay {
     position: fixed;
     inset: 0;
