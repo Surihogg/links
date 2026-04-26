@@ -109,3 +109,19 @@ export async function checkLinkStatus(url) {
 export async function exitApp() {
   return invoke("exit_app");
 }
+
+// Autostart
+export async function enableAutostart() {
+  const { enable } = await import("@tauri-apps/plugin-autostart");
+  return enable();
+}
+
+export async function disableAutostart() {
+  const { disable } = await import("@tauri-apps/plugin-autostart");
+  return disable();
+}
+
+export async function isAutostartEnabled() {
+  const { isEnabled } = await import("@tauri-apps/plugin-autostart");
+  return isEnabled();
+}
