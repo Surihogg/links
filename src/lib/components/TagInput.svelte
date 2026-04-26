@@ -6,16 +6,20 @@
   let suggestions = $state([]);
   let show_suggestions = $state(false);
   let active_index = $state(-1);
+  let blur_timeout = null;
+
+  async function onfocus_handler() {
+    clearTimeout(blur_timeout);
+    suggestions = await autocompleteTags(input);
+    show_suggestions = suggestions.length > 0;
+    active_index = -1;
+  }
 
   async function oninput(e) {
     input = e.target.value;
-    if (input.length > 0) {
-      suggestions = await autocompleteTags(input);
-      show_suggestions = suggestions.length > 0;
-      active_index = -1;
-    } else {
-      show_suggestions = false;
-    }
+    suggestions = await autocompleteTags(input);
+    show_suggestions = suggestions.length > 0;
+    active_index = -1;
   }
 
   function add_tag(name) {
@@ -68,7 +72,8 @@
       value={input}
       oninput={oninput}
       onkeydown={onkeydown}
-      onblur={() => setTimeout(() => show_suggestions = false, 150)}
+      onfocus={onfocus_handler}
+      onblur={() => { blur_timeout = setTimeout(() => show_suggestions = false, 150); }}
       placeholder={tags.length === 0 ? "快到碗里来！" : ""}
       class="tag-text-input"
     />

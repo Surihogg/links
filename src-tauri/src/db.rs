@@ -757,10 +757,11 @@ impl Db {
 
     pub fn create_tag(&self, name: &str) -> Result<Tag, AppError> {
         let conn = self.0.lock().unwrap();
-        conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", rusqlite::params![name])?;
+        conn.execute("INSERT INTO tags (name) VALUES (?)", rusqlite::params![name])?;
+        let id = conn.last_insert_rowid();
         let tag = conn.query_row(
-            "SELECT id, name, updated_at FROM tags WHERE name = ?",
-            rusqlite::params![name],
+            "SELECT id, name, updated_at FROM tags WHERE id = ?",
+            rusqlite::params![id],
             |row| Ok(Tag { id: row.get(0)?, name: row.get(1)?, updated_at: row.get(2)? }),
         )?;
         Ok(tag)
@@ -789,7 +790,14 @@ impl Db {
     pub fn autocomplete_tags(&self, prefix: &str) -> Result<Vec<Tag>, AppError> {
         let conn = self.0.lock().unwrap();
         let pattern = format!("%{}%", prefix.replace('%', "\\%").replace('_', "\\_"));
-        let mut stmt = conn.prepare("SELECT id, name, updated_at FROM tags WHERE name LIKE ? ORDER BY name LIMIT 10")?;
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.name, t.updated_at FROM tags t \
+             LEFT JOIN link_tags lt ON t.id = lt.tag_id \
+             WHERE t.name LIKE ? \
+             GROUP BY t.id \
+             ORDER BY COUNT(lt.link_id) DESC, t.name \
+             LIMIT 10"
+        )?;
         let tags = stmt
             .query_map(rusqlite::params![pattern], |row| {
                 Ok(Tag {
