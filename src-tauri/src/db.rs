@@ -99,8 +99,8 @@ impl Db {
         )?;
         // Ensure is_broken column exists for existing databases
         conn.execute_batch("ALTER TABLE links ADD COLUMN is_broken INTEGER NOT NULL DEFAULT 0").ok();
-        // Ensure tags table has updated_at column for existing databases
-        conn.execute_batch("ALTER TABLE tags ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))").ok();
+        conn.execute_batch("ALTER TABLE tags ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''").ok();
+        conn.execute_batch("UPDATE tags SET updated_at = datetime('now','localtime') WHERE updated_at = ''").ok();
         Ok(())
     }
 }

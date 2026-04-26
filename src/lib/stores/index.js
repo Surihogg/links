@@ -152,7 +152,10 @@ function createTagsStore() {
     },
     async update(payload) {
       const tag = await api.updateTag(payload);
-      update((s) => s.map((t) => (t.id === tag.id ? tag : t)));
+      update((s) => {
+        const rest = s.filter((t) => t.id !== tag.id);
+        return [tag, ...rest];
+      });
       return tag;
     },
   };
