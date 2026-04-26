@@ -87,7 +87,11 @@
   }
 
   function on_overlay_click(e) {
-    if (e.target === e.currentTarget) oncancel?.();
+    // 只有直接点击 overlay（不是从 modal 内拖拽出来的）才关闭窗口
+    if (e.target === e.currentTarget && !mouseDownInside) {
+      oncancel?.();
+    }
+    mouseDownInside = false;
   }
 
   let btn_text = $derived(
@@ -100,6 +104,14 @@
     if (!u) return;
     user_edited = { title: false, description: false };
     await do_fetch(u);
+  }
+
+  let mouseDownInside = false;
+
+  function on_overlay_mousedown(e) {
+    // 记录 mousedown 是否发生在 modal 内容区内
+    // 如果是，说明用户可能在选中文本或拖拽，后续 click 不应关闭窗口
+    mouseDownInside = !!e.target.closest('.modal');
   }
 
   function on_input_keydown(e) {
@@ -133,7 +145,7 @@
   });
 </script>
 
-<div class="modal-overlay" onclick={on_overlay_click}>
+<div class="modal-overlay" onclick={on_overlay_click} onmousedown={on_overlay_mousedown}>
   <div class="modal">
     <div class="modal-header">
       <h2 class="modal-title">{link ? "编辑链接" : "添加链接"}</h2>
