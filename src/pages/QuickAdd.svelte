@@ -25,6 +25,7 @@
   let has_focused = $state(false);
 
   let dark_mode = $state(false);
+  let theme_ready = $state(false);
 
   function apply_theme(mode) {
     if (mode === "system") {
@@ -55,6 +56,9 @@
       themeMode = legacyDark === "true" ? "dark" : (legacyDark === "false" ? "light" : "system");
     }
     apply_theme(themeMode || "system");
+    theme_ready = true;
+    // Sync the html-level dark class from inline script with actual state
+    document.documentElement.classList.toggle("dark", dark_mode);
 
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     function on_system_theme(e) {
@@ -175,6 +179,7 @@
 </script>
 
 <div class={dark_mode ? "dark" : ""}>
+{#if theme_ready}
 <div class="quick-add">
   <div class="modal-header">
     <h2 class="modal-title">添加链接</h2>
@@ -248,6 +253,7 @@
     </div>
   </form>
 </div>
+{/if}
 </div>
 
 <style>
