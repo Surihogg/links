@@ -147,7 +147,10 @@ function createTagsStore() {
     },
     async create(name) {
       const tag = await api.createTag(name);
-      update((s) => [tag, ...s]);
+      update((s) => {
+        const rest = s.filter((t) => t.id !== tag.id);
+        return [tag, ...rest];
+      });
       return tag;
     },
     async update(payload) {

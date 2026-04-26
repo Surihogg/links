@@ -36,7 +36,13 @@
       cat_placeholder = cat_placeholder === "给我一点输入" ? "你是认真的吗？" : "给我一点输入";
       return;
     }
-    oncreate?.({ name: new_name.trim(), parent_id: new_parent_id });
+    const name = new_name.trim();
+    if (flat_categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+      new_name = "";
+      cat_placeholder = "已经有这个分组了";
+      return;
+    }
+    oncreate?.({ name, parent_id: new_parent_id });
     new_name = "";
     cat_placeholder = "给我一点输入";
   }
@@ -137,7 +143,13 @@
       tag_placeholder = tag_placeholder === "给我一点输入" ? "你是认真的吗？" : "给我一点输入";
       return;
     }
-    oncreate_tag?.(new_tag_name.trim());
+    const name = new_tag_name.trim();
+    if (tags.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+      new_tag_name = "";
+      tag_placeholder = "已经有这个标签了";
+      return;
+    }
+    oncreate_tag?.(name);
     new_tag_name = "";
     tag_placeholder = "给我一点输入";
   }
