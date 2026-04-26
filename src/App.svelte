@@ -3,7 +3,7 @@
   import { linksStore, categoriesStore, tagsStore } from "./lib/stores/index.js";
   import * as api from "./lib/api.js";
   import { waitForBackendReady } from "./lib/ready.js";
-  import { emit } from "@tauri-apps/api/event";
+  import { emit, listen } from "@tauri-apps/api/event";
   import SearchBar from "./lib/components/SearchBar.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import LinkList from "./lib/components/LinkList.svelte";
@@ -74,8 +74,8 @@
 
     const { getCurrentWindow, LogicalSize, PhysicalPosition } = await import("@tauri-apps/api/window");
     const mainWindow = getCurrentWindow();
-    mainWindow.onFocusChanged(({ payload: focused }) => {
-      if (focused) search_bar?.focus();
+    const unlisten = await listen("main-shown", () => {
+      search_bar?.focus();
     });
 
     const savedSize = await api.getSetting("window-size");
@@ -164,6 +164,7 @@
       clearTimeout(resize_restore_timeout);
       clearTimeout(resize_timer);
       window.removeEventListener("resize", on_resize);
+      if (unlisten) unlisten();
       if (unlistenLinksChanged) unlistenLinksChanged();
       if (unlistenMoved) unlistenMoved();
       if (system_unlisten) system_unlisten();

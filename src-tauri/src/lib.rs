@@ -78,6 +78,7 @@ pub fn run() {
                             let _ = w.show();
                             let _ = w.unminimize();
                             let _ = w.set_focus();
+                            let _ = app.emit("main-shown", ());
                         }
                     }
                 })
