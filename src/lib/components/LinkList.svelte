@@ -1,7 +1,7 @@
 <script>
   import LinkCard from "./LinkCard.svelte";
 
-  let { links = [], categories = [], loading = false, highlight = "", has_more = false, onedit, ondelete, ontoggle_favorite, onloadmore } = $props();
+  let { links = [], categories = [], loading = false, highlight = "", has_more = false, onedit, ondelete, ontoggle_favorite, onloadmore, onremovecategory, onremovetag } = $props();
 
   let cat_map = $derived(() => {
     const map = {};
@@ -39,7 +39,7 @@
     </div>
   {:else}
     {#each links as link (link.id)}
-      <LinkCard {link} {highlight} category_name={link.category_id ? cat_map()[link.category_id] : null} onedit={onedit} ondelete={ondelete} ontoggle_favorite={ontoggle_favorite} />
+      <LinkCard {link} {highlight} category_name={link.category_id ? cat_map()[link.category_id] : null} onedit={onedit} ondelete={ondelete} ontoggle_favorite={ontoggle_favorite} onremovecategory={onremovecategory} onremovetag={onremovetag} />
     {/each}
     {#if loading}
       <div class="load-more-state">

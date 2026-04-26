@@ -2,7 +2,7 @@
   import { openUrl } from "../api.js";
   import { copyToClipboard } from "../api.js";
 
-  let { link, highlight = "", category_name = null, onedit, ondelete, ontoggle_favorite } = $props();
+  let { link, highlight = "", category_name = null, onedit, ondelete, ontoggle_favorite, onremovecategory, onremovetag } = $props();
   let show_confirm = $state(false);
   let show_share_menu = $state(false);
   let copy_success = $state(false);
@@ -146,13 +146,23 @@
         <div class="card-tags">
           {#if category_name}
             <span class="cat-chip">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
+              <span class="chip-icon-area"
+                onclick={(e) => { e.stopPropagation(); onremovecategory?.(link); }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chip-icon icon-folder"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chip-icon icon-delete"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+              </span>
               {category_name}
             </span>
           {/if}
           {#each link.tags.slice(0, 5) as tag}
             <span class="tag-chip">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+              <span class="chip-icon-area"
+                onclick={(e) => { e.stopPropagation(); onremovetag?.(link, tag); }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chip-icon icon-tag"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chip-icon icon-delete"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+              </span>
               {@html hl(tag)}
             </span>
           {/each}
@@ -398,85 +408,36 @@
     font-weight: 500;
   }
 
-  :global(.dark) .cat-chip {
-    background: var(--cat-soft);
-    color: var(--cat-text);
-  }
-
-  .tag-chip {
+  .chip-icon-area {
     display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-size: 11px;
-    background: var(--accent-soft);
-    color: var(--accent-text);
-    font-weight: 500;
-  }
-
-  .tag-more { font-size: 11px; color: var(--text-3); padding: 1px 4px; }
-
-  .note-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-size: 11px;
-    background: var(--danger-soft);
-    color: var(--danger);
-    font-weight: 500;
-    max-width: 200px;
-  }
-
-  .note-icon {
-    flex-shrink: 0;
-  }
-
-  .note-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-  }
-
-  :global(.dark) .note-chip {
-    background: var(--danger-soft);
-    color: var(--danger);
-  }
-
-  .card-actions {
-    display: flex;
-    gap: 2px;
-    flex-shrink: 0;
-    align-self: center;
-  }
-
-  .card-actions .action-btn {
-    opacity: 0;
-    transition: opacity var(--transition);
-  }
-
-  .link-card:hover .card-actions .action-btn { opacity: 1; }
-
-  .action-btn {
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: none;
-    border-radius: var(--radius-sm);
-    color: var(--text-3);
-    cursor: pointer;
-    display: flex;
     align-items: center;
     justify-content: center;
-    transition: all var(--transition);
-    text-decoration: none;
+    cursor: pointer;
   }
 
-  .action-btn:hover { background: var(--border-1); color: var(--text-1); }
-  .action-btn.danger:hover { background: var(--danger-soft); color: var(--danger); }
+  .chip-icon.icon-folder,
+  .chip-icon.icon-tag {
+    display: inline;
+  }
+
+  .chip-icon.icon-delete {
+    display: none;
+    color: var(--danger);
+  }
+
+  .cat-chip:hover .icon-folder {
+    display: none;
+  }
+  .cat-chip:hover .icon-delete {
+    display: inline;
+  }
+
+  .tag-chip:hover .icon-tag {
+    display: none;
+  }
+  .tag-chip:hover .icon-delete {
+    display: inline;
+  }
 
   .confirm-overlay {
     position: fixed;

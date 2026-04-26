@@ -233,6 +233,18 @@
     await refresh_current_view();
   }
 
+  async function on_remove_category(link) {
+    await linksStore.update({ id: link.id, category_id: -1 });
+    await refresh_current_view();
+  }
+
+  async function on_remove_tag(link, tag) {
+    const remaining = link.tags.filter(t => t !== tag);
+    await linksStore.update({ id: link.id, tags: remaining });
+    await refresh_current_view();
+    await tagsStore.load();
+  }
+
   async function on_create_category(payload) {
     await categoriesStore.create(payload);
   }
@@ -394,6 +406,8 @@
         onedit={(link) => edit_link = link}
         ondelete={on_delete_link}
         ontoggle_favorite={on_toggle_favorite}
+        onremovecategory={on_remove_category}
+        onremovetag={on_remove_tag}
       />
 
       <button class="fab" onclick={() => show_add_form = true} title="添加链接">
