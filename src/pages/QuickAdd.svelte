@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import TagInput from "../lib/components/TagInput.svelte";
   import CategoryInput from "../lib/components/CategoryInput.svelte";
-  import { fetchMeta, checkDuplicate, createLink, listCategories } from "../lib/api.js";
+  import { fetchMeta, checkDuplicate, createLink, listCategories, getSetting } from "../lib/api.js";
   import { waitForBackendReady } from "../lib/ready.js";
   import { emit } from "@tauri-apps/api/event";
 
@@ -24,6 +24,16 @@
   let pending_fetch = null;
   let has_focused = $state(false);
 
+  let dark_mode = $state(false);
+
+  function apply_theme(mode) {
+    if (mode === "system") {
+      dark_mode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    } else {
+      dark_mode = mode === "dark";
+    }
+  }
+
   function flatten_categories(tree) {
     const result = [];
     for (const cat of tree) {
@@ -37,6 +47,23 @@
 
   onMount(async () => {
     await waitForBackendReady();
+
+    // Apply theme
+    let themeMode = await getSetting("theme-mode");
+    if (!themeMode) {
+      const legacyDark = await getSetting("dark-mode");
+      themeMode = legacyDark === "true" ? "dark" : (legacyDark === "false" ? "light" : "system");
+    }
+    apply_theme(themeMode || "system");
+
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    function on_system_theme(e) {
+      if ((themeMode || "system") === "system") {
+        dark_mode = e.matches;
+      }
+    }
+    if (mq) mq.addEventListener("change", on_system_theme);
+
     listCategories().then(c => categories = c);
     const handle_blur = () => {
       if (has_focused) close_window();
@@ -147,6 +174,7 @@
   let btn_disabled = $derived(saving);
 </script>
 
+<div class={dark_mode ? "dark" : ""}>
 <div class="quick-add">
   <div class="modal-header">
     <h2 class="modal-title">添加链接</h2>
@@ -219,6 +247,7 @@
       </div>
     </div>
   </form>
+</div>
 </div>
 
 <style>
