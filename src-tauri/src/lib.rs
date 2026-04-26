@@ -89,6 +89,13 @@ pub fn run() {
             log::info!("[startup] data_dir = {:?}", dir);
 
             let cfg = config::Config::load(&dir).unwrap_or_else(|_| config::Config::empty());
+
+            // Windows 上 quick-add 窗口需要移除原生标题栏（macOS 通过 titleBarStyle: Overlay 隐藏）
+            #[cfg(target_os = "windows")]
+            if let Some(quick_add) = app.get_webview_window("quick-add") {
+                let _ = quick_add.set_decorations(false);
+            }
+
             let mut window_width: f64 = 900.0;
             let mut window_height: f64 = 600.0;
             if let Some(size_val) = cfg.get_value("window-size") {
