@@ -298,10 +298,32 @@ pub fn exit_app(app: AppHandle) {
 }
 
 pub const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+L";
+pub const DEFAULT_MAIN_SHORTCUT: &str = "CmdOrCtrl+Shift+J";
 
 #[tauri::command]
 pub fn get_shortcut(config: State<'_, Config>) -> Result<String, AppError> {
     Ok(config.get("global-shortcut").unwrap_or_else(|| DEFAULT_SHORTCUT.to_string()))
+}
+
+#[tauri::command]
+pub fn get_main_shortcut(config: State<'_, Config>) -> Result<String, AppError> {
+    Ok(config.get("main-shortcut").unwrap_or_else(|| DEFAULT_MAIN_SHORTCUT.to_string()))
+}
+
+#[tauri::command]
+pub fn set_main_shortcut(app: AppHandle, config: State<'_, Config>, shortcut: String) -> Result<String, AppError> {
+    let parsed: tauri_plugin_global_shortcut::Shortcut = shortcut
+        .parse()
+        .map_err(|e: <tauri_plugin_global_shortcut::Shortcut as std::str::FromStr>::Err| AppError::General(e.to_string()))?;
+    let old = config.get("main-shortcut").unwrap_or_else(|| DEFAULT_MAIN_SHORTCUT.to_string());
+    let _ = app.global_shortcut().unregister(old.as_str());
+    app.global_shortcut()
+        .register(parsed)
+        .map_err(|e| AppError::General(e.to_string()))?;
+    config.set("main-shortcut", &shortcut)?;
+    let dir = app.path().app_data_dir().expect("failed to resolve app data dir");
+    config.save(&dir)?;
+    Ok(parsed.to_string())
 }
 
 #[tauri::command]

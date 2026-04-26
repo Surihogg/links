@@ -757,6 +757,14 @@ impl Db {
 
     pub fn create_tag(&self, name: &str) -> Result<Tag, AppError> {
         let conn = self.0.lock().unwrap();
+        // Check if tag already exists to avoid UNIQUE constraint on insert
+        if let Ok(mut stmt) = conn.prepare("SELECT id, name, updated_at FROM tags WHERE name = ?") {
+            let mut rows = stmt.query(rusqlite::params![name])?;
+            if let Some(row) = rows.next()? {
+                return Ok(Tag { id: row.get(0)?, name: row.get(1)?, updated_at: row.get(2)? });
+            }
+        }
+        // Insert new tag
         conn.execute("INSERT INTO tags (name) VALUES (?)", rusqlite::params![name])?;
         let id = conn.last_insert_rowid();
         let tag = conn.query_row(
@@ -995,6 +1003,7 @@ mod tests {
         }
         let result = db.list_links(&ListLinksParams {
             page: Some(1), per_page: Some(3), category_id: None, tag: None, query: None, favorite_only: None,
+            untagged_only: None, uncategorized_only: None,
         }).unwrap();
         assert_eq!(result.items.len(), 3);
         assert_eq!(result.total, 5);
@@ -1010,6 +1019,7 @@ mod tests {
 
         let result = db.list_links(&ListLinksParams {
             category_id: Some(Some(cat.id)), page: None, per_page: None, tag: None, query: None, favorite_only: None,
+            untagged_only: None, uncategorized_only: None,
         }).unwrap();
         assert_eq!(result.items.len(), 1);
         assert_eq!(result.items[0].url, "https://news.com");
@@ -1023,6 +1033,7 @@ mod tests {
 
         let result = db.list_links(&ListLinksParams {
             tag: Some("rust".into()), page: None, per_page: None, category_id: None, query: None, favorite_only: None,
+            untagged_only: None, uncategorized_only: None,
         }).unwrap();
         assert_eq!(result.items.len(), 1);
     }
@@ -1036,6 +1047,7 @@ mod tests {
 
         let result = db.list_links(&ListLinksParams {
             favorite_only: Some(true), page: None, per_page: None, category_id: None, tag: None, query: None,
+            untagged_only: None, uncategorized_only: None,
         }).unwrap();
         assert_eq!(result.items.len(), 1);
         assert!(result.items[0].is_favorite);
@@ -1147,6 +1159,7 @@ mod tests {
 
         let link_after = db.list_links(&ListLinksParams {
             page: None, per_page: None, category_id: None, tag: None, query: None, favorite_only: None,
+            untagged_only: None, uncategorized_only: None,
         }).unwrap();
         assert!(link_after.items[0].category_id.is_none());
 
@@ -1196,7 +1209,7 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Rust Programming Language", "A systems language", vec![])).unwrap();
 
-        let results = db.search_links(&SearchParams { query: "Rust".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None }).unwrap();
+        let results = db.search_links(&SearchParams { query: "Rust".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None }).unwrap();
         assert!(!results.items.is_empty());
         assert!(results.items[0].title.contains("Rust"));
     }
@@ -1206,7 +1219,7 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Rust 编程语言指南", "学习 Rust", vec![])).unwrap();
 
-        let results = db.search_links(&SearchParams { query: "编程".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None }).unwrap();
+        let results = db.search_links(&SearchParams { query: "编程".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None }).unwrap();
         assert!(!results.items.is_empty());
     }
 
@@ -1215,7 +1228,7 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Some Title", "desc", vec!["webassembly"])).unwrap();
 
-        let results = db.search_links(&SearchParams { query: "webassembly".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None }).unwrap();
+        let results = db.search_links(&SearchParams { query: "webassembly".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None }).unwrap();
         assert!(!results.items.is_empty());
     }
 
@@ -1224,7 +1237,7 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Hello World", "desc", vec![])).unwrap();
 
-        let results = db.search_links(&SearchParams { query: "ello".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None }).unwrap();
+        let results = db.search_links(&SearchParams { query: "ello".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None }).unwrap();
         assert!(!results.items.is_empty());
     }
 

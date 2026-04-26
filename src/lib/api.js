@@ -93,6 +93,15 @@ export async function setShortcut(shortcut) {
   return invoke("set_shortcut", { shortcut });
 }
 
+// Main window shortcut management
+export async function getMainShortcut() {
+  return invoke("get_main_shortcut");
+}
+
+export async function setMainShortcut(shortcut) {
+  return invoke("set_main_shortcut", { shortcut });
+}
+
 // Frontend helpers for link sharing and status checks
 export async function copyToClipboard(content) {
   return invoke("copy_to_clipboard", { content });

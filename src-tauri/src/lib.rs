@@ -13,6 +13,7 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use std::str::FromStr;
+use crate::config::Config;
 
 fn static_data_dir() -> PathBuf {
     dirs::data_dir()
@@ -47,11 +48,37 @@ pub fn run() {
         )
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(move |app, _event, _shortcut| {
-                    if let Some(window) = app.get_webview_window("quick-add") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                        let _ = app.emit("quick-add-shown", ());
+                .with_handler(move |app, shortcut, _event| {
+                    let cfg = app.state::<Config>();
+                    let quick_add_str = cfg
+                        .get("global-shortcut")
+                        .unwrap_or_else(|| commands::DEFAULT_SHORTCUT.to_string());
+                    let main_str = cfg
+                        .get("main-shortcut")
+                        .unwrap_or_else(|| commands::DEFAULT_MAIN_SHORTCUT.to_string());
+                    drop(cfg);
+
+                    let quick_add: Shortcut = match quick_add_str.parse() {
+                        Ok(s) => s,
+                        Err(_) => return,
+                    };
+                    let main_shortcut: Shortcut = match main_str.parse() {
+                        Ok(s) => s,
+                        Err(_) => return,
+                    };
+
+                    if *shortcut == quick_add {
+                        if let Some(window) = app.get_webview_window("quick-add") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            let _ = app.emit("quick-add-shown", ());
+                        }
+                    } else if *shortcut == main_shortcut {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.unminimize();
+                            let _ = w.set_focus();
+                        }
                     }
                 })
                 .build(),
@@ -101,6 +128,15 @@ pub fn run() {
                 }
             }
             let shortcut_str = cfg.get("global-shortcut").unwrap_or_else(|| commands::DEFAULT_SHORTCUT.to_string());
+            // Initialize main shortcut on startup as well
+            let main_shortcut_str = cfg
+                .get("main-shortcut")
+                .unwrap_or_else(|| commands::DEFAULT_MAIN_SHORTCUT.to_string());
+            let main_shortcut = Shortcut::from_str(&main_shortcut_str).unwrap_or_else(|_| {
+                // Fallback to default if parsing fails
+                Shortcut::from_str(commands::DEFAULT_MAIN_SHORTCUT).expect("invalid default shortcut")
+            });
+            app.global_shortcut().register(main_shortcut).ok();
             app.manage(cfg);
 
             log::info!("[startup] initializing database...");
@@ -181,6 +217,8 @@ pub fn run() {
             commands::set_setting,
             commands::get_shortcut,
             commands::set_shortcut,
+            commands::get_main_shortcut,
+            commands::set_main_shortcut,
             commands::exit_app,
         ])
         .run(tauri::generate_context!())

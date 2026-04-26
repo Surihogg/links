@@ -12,6 +12,11 @@
   let recording = $state(false);
   let recorded_shortcut = $state(null);
   let shortcut_error = $state(false);
+  let main_shortcut = $state(null);
+  let main_shortcut_loaded = $state(false);
+  let main_recording = $state(false);
+  let main_recorded_shortcut = $state(null);
+  let main_shortcut_error = $state(false);
   let autostart_enabled = $state(false);
   let autostart_loaded = $state(false);
   
@@ -56,10 +61,22 @@
     recording = true;
   }
 
+  function start_main_recording() {
+    main_recorded_shortcut = null;
+    main_shortcut_error = false;
+    main_recording = true;
+  }
+
   function cancel_recording() {
     recorded_shortcut = null;
     recording = false;
     shortcut_error = false;
+  }
+
+  function cancel_main_recording() {
+    main_recorded_shortcut = null;
+    main_recording = false;
+    main_shortcut_error = false;
   }
 
   async function save_shortcut() {
@@ -76,6 +93,20 @@
     }
   }
 
+  async function save_main_shortcut() {
+    if (!main_recorded_shortcut) return;
+    main_shortcut_error = false;
+    try {
+      const result = await api.setMainShortcut(main_recorded_shortcut);
+      main_shortcut = result;
+      main_recording = false;
+      main_recorded_shortcut = null;
+    } catch {
+      main_shortcut_error = true;
+      main_recorded_shortcut = null;
+    }
+  }
+
   onMount(async () => {
     const val = await api.getSetting("close-behavior");
     close_behavior = val || "ask";
@@ -86,6 +117,12 @@
       shortcut_raw = null;
     }
     shortcut_loaded = true;
+    try {
+      main_shortcut = await api.getMainShortcut();
+    } catch {
+      main_shortcut = null;
+    }
+    main_shortcut_loaded = true;
     // Load autostart state
     try {
       autostart_enabled = await api.isAutostartEnabled();
@@ -149,7 +186,17 @@
   }
 
   function handle_window_keydown(e) {
+    if (e.key === "Escape") {
+      onclose?.();
+      return;
+    }
     if (recording) on_record_keydown(e);
+    if (main_recording) {
+      e.preventDefault();
+      e.stopPropagation();
+      const res = buildShortcutFromEvent(e);
+      if (res) main_recorded_shortcut = res;
+    }
   }
 </script>
 
@@ -191,6 +238,64 @@
                 {/if}
               </button>
             {/each}
+          </div>
+        {:else}
+          <div class="format-loading">加载中...</div>
+        {/if}
+
+        <div class="section-label" style="margin-top: 16px;">快捷键</div>
+        {#if shortcut_loaded && main_shortcut_loaded}
+          <div class="shortcut-section">
+            <div class="shortcut-row">
+              <div class="shortcut-info">
+                <span class="format-name">快速添加</span>
+                <span class="format-desc">唤起快速添加窗口</span>
+              </div>
+              {#if !recording}
+                <div class="shortcut-display">{formatShortcut(shortcut_raw) || "未设置"}</div>
+                <button class="btn btn-secondary btn-sm" onclick={start_recording}>修改</button>
+              {:else}
+                <div class="shortcut-display recording-area">
+                  {#if recorded_shortcut}
+                    {formatShortcut(recorded_shortcut)}
+                  {:else}
+                    请按下新的快捷键...
+                  {/if}
+                </div>
+                {#if shortcut_error}
+                  <span class="shortcut-error">快捷键设置失败，请重试</span>
+                {/if}
+                <div class="shortcut-actions">
+                  <button class="btn btn-secondary btn-sm" onclick={cancel_recording}>取消</button>
+                  <button class="btn btn-primary btn-sm" disabled={!recorded_shortcut} onclick={save_shortcut}>保存</button>
+                </div>
+              {/if}
+            </div>
+            <div class="shortcut-row" style="margin-top: 10px;">
+              <div class="shortcut-info">
+                <span class="format-name">主窗口</span>
+                <span class="format-desc">唤起主窗口</span>
+              </div>
+              {#if !main_recording}
+                <div class="shortcut-display">{formatShortcut(main_shortcut) || "未设置"}</div>
+                <button class="btn btn-secondary btn-sm" onclick={start_main_recording}>修改</button>
+              {:else}
+                <div class="shortcut-display recording-area">
+                  {#if main_recorded_shortcut}
+                    {formatShortcut(main_recorded_shortcut)}
+                  {:else}
+                    请按下新的快捷键...
+                  {/if}
+                </div>
+                {#if main_shortcut_error}
+                  <span class="shortcut-error">快捷键设置失败，请重试</span>
+                {/if}
+                <div class="shortcut-actions">
+                  <button class="btn btn-secondary btn-sm" onclick={cancel_main_recording}>取消</button>
+                  <button class="btn btn-primary btn-sm" disabled={!main_recorded_shortcut} onclick={save_main_shortcut}>保存</button>
+                </div>
+              {/if}
+            </div>
           </div>
         {:else}
           <div class="format-loading">加载中...</div>
@@ -240,39 +345,6 @@
         {:else}
           <div class="format-loading">加载中...</div>
         {/if}
-        
-        <div class="section-label" style="margin-top: 16px;">快捷键</div>
-        {#if shortcut_loaded}
-          <div class="shortcut-section">
-            <div class="shortcut-row">
-              <div class="shortcut-info">
-                <span class="format-name">全局快捷键</span>
-                <span class="format-desc">用于唤起快速添加窗口</span>
-              </div>
-              {#if !recording}
-                <div class="shortcut-display">{formatShortcut(shortcut_raw) || "未设置"}</div>
-                <button class="btn btn-secondary btn-sm" onclick={start_recording}>修改</button>
-              {:else}
-                <div class="shortcut-display recording-area">
-                  {#if recorded_shortcut}
-                    {formatShortcut(recorded_shortcut)}
-                  {:else}
-                    请按下新的快捷键...
-                  {/if}
-                </div>
-                {#if shortcut_error}
-                  <span class="shortcut-error">快捷键设置失败，请重试</span>
-                {/if}
-                <div class="shortcut-actions">
-                  <button class="btn btn-secondary btn-sm" onclick={cancel_recording}>取消</button>
-                  <button class="btn btn-primary btn-sm" disabled={!recorded_shortcut} onclick={save_shortcut}>保存</button>
-                </div>
-              {/if}
-            </div>
-          </div>
-        {:else}
-          <div class="format-loading">加载中...</div>
-        {/if}
       </div>
 
       <div class="modal-footer">
@@ -301,7 +373,6 @@
     justify-content: flex-end;
     gap: 8px;
     padding: 12px 20px 20px;
-    border-top: 1px solid var(--border-0);
     flex-shrink: 0;
   }
 
