@@ -105,8 +105,13 @@
   let is_dragging = false;
 
   function on_modal_mousedown(e) {
-    if (e.target.closest('.modal')) {
-      is_dragging = true;
+    // 只在 overlay 上（不在 modal 内容区）mousedown 时才触发拖拽关闭
+    is_dragging = !e.target.closest('.modal');
+  }
+
+  function on_input_keydown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
     }
   }
 
@@ -151,7 +156,7 @@
   <div class="modal">
     <div class="modal-header">
       <h2 class="modal-title">{link ? "编辑链接" : "添加链接"}</h2>
-      <button class="modal-close" onclick={oncancel}>
+      <button type="button" class="modal-close" onclick={oncancel}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
           <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
         </svg>
@@ -162,7 +167,7 @@
       <div class="field url-field">
         <label class="field-label">URL <span class="required">*</span></label>
         <div class="url-input-wrap">
-          <input type="url" bind:value={url} oninput={on_url_input} required placeholder="https://..." class="field-input" />
+          <input type="url" bind:value={url} oninput={on_url_input} onkeydown={on_input_keydown} required placeholder="https://..." class="field-input" />
           <button type="button" class="refresh-btn" onclick={refresh_meta} disabled={fetching || !url.trim()} title="重新抓取元数据">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class={fetching ? 'spin-anim' : ''}>
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
@@ -176,7 +181,7 @@
 
       <div class="field">
         <label class="field-label">标题</label>
-        <input type="text" bind:value={title} oninput={mark_edited("title")} placeholder="会自动帮你抓取哦" class="field-input" />
+        <input type="text" bind:value={title} oninput={mark_edited("title")} onkeydown={on_input_keydown} placeholder="会自动帮你抓取哦" class="field-input" />
       </div>
 
       <div class="field">

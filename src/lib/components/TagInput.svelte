@@ -60,7 +60,7 @@
     {#each tags as tag, i}
       <span class="tag-pill">
         {tag}
-        <button class="tag-remove" onclick={() => remove_tag(i)}>×</button>
+        <button type="button" class="tag-remove" onclick={() => remove_tag(i)}>×</button>
       </span>
     {/each}
     <input
