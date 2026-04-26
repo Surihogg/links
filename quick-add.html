@@ -6,7 +6,7 @@
     <title>快速添加链接</title>
     <style>
       html {
-        background: transparent;
+        background: transparent !important;
       }
       body {
         margin: 0;
@@ -14,15 +14,16 @@
         overflow: hidden;
         height: 100%;
         width: 100%;
-        background: transparent;
+        background: transparent !important;
+      }
+      #app {
+        height: 100%;
+        opacity: 0;
+      }
+      html.theme-ready #app {
+        opacity: 1;
       }
     </style>
-    <script>
-      // Prevent theme flash: apply dark class based on system preference immediately
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        document.documentElement.classList.add('dark');
-      }
-    </script>
   </head>
   <body>
     <div id="app"></div>

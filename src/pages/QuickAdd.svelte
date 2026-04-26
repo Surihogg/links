@@ -4,7 +4,7 @@
   import CategoryInput from "../lib/components/CategoryInput.svelte";
   import { fetchMeta, checkDuplicate, createLink, listCategories, getSetting } from "../lib/api.js";
   import { waitForBackendReady } from "../lib/ready.js";
-  import { emit } from "@tauri-apps/api/event";
+  import { emit, listen } from "@tauri-apps/api/event";
 
   let url = $state("");
   let title = $state("");
@@ -25,14 +25,40 @@
   let has_focused = $state(false);
 
   let dark_mode = $state(false);
-  let theme_ready = $state(false);
+  let theme_mode = $state("system");
+  let url_input;
 
   function apply_theme(mode) {
-    if (mode === "system") {
+    if (mode !== undefined) theme_mode = mode;
+    if (theme_mode === "system") {
       dark_mode = window.matchMedia("(prefers-color-scheme: dark)").matches;
     } else {
-      dark_mode = mode === "dark";
+      dark_mode = theme_mode === "dark";
     }
+    const root = document.documentElement;
+    root.classList.add("no-transition");
+    root.classList.toggle("dark", dark_mode);
+    root.offsetHeight;
+    requestAnimationFrame(() => root.classList.remove("no-transition"));
+  }
+
+  function reset_form() {
+    url = "";
+    title = "";
+    description = "";
+    notes = "";
+    category_id = null;
+    tags = [];
+    saving = false;
+    fetching = false;
+    fetch_error = "";
+    duplicate_warning = "";
+    user_edited = { title: false, description: false };
+    fetched_meta = { favicon_url: "", og_image_url: "" };
+    message = "";
+    has_focused = false;
+    clearTimeout(fetch_timer);
+    pending_fetch = null;
   }
 
   function flatten_categories(tree) {
@@ -49,24 +75,29 @@
   onMount(async () => {
     await waitForBackendReady();
 
-    // Apply theme
-    let themeMode = await getSetting("theme-mode");
-    if (!themeMode) {
+    let saved = await getSetting("theme-mode");
+    if (!saved) {
       const legacyDark = await getSetting("dark-mode");
-      themeMode = legacyDark === "true" ? "dark" : (legacyDark === "false" ? "light" : "system");
+      saved = legacyDark === "true" ? "dark" : (legacyDark === "false" ? "light" : "system");
     }
-    apply_theme(themeMode || "system");
-    theme_ready = true;
-    // Sync the html-level dark class from inline script with actual state
-    document.documentElement.classList.toggle("dark", dark_mode);
+    apply_theme(saved || "system");
+    document.documentElement.classList.add("theme-ready");
 
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     function on_system_theme(e) {
-      if ((themeMode || "system") === "system") {
-        dark_mode = e.matches;
+      if (theme_mode === "system") {
+        apply_theme();
       }
     }
     if (mq) mq.addEventListener("change", on_system_theme);
+
+    const unlistenTheme = await listen("theme-changed", (e) => {
+      apply_theme(e.payload);
+    });
+    const unlistenShown = await listen("quick-add-shown", () => {
+      reset_form();
+      setTimeout(() => url_input?.focus(), 50);
+    });
 
     listCategories().then(c => categories = c);
     const handle_blur = () => {
@@ -88,6 +119,8 @@
       window.removeEventListener("blur", handle_blur);
       window.removeEventListener("focus", handle_focus);
       window.removeEventListener("keydown", handle_keydown);
+      unlistenTheme();
+      unlistenShown();
     };
   });
 
@@ -171,7 +204,7 @@
 
   async function close_window() {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    await getCurrentWindow().close();
+    await getCurrentWindow().hide();
   }
 
   let btn_text = $derived(saving ? "保存中..." : "保存");
@@ -179,7 +212,6 @@
 </script>
 
 <div class={dark_mode ? "dark" : ""}>
-{#if theme_ready}
 <div class="quick-add">
   <div class="modal-header">
     <h2 class="modal-title">添加链接</h2>
@@ -194,7 +226,7 @@
     <div class="field url-field">
       <label class="field-label">URL <span class="required">*</span></label>
       <div class="url-input-wrap">
-        <input type="url" bind:value={url} oninput={on_url_input} required placeholder="https://..." class="field-input" />
+        <input bind:this={url_input} type="url" bind:value={url} oninput={on_url_input} required placeholder="https://..." class="field-input" />
         <button type="button" class="refresh-btn" onclick={refresh_meta} disabled={fetching || !url.trim()} title="重新抓取元数据">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class={fetching ? 'spin-anim' : ''}>
             <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
@@ -253,7 +285,6 @@
     </div>
   </form>
 </div>
-{/if}
 </div>
 
 <style>

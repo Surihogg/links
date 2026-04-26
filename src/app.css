@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
   /* Backgrounds */
   --bg-0: #ffffff;
   --bg-1: #f7f7f8;
@@ -60,6 +61,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --bg-0: #0a0a0b;
   --bg-1: #141416;
   --bg-2: #1e1e22;
@@ -120,6 +122,13 @@ html, body {
 
 .dark, .dark body, .dark html {
   background-color: #0a0a0b;
+}
+
+.no-transition,
+.no-transition *,
+.no-transition *::before,
+.no-transition *::after {
+  transition: none !important;
 }
 
 ::-webkit-scrollbar {

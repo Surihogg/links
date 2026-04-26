@@ -3,6 +3,7 @@
   import { linksStore, categoriesStore, tagsStore } from "./lib/stores/index.js";
   import * as api from "./lib/api.js";
   import { waitForBackendReady } from "./lib/ready.js";
+  import { emit } from "@tauri-apps/api/event";
   import SearchBar from "./lib/components/SearchBar.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import LinkList from "./lib/components/LinkList.svelte";
@@ -51,7 +52,7 @@
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     function on_system_theme_change(e) {
       if (theme_mode === "system") {
-        dark_mode = e.matches;
+        apply_theme();
       }
     }
     if (mq && typeof mq.addEventListener === "function") {
@@ -341,9 +342,10 @@
   }
 
   async function toggle_dark() {
-    dark_mode = !dark_mode;
-    theme_mode = dark_mode ? "dark" : "light";
+    theme_mode = dark_mode ? "light" : "dark";
+    apply_theme();
     await api.setSetting("theme-mode", theme_mode);
+    emit("theme-changed", theme_mode);
   }
 
   function apply_theme() {
@@ -352,11 +354,17 @@
     } else {
       dark_mode = (theme_mode === "dark");
     }
+    const root = document.documentElement;
+    root.classList.add("no-transition");
+    root.classList.toggle("dark", dark_mode);
+    root.offsetHeight;
+    requestAnimationFrame(() => root.classList.remove("no-transition"));
   }
 
   async function on_theme_change(mode) {
     theme_mode = mode;
     apply_theme();
+    emit("theme-changed", mode);
   }
 
   let filtered_links = $derived(links.items);
