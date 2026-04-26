@@ -48,6 +48,10 @@ export async function createTag(name) {
   return invoke("tags_create", { name });
 }
 
+export async function updateTag(payload) {
+  return invoke("tags_update", { payload });
+}
+
 export async function autocompleteTags(prefix) {
   return invoke("tags_autocomplete", { prefix });
 }

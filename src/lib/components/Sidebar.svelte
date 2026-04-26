@@ -1,5 +1,5 @@
 <script>
-  let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, ontag_delete, oncreate_tag, dark = false, ontoggle_dark, onexport, onimport, onsettings, importing = false } = $props();
+  let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, onrename_cat, ontag_delete, onrename_tag, oncreate_tag, dark = false, ontoggle_dark, onexport, onimport, onsettings, importing = false } = $props();
   let expanded = $state(new Set());
   let show_new = $state(false);
   let new_name = $state("");
@@ -13,6 +13,11 @@
   let new_tag_name = $state("");
   let cat_placeholder = $state("给我一点输入");
   let tag_placeholder = $state("给我一点输入");
+
+  let editing_cat_id = $state(null);
+  let editing_cat_name = $state("");
+  let editing_tag_id = $state(null);
+  let editing_tag_name = $state("");
 
   function toggle_section(key) {
     const next = new Set(collapsed);
@@ -85,6 +90,46 @@
 
   function reset_tag_delete() {
     deleting_tag_id = null;
+  }
+
+  function start_rename_cat(e, cat) {
+    e.stopPropagation();
+    editing_cat_id = cat.id;
+    editing_cat_name = cat.name;
+  }
+
+  function confirm_rename_cat(cat) {
+    const name = editing_cat_name.trim();
+    if (name && name !== cat.name) {
+      onrename_cat?.({ id: cat.id, name });
+    }
+    editing_cat_id = null;
+    editing_cat_name = "";
+  }
+
+  function cancel_rename_cat() {
+    editing_cat_id = null;
+    editing_cat_name = "";
+  }
+
+  function start_rename_tag(e, tag) {
+    e.stopPropagation();
+    editing_tag_id = tag.id;
+    editing_tag_name = tag.name;
+  }
+
+  function confirm_rename_tag(tag) {
+    const name = editing_tag_name.trim();
+    if (name && name !== tag.name) {
+      onrename_tag?.({ id: tag.id, name });
+    }
+    editing_tag_id = null;
+    editing_tag_name = "";
+  }
+
+  function cancel_rename_tag() {
+    editing_tag_id = null;
+    editing_tag_name = "";
   }
 
   function submit_tag() {
@@ -175,6 +220,7 @@
       <button
         class="nav-item cat-item"
         class:active={selected_id === 'uncategorized'}
+        style="padding-left: 12px"
         onclick={() => onselect?.('uncategorized')}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
@@ -185,7 +231,7 @@
           class="nav-item cat-item"
           class:active={selected_id === cat.id}
           style="padding-left: {12 + cat.depth * 16}px"
-          onclick={() => onselect?.(cat.id)}
+          onclick={() => { if (editing_cat_id !== cat.id) onselect?.(cat.id); }}
           onmouseleave={reset_cat_delete}
         >
           {#if cat.children?.length > 0}
@@ -197,12 +243,27 @@
           {:else}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
           {/if}
-          {#if deleting_id === cat.id}
+          {#if editing_cat_id === cat.id}
+            <input
+              type="text"
+              class="rename-input"
+              bind:value={editing_cat_name}
+              onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirm_rename_cat(cat); } if (e.key === 'Escape') cancel_rename_cat(); }}
+              onblur={() => confirm_rename_cat(cat)}
+              onclick={(e) => e.stopPropagation()}
+              autofocus
+            />
+          {:else if deleting_id === cat.id}
             <span class="cat-delete-hint">再点一下就删除</span>
           {:else}
             <span class="cat-name">{cat.name}</span>
           {/if}
-           <span class="cat-delete-btn" onclick={(e) => handle_delete_cat(e, cat.id)}>
+           <span class="cat-action-btn" onclick={(e) => start_rename_cat(e, cat)}>
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+               <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+             </svg>
+           </span>
+           <span class="cat-action-btn cat-delete-btn" onclick={(e) => handle_delete_cat(e, cat.id)}>
              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
              </svg>
@@ -257,16 +318,31 @@
         <button
           class="nav-item tag-item"
           class:active={selected_tag === tag.name}
-          onclick={() => onselect_tag?.(tag.name)}
+          onclick={() => { if (editing_tag_id !== tag.id) onselect_tag?.(tag.name); }}
           onmouseleave={reset_tag_delete}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tag-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-          {#if deleting_tag_id === tag.id}
+          {#if editing_tag_id === tag.id}
+            <input
+              type="text"
+              class="rename-input"
+              bind:value={editing_tag_name}
+              onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirm_rename_tag(tag); } if (e.key === 'Escape') cancel_rename_tag(); }}
+              onblur={() => confirm_rename_tag(tag)}
+              onclick={(e) => e.stopPropagation()}
+              autofocus
+            />
+          {:else if deleting_tag_id === tag.id}
             <span class="cat-delete-hint">再点一下就删除</span>
           {:else}
             <span class="cat-name">{tag.name}</span>
           {/if}
-           <span class="tag-delete-btn" onclick={(e) => handle_delete_tag(e, tag.id)}>
+           <span class="tag-action-btn" onclick={(e) => start_rename_tag(e, tag)}>
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+               <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+             </svg>
+           </span>
+           <span class="tag-action-btn tag-delete-btn" onclick={(e) => handle_delete_tag(e, tag.id)}>
              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
              </svg>
@@ -502,22 +578,30 @@
     color: var(--accent-text);
   }
 
-  .cat-delete-btn {
+  .cat-action-btn {
     display: none;
     align-items: center;
     justify-content: center;
     width: 18px;
     height: 18px;
     border-radius: 4px;
-    margin-left: auto;
     flex-shrink: 0;
     color: var(--text-3);
     cursor: pointer;
     transition: all var(--transition);
   }
 
-  .cat-item:hover .cat-delete-btn {
+  .cat-action-btn:last-child {
+    margin-left: auto;
+  }
+
+  .cat-item:hover .cat-action-btn {
     display: flex;
+  }
+
+  .cat-action-btn:hover {
+    color: var(--text-1);
+    background: var(--bg-hover);
   }
 
   .cat-delete-btn:hover {
@@ -569,6 +653,19 @@
     text-align: left;
   }
 
+  .rename-input {
+    flex: 1;
+    min-width: 0;
+    padding: 1px 4px;
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    background: var(--bg-0);
+    color: var(--text-0);
+    font-size: 13px;
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+
   .new-cat-form {
     padding: 8px 4px;
     display: flex;
@@ -599,22 +696,30 @@
     gap: 1px;
   }
 
-  .tag-delete-btn {
+  .tag-action-btn {
     display: none;
     align-items: center;
     justify-content: center;
     width: 18px;
     height: 18px;
     border-radius: 4px;
-    margin-left: auto;
     flex-shrink: 0;
     color: var(--text-3);
     cursor: pointer;
     transition: all var(--transition);
   }
 
-  .tag-item:hover .tag-delete-btn {
+  .tag-action-btn:last-child {
+    margin-left: auto;
+  }
+
+  .tag-item:hover .tag-action-btn {
     display: flex;
+  }
+
+  .tag-action-btn:hover {
+    color: var(--text-1);
+    background: var(--bg-hover);
   }
 
   .tag-delete-btn:hover {

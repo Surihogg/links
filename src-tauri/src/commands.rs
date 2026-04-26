@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::db::{
     AppError, CreateCategoryPayload, CreateLinkPayload, Db, ExportParams, ListLinksParams,
-    PaginatedResult, SearchParams, UpdateCategoryPayload, UpdateLinkPayload,
+    PaginatedResult, SearchParams, UpdateCategoryPayload, UpdateLinkPayload, UpdateTagPayload,
 };
 use rusqlite::params;
 use std::io::Write;
@@ -183,6 +183,11 @@ pub fn tags_delete(db: State<'_, Db>, id: i64) -> Result<(), AppError> {
 #[tauri::command]
 pub fn tags_create(db: State<'_, Db>, name: String) -> Result<crate::db::Tag, AppError> {
     db.create_tag(&name)
+}
+
+#[tauri::command]
+pub fn tags_update(db: State<'_, Db>, payload: UpdateTagPayload) -> Result<crate::db::Tag, AppError> {
+    db.update_tag(&payload)
 }
 
 #[tauri::command]

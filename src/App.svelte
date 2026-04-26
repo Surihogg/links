@@ -247,11 +247,21 @@
     await refresh_current_view();
   }
 
+  async function on_rename_category(payload) {
+    await categoriesStore.update(payload);
+    await refresh_current_view();
+  }
+
   async function on_delete_tag(id) {
     await tagsStore.remove(id);
     if (selected_tag) {
       selected_tag = null;
     }
+    await refresh_current_view();
+  }
+
+  async function on_rename_tag(payload) {
+    await tagsStore.update(payload);
     await refresh_current_view();
   }
 
@@ -344,7 +354,9 @@
       onselect_tag={on_tag_select}
       oncreate={on_create_category}
       ondelete_cat={on_delete_category}
+      onrename_cat={on_rename_category}
       ontag_delete={on_delete_tag}
+      onrename_tag={on_rename_tag}
       oncreate_tag={on_create_tag}
       dark={dark_mode}
       ontoggle_dark={toggle_dark}

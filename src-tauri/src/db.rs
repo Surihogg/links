@@ -176,6 +176,12 @@ pub struct Tag {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct UpdateTagPayload {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ListLinksParams {
     pub page: Option<u32>,
     pub per_page: Option<u32>,
@@ -755,6 +761,20 @@ impl Db {
         let conn = self.0.lock().unwrap();
         conn.execute("DELETE FROM tags WHERE id = ?", rusqlite::params![id])?;
         Ok(())
+    }
+
+    pub fn update_tag(&self, payload: &UpdateTagPayload) -> Result<Tag, AppError> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "UPDATE tags SET name = ? WHERE id = ?",
+            rusqlite::params![payload.name, payload.id],
+        )?;
+        let tag = conn.query_row(
+            "SELECT id, name FROM tags WHERE id = ?",
+            rusqlite::params![payload.id],
+            |row| Ok(Tag { id: row.get(0)?, name: row.get(1)? }),
+        )?;
+        Ok(tag)
     }
 
     pub fn autocomplete_tags(&self, prefix: &str) -> Result<Vec<Tag>, AppError> {

@@ -176,6 +176,7 @@ pub fn run() {
             commands::categories_delete,
             commands::tags_list,
             commands::tags_create,
+            commands::tags_update,
             commands::tags_delete,
             commands::tags_autocomplete,
             commands::export_links,
