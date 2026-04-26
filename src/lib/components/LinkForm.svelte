@@ -102,26 +102,9 @@
     await do_fetch(u);
   }
 
-  let is_dragging = false;
-
-  function on_modal_mousedown(e) {
-    // 只在 overlay 上（不在 modal 内容区）mousedown 时才触发拖拽关闭
-    is_dragging = !e.target.closest('.modal');
-  }
-
   function on_input_keydown(e) {
     if (e.key === 'Enter') {
       e.preventDefault();
-    }
-  }
-
-  function on_window_mouseup(e) {
-    if (is_dragging) {
-      const modal = e.currentTarget.querySelector('.modal');
-      if (modal && !modal.contains(e.target)) {
-        oncancel?.();
-      }
-      is_dragging = false;
     }
   }
 
@@ -150,9 +133,7 @@
   });
 </script>
 
-<svelte:window onmouseup={on_window_mouseup} />
-
-<div class="modal-overlay" onclick={on_overlay_click} onmousedown={on_modal_mousedown}>
+<div class="modal-overlay" onclick={on_overlay_click}>
   <div class="modal">
     <div class="modal-header">
       <h2 class="modal-title">{link ? "编辑链接" : "添加链接"}</h2>
