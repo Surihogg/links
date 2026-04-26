@@ -18,6 +18,8 @@
   let editing_cat_name = $state("");
   let editing_tag_id = $state(null);
   let editing_tag_name = $state("");
+  let icon_hover_cat_id = $state(null);
+  let icon_hover_tag_id = $state(null);
 
   function toggle_section(key) {
     const next = new Set(collapsed);
@@ -232,7 +234,7 @@
           class:active={selected_id === cat.id}
           style="padding-left: {12 + cat.depth * 16}px"
           onclick={() => { if (editing_cat_id !== cat.id) onselect?.(cat.id); }}
-          onmouseleave={reset_cat_delete}
+          onmouseleave={() => { reset_cat_delete(); icon_hover_cat_id = null; }}
         >
           {#if cat.children?.length > 0}
             <span class="cat-toggle" onclick={(e) => { e.stopPropagation(); toggle(cat.id); }}>
@@ -241,7 +243,17 @@
               </svg>
             </span>
           {:else}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
+            <span class="cat-icon-area"
+              onmouseenter={() => { if (editing_cat_id !== cat.id) icon_hover_cat_id = cat.id; }}
+              onmouseleave={() => { icon_hover_cat_id = null; }}
+              onclick={(e) => { if (deleting_id === cat.id || icon_hover_cat_id === cat.id) handle_delete_cat(e, cat.id); }}
+            >
+              {#if deleting_id === cat.id || icon_hover_cat_id === cat.id}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon icon-delete"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+              {:else}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
+              {/if}
+            </span>
           {/if}
           {#if editing_cat_id === cat.id}
             <input
@@ -263,13 +275,8 @@
                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
              </svg>
            </span>
-           <span class="cat-action-btn cat-delete-btn" onclick={(e) => handle_delete_cat(e, cat.id)}>
-             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-               <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-             </svg>
-           </span>
-        </button>
-      {/each}
+         </button>
+       {/each}
     </div>
     {/if}
 
@@ -321,9 +328,19 @@
           class:active={selected_tag === tag.name}
           style="padding-left: 12px"
           onclick={() => { if (editing_tag_id !== tag.id) onselect_tag?.(tag.name); }}
-          onmouseleave={reset_tag_delete}
+          onmouseleave={() => { reset_tag_delete(); icon_hover_tag_id = null; }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tag-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          <span class="tag-icon-area"
+            onmouseenter={() => { if (editing_tag_id !== tag.id) icon_hover_tag_id = tag.id; }}
+            onmouseleave={() => { icon_hover_tag_id = null; }}
+            onclick={(e) => { if (deleting_tag_id === tag.id || icon_hover_tag_id === tag.id) handle_delete_tag(e, tag.id); }}
+          >
+            {#if deleting_tag_id === tag.id || icon_hover_tag_id === tag.id}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tag-icon icon-delete"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+            {:else}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tag-icon"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            {/if}
+          </span>
           {#if editing_tag_id === tag.id}
             <input
               type="text"
@@ -344,13 +361,8 @@
                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
              </svg>
            </span>
-           <span class="tag-action-btn tag-delete-btn" onclick={(e) => handle_delete_tag(e, tag.id)}>
-             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-               <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-             </svg>
-           </span>
-        </button>
-      {/each}
+         </button>
+       {/each}
     </div>
     {/if}
   </div>
@@ -481,6 +493,26 @@
     margin: 0 5px;
   }
 
+  .cat-icon-area, .tag-icon-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin: 0 5px;
+    cursor: pointer;
+  }
+
+  .icon-delete {
+    color: var(--text-3);
+    border-radius: 3px;
+  }
+
+  .cat-icon-area:hover .icon-delete,
+  .tag-icon-area:hover .icon-delete {
+    color: var(--danger);
+    background: var(--danger-soft);
+  }
+
   .sidebar-section {
     flex: 1;
     padding: 8px 8px 0;
@@ -587,14 +619,11 @@
     width: 18px;
     height: 18px;
     border-radius: 4px;
+    margin-left: auto;
     flex-shrink: 0;
     color: var(--text-3);
     cursor: pointer;
     transition: all var(--transition);
-  }
-
-  .cat-action-btn:last-child {
-    margin-left: auto;
   }
 
   .cat-item:hover .cat-action-btn {
@@ -604,11 +633,6 @@
   .cat-action-btn:hover {
     color: var(--text-1);
     background: var(--bg-hover);
-  }
-
-  .cat-delete-btn:hover {
-    color: var(--danger);
-    background: var(--danger-soft);
   }
 
   .section-search {
@@ -705,14 +729,11 @@
     width: 18px;
     height: 18px;
     border-radius: 4px;
+    margin-left: auto;
     flex-shrink: 0;
     color: var(--text-3);
     cursor: pointer;
     transition: all var(--transition);
-  }
-
-  .tag-action-btn:last-child {
-    margin-left: auto;
   }
 
   .tag-item:hover .tag-action-btn {
@@ -722,11 +743,6 @@
   .tag-action-btn:hover {
     color: var(--text-1);
     background: var(--bg-hover);
-  }
-
-  .tag-delete-btn:hover {
-    color: var(--danger);
-    background: var(--danger-soft);
   }
 
   .sidebar-footer {
