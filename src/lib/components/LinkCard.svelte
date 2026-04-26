@@ -408,6 +408,48 @@
     font-weight: 500;
   }
 
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-weight: 500;
+  }
+
+  .tag-more {
+    font-size: 11px;
+    color: var(--text-3);
+    padding: 1px 4px;
+  }
+
+  .note-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: var(--bg-2);
+    color: var(--text-2);
+    max-width: 200px;
+    overflow: hidden;
+  }
+
+  .note-icon {
+    flex-shrink: 0;
+    opacity: 0.5;
+  }
+
+  .note-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .chip-icon-area {
     display: inline-flex;
     align-items: center;
