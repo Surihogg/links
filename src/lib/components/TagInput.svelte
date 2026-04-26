@@ -19,14 +19,14 @@
   async function onfocus_handler() {
     clearTimeout(blur_timeout);
     suggestions = await autocompleteTags(input);
-    show_suggestions = suggestions.length > 0 || showCreateOption;
+    show_suggestions = true;
     active_index = -1;
   }
 
   async function oninput(e) {
     input = e.target.value;
     suggestions = await autocompleteTags(input);
-    show_suggestions = suggestions.length > 0 || showCreateOption;
+    show_suggestions = true;
     active_index = -1;
   }
 
@@ -92,25 +92,29 @@
   </div>
   {#if show_suggestions}
     <div class="tag-suggestions">
-      {#each suggestions as suggestion, i}
-        <button
-          class="suggestion-item"
-          class:active={i === active_index}
-          onclick={() => add_tag(suggestion.name)}
-          onmouseenter={() => active_index = i}
-        >
-          {suggestion.name}
-        </button>
-      {/each}
-      {#if showCreateOption}
-        <button
-          class="suggestion-item suggestion-create"
-          class:active={active_index === suggestions.length}
-          onclick={() => add_tag(input)}
-          onmouseenter={() => active_index = suggestions.length}
-        >
-          创建 "{input.trim()}"
-        </button>
+      {#if suggestions.length === 0 && !showCreateOption}
+        <div class="tag-empty">暂无标签</div>
+      {:else}
+        {#each suggestions as suggestion, i}
+          <button
+            class="suggestion-item"
+            class:active={i === active_index}
+            onclick={() => add_tag(suggestion.name)}
+            onmouseenter={() => active_index = i}
+          >
+            {suggestion.name}
+          </button>
+        {/each}
+        {#if showCreateOption}
+          <button
+            class="suggestion-item suggestion-create"
+            class:active={active_index === suggestions.length}
+            onclick={() => add_tag(input)}
+            onmouseenter={() => active_index = suggestions.length}
+          >
+            创建 "{input.trim()}"
+          </button>
+        {/if}
       {/if}
     </div>
   {/if}
@@ -208,5 +212,12 @@
   .suggestion-create {
     color: var(--accent);
     border-top: 1px solid var(--border-0);
+  }
+
+  .tag-empty {
+    padding: 10px;
+    text-align: center;
+    color: var(--text-3);
+    font-size: 12px;
   }
 </style>
