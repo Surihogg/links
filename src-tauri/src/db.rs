@@ -99,6 +99,8 @@ impl Db {
         )?;
         // Ensure is_broken column exists for existing databases
         conn.execute_batch("ALTER TABLE links ADD COLUMN is_broken INTEGER NOT NULL DEFAULT 0").ok();
+        // Ensure tags table has updated_at column for existing databases
+        conn.execute_batch("ALTER TABLE tags ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))").ok();
         Ok(())
     }
 }
@@ -173,6 +175,7 @@ pub struct UpdateCategoryPayload {
 pub struct Tag {
     pub id: i64,
     pub name: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -617,7 +620,7 @@ impl Db {
     pub fn list_categories(&self) -> Result<Vec<Category>, AppError> {
         let conn = self.0.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, name, parent_id, sort_order, created_at, updated_at FROM categories ORDER BY sort_order, name",
+            "SELECT id, name, parent_id, sort_order, created_at, updated_at FROM categories ORDER BY updated_at DESC",
         )?;
         let rows: Vec<Category> = stmt
             .query_map([], |row| {
@@ -734,12 +737,13 @@ impl Db {
 
     pub fn list_tags(&self) -> Result<Vec<Tag>, AppError> {
         let conn = self.0.lock().unwrap();
-        let mut stmt = conn.prepare("SELECT id, name FROM tags ORDER BY name")?;
+        let mut stmt = conn.prepare("SELECT id, name, updated_at FROM tags ORDER BY updated_at DESC")?;
         let tags = stmt
             .query_map([], |row| {
                 Ok(Tag {
                     id: row.get(0)?,
                     name: row.get(1)?,
+                    updated_at: row.get(2)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -750,9 +754,9 @@ impl Db {
         let conn = self.0.lock().unwrap();
         conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", rusqlite::params![name])?;
         let tag = conn.query_row(
-            "SELECT id, name FROM tags WHERE name = ?",
+            "SELECT id, name, updated_at FROM tags WHERE name = ?",
             rusqlite::params![name],
-            |row| Ok(Tag { id: row.get(0)?, name: row.get(1)? }),
+            |row| Ok(Tag { id: row.get(0)?, name: row.get(1)?, updated_at: row.get(2)? }),
         )?;
         Ok(tag)
     }
@@ -766,13 +770,13 @@ impl Db {
     pub fn update_tag(&self, payload: &UpdateTagPayload) -> Result<Tag, AppError> {
         let conn = self.0.lock().unwrap();
         conn.execute(
-            "UPDATE tags SET name = ? WHERE id = ?",
+            "UPDATE tags SET name = ?, updated_at = datetime('now','localtime') WHERE id = ?",
             rusqlite::params![payload.name, payload.id],
         )?;
         let tag = conn.query_row(
-            "SELECT id, name FROM tags WHERE id = ?",
+            "SELECT id, name, updated_at FROM tags WHERE id = ?",
             rusqlite::params![payload.id],
-            |row| Ok(Tag { id: row.get(0)?, name: row.get(1)? }),
+            |row| Ok(Tag { id: row.get(0)?, name: row.get(1)?, updated_at: row.get(2)? }),
         )?;
         Ok(tag)
     }
@@ -780,12 +784,13 @@ impl Db {
     pub fn autocomplete_tags(&self, prefix: &str) -> Result<Vec<Tag>, AppError> {
         let conn = self.0.lock().unwrap();
         let pattern = format!("%{}%", prefix.replace('%', "\\%").replace('_', "\\_"));
-        let mut stmt = conn.prepare("SELECT id, name FROM tags WHERE name LIKE ? ORDER BY name LIMIT 10")?;
+        let mut stmt = conn.prepare("SELECT id, name, updated_at FROM tags WHERE name LIKE ? ORDER BY name LIMIT 10")?;
         let tags = stmt
             .query_map(rusqlite::params![pattern], |row| {
                 Ok(Tag {
                     id: row.get(0)?,
                     name: row.get(1)?,
+                    updated_at: row.get(2)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;

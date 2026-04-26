@@ -111,7 +111,7 @@ function createCategoriesStore() {
       update((s) => {
         function replace(list) {
           return list.map((c) => {
-            if (c.id === cat.id) return { ...c, name: cat.name };
+            if (c.id === cat.id) return { ...c, name: cat.name, updated_at: cat.updated_at };
             if (c.children) return { ...c, children: replace(c.children) };
             return c;
           });
@@ -147,14 +147,12 @@ function createTagsStore() {
     },
     async create(name) {
       const tag = await api.createTag(name);
-      update((s) => [...s, tag].sort((a, b) => a.name.localeCompare(b.name)));
+      update((s) => [tag, ...s]);
       return tag;
     },
     async update(payload) {
       const tag = await api.updateTag(payload);
-      update((s) =>
-        s.map((t) => (t.id === tag.id ? tag : t)).sort((a, b) => a.name.localeCompare(b.name))
-      );
+      update((s) => s.map((t) => (t.id === tag.id ? tag : t)));
       return tag;
     },
   };
