@@ -22,8 +22,6 @@
   let categories = $state([]);
   let message = $state("");
   let pending_fetch = null;
-  let has_focused = $state(false);
-
   let dark_mode = $state(false);
   let theme_mode = $state("system");
   let url_input;
@@ -56,7 +54,6 @@
     user_edited = { title: false, description: false };
     fetched_meta = { favicon_url: "", og_image_url: "" };
     message = "";
-    has_focused = false;
     clearTimeout(fetch_timer);
     pending_fetch = null;
   }
@@ -100,24 +97,14 @@
     });
 
     listCategories().then(c => categories = c);
-    const handle_blur = () => {
-      if (has_focused) close_window();
-    };
-    const handle_focus = () => {
-      has_focused = true;
-    };
     const handle_keydown = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
         close_window();
       }
     };
-    window.addEventListener("blur", handle_blur);
-    window.addEventListener("focus", handle_focus);
     window.addEventListener("keydown", handle_keydown);
     return () => {
-      window.removeEventListener("blur", handle_blur);
-      window.removeEventListener("focus", handle_focus);
       window.removeEventListener("keydown", handle_keydown);
       unlistenTheme();
       unlistenShown();
