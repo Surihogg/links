@@ -7,7 +7,7 @@ mod normalize;
 
 use std::path::PathBuf;
 use tauri::{
-    Manager,
+    Emitter, Manager,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
@@ -48,19 +48,11 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, _event, _shortcut| {
-                    let window = if let Some(w) = app.get_webview_window("quick-add") {
-                        w
-                    } else {
-                        let config = app.config().app.windows.iter().find(|w| w.label == "quick-add").unwrap();
-                        let builder = tauri::WebviewWindowBuilder::from_config(app, config).unwrap();
-                        #[cfg(target_os = "macos")]
-                        let builder = builder.decorations(true).title_bar_style(tauri::TitleBarStyle::Overlay).title(" ");
-                        #[cfg(target_os = "windows")]
-                        let builder = builder.decorations(false);
-                        builder.build().unwrap()
-                    };
-                    let _ = window.show();
-                    let _ = window.set_focus();
+                    if let Some(window) = app.get_webview_window("quick-add") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                        let _ = app.emit("quick-add-shown", ());
+                    }
                 })
                 .build(),
         )
