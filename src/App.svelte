@@ -31,6 +31,7 @@
   let show_export = $state(false);
   let show_settings = $state(false);
   let show_close_dialog = $state(false);
+  let search_bar;
 
   onMount(async () => {
     console.log("[startup] App onMount start");
@@ -73,6 +74,9 @@
 
     const { getCurrentWindow, LogicalSize, PhysicalPosition } = await import("@tauri-apps/api/window");
     const mainWindow = getCurrentWindow();
+    mainWindow.onFocusChanged(({ payload: focused }) => {
+      if (focused) search_bar?.focus();
+    });
 
     const savedSize = await api.getSetting("window-size");
     if (savedSize) {
@@ -199,15 +203,71 @@
     return document.querySelector('.link-list');
   }
 
-  async function with_scroll_preserve(fn) {
+async function with_scroll_preserve(fn) {
     const el = get_scroll_el();
-    const scroll_top = el?.scrollTop ?? 0;
+    if (!el) {
+        await fn();
+        return;
+    }
+
+    // Identify the first visible LinkCard in the viewport to anchor scrolling
+    const containerRect = el.getBoundingClientRect();
+    let anchorId = null;
+    let anchorOffsetTop = 0;
+
+    const cards = el.querySelectorAll('.link-card[data-link-id]');
+    let firstVisible = null;
+    for (let i = 0; i < cards.length; i++) {
+        const c = cards[i];
+        const r = c.getBoundingClientRect();
+        if (r.bottom > containerRect.top && r.top < containerRect.bottom) {
+            firstVisible = c;
+            break;
+        }
+    }
+    if (firstVisible) {
+        anchorId = firstVisible.getAttribute('data-link-id');
+        anchorOffsetTop = firstVisible.offsetTop;
+    }
+
+    const scrollTopBefore = el.scrollTop;
+    const scrollHeightBefore = el.scrollHeight;
+
     await fn();
     await tick();
     await new Promise(r => requestAnimationFrame(r));
-    const el2 = get_scroll_el();
-    if (el2) el2.scrollTop = scroll_top;
-  }
+
+    const el_after = get_scroll_el();
+    if (el_after && anchorId) {
+        const anchorEl2 = el_after.querySelector(`.link-card[data-link-id="${anchorId}"]`);
+        if (anchorEl2) {
+            const anchorTop2 = anchorEl2.offsetTop;
+            const newScrollTop = anchorTop2 - anchorOffsetTop;
+            const maxScroll = Math.max(0, (el_after.scrollHeight - el_after.clientHeight));
+            el_after.scrollTop = Math.max(0, Math.min(newScrollTop, maxScroll));
+            return;
+        } else {
+            // Try to scroll to the next card if the anchored one disappeared (e.g., deletion)
+            const nextCard = el_after.querySelector('.link-card[data-link-id]');
+            if (nextCard) {
+                const targetTop = nextCard.offsetTop;
+                const maxScroll = Math.max(0, (el_after.scrollHeight - el_after.clientHeight));
+                el_after.scrollTop = Math.max(0, Math.min(targetTop, maxScroll));
+                return;
+            }
+        }
+    }
+
+    // Fallback: preserve proportional scroll position if no anchor could be restored
+    const newTotal = el_after?.scrollHeight ?? 0;
+    const clientHeight = el_after?.clientHeight ?? 0;
+    if (scrollHeightBefore > 0 && newTotal > 0 && clientHeight > 0) {
+        const ratio = scrollTopBefore / scrollHeightBefore;
+        const newScrollTop = Math.round(newTotal * ratio);
+        const maxScroll = Math.max(0, newTotal - clientHeight);
+        el_after.scrollTop = Math.max(0, Math.min(newScrollTop, maxScroll));
+    }
+}
 
   async function refresh_current_view() {
     await with_scroll_preserve(async () => {
@@ -258,10 +318,10 @@
     await tagsStore.load();
   }
 
-  async function on_toggle_favorite(link) {
+async function on_toggle_favorite(link) {
     await linksStore.update({ id: link.id, is_favorite: !link.is_favorite });
-    await refresh_current_view();
-  }
+    // Do not refresh the view; local update suffices for bookmark toggle
+}
 
   async function on_delete_link(link) {
     await linksStore.remove(link.id);
@@ -406,7 +466,18 @@
       await linksStore.loadMore({ page: next_page, per_page: 30, ...build_filter_params() });
     }
   }
+
+  function on_global_keydown(e) {
+    if (e.key !== "Escape") return;
+    if (show_settings) { show_settings = false; return; }
+    if (show_export) { show_export = false; return; }
+    if (show_add_form) { show_add_form = false; return; }
+    if (edit_link) { edit_link = null; return; }
+    if (show_close_dialog) { show_close_dialog = false; return; }
+  }
 </script>
+
+<svelte:window onkeydown={on_global_keydown} />
 
 <div class={dark_mode ? "dark" : ""}>
   <div class="app-root" class:has-titlebar={is_macos}>
@@ -448,7 +519,7 @@
           </div>
         {/if}
         <div class="header-right">
-          <SearchBar bind:query={search_query} onsearch={on_search} />
+          <SearchBar bind:this={search_bar} bind:query={search_query} onsearch={on_search} />
         </div>
       </header>
 

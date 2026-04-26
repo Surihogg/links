@@ -99,7 +99,7 @@
   }
 </script>
 
-<div class="link-card">
+<div class="link-card" data-link-id={link.id}>
   {#if link.is_favorite}
     <div class="bookmark-corner" data-tooltip="取消标记" onclick={toggle_fav}>
       <svg width="10" height="14" viewBox="0 0 10 14" fill="var(--star)" stroke="none">

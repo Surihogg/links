@@ -1,6 +1,11 @@
 <script>
   let { query = $bindable(""), onsearch } = $props();
   let timer = $state(null);
+  let input_el;
+
+  export function focus() {
+    input_el?.focus();
+  }
 
   function oninput() {
     clearTimeout(timer);
@@ -23,6 +28,7 @@
     type="text"
     placeholder="找找看~"
     bind:value={query}
+    bind:this={input_el}
     {oninput}
     class="search-input"
   />
