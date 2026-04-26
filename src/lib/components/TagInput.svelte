@@ -8,17 +8,25 @@
   let active_index = $state(-1);
   let blur_timeout = null;
 
+  let exactMatch = $derived(
+    input.trim().length > 0 && suggestions.some(s => s.name.toLowerCase() === input.trim().toLowerCase())
+  );
+
+  let showCreateOption = $derived(input.trim().length > 0 && !exactMatch);
+
+  let totalItems = $derived(suggestions.length + (showCreateOption ? 1 : 0));
+
   async function onfocus_handler() {
     clearTimeout(blur_timeout);
     suggestions = await autocompleteTags(input);
-    show_suggestions = suggestions.length > 0;
+    show_suggestions = suggestions.length > 0 || showCreateOption;
     active_index = -1;
   }
 
   async function oninput(e) {
     input = e.target.value;
     suggestions = await autocompleteTags(input);
-    show_suggestions = suggestions.length > 0;
+    show_suggestions = suggestions.length > 0 || showCreateOption;
     active_index = -1;
   }
 
@@ -40,8 +48,12 @@
   function onkeydown(e) {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
-      if (active_index >= 0 && suggestions[active_index]) {
-        add_tag(suggestions[active_index].name);
+      if (active_index >= 0) {
+        if (active_index < suggestions.length) {
+          add_tag(suggestions[active_index].name);
+        } else if (showCreateOption) {
+          add_tag(input);
+        }
       } else if (input.trim()) {
         add_tag(input);
       }
@@ -49,7 +61,7 @@
       remove_tag(tags.length - 1);
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      active_index = Math.min(active_index + 1, suggestions.length - 1);
+      active_index = Math.min(active_index + 1, totalItems - 1);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       active_index = Math.max(active_index - 1, -1);
@@ -74,7 +86,7 @@
       onkeydown={onkeydown}
       onfocus={onfocus_handler}
       onblur={() => { blur_timeout = setTimeout(() => show_suggestions = false, 150); }}
-      placeholder={tags.length === 0 ? "快到碗里来！" : ""}
+      placeholder={tags.length === 0 ? "搜索或创建标签" : ""}
       class="tag-text-input"
     />
   </div>
@@ -90,6 +102,16 @@
           {suggestion.name}
         </button>
       {/each}
+      {#if showCreateOption}
+        <button
+          class="suggestion-item suggestion-create"
+          class:active={active_index === suggestions.length}
+          onclick={() => add_tag(input)}
+          onmouseenter={() => active_index = suggestions.length}
+        >
+          创建 "{input.trim()}"
+        </button>
+      {/if}
     </div>
   {/if}
 </div>
@@ -182,4 +204,9 @@
 
   .suggestion-item:hover,
   .suggestion-item.active { background: var(--accent-soft); }
+
+  .suggestion-create {
+    color: var(--accent);
+    border-top: 1px solid var(--border-0);
+  }
 </style>
