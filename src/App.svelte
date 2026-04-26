@@ -12,6 +12,12 @@
 
   let is_macos = $state(false);
 
+  // Theme mode state: "light" | "dark" | "system". Default to "system".
+  let theme_mode = $state("system");
+  // Actual applied dark mode state derived from theme_mode (system or explicit)
+  let dark_mode = $state(false);
+  let system_unlisten; // cleanup for system theme listener
+
   let links = $derived($linksStore);
   let categories = $derived($categoriesStore);
   let tags = $derived($tagsStore);
@@ -23,15 +29,42 @@
   let edit_link = $state(null);
   let show_export = $state(false);
   let show_settings = $state(false);
-  let dark_mode = $state(false);
   let show_close_dialog = $state(false);
 
   onMount(async () => {
     console.log("[startup] App onMount start");
     await waitForBackendReady();
     console.log("[startup] backend ready");
-    const darkVal = await api.getSetting("dark-mode");
-    dark_mode = darkVal === "true";
+    // Load theme setting with backward-compatibility
+    let savedTheme = await api.getSetting("theme-mode");
+    if (!savedTheme) {
+      // Backwards compatibility: migrate legacy dark-mode if present
+      const legacyDark = await api.getSetting("dark-mode");
+      if (legacyDark === "true") savedTheme = "dark";
+      else if (legacyDark === "false") savedTheme = "light";
+      else savedTheme = "system";
+    }
+    theme_mode = savedTheme || "system";
+    // Initialize dark_mode based on current theme_mode
+    apply_theme();
+    // Listen for OS theme changes if in system mode
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    function on_system_theme_change(e) {
+      if (theme_mode === "system") {
+        dark_mode = e.matches;
+      }
+    }
+    if (mq && typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", on_system_theme_change);
+    } else if (mq && typeof mq.addListener === "function") {
+      mq.addListener(on_system_theme_change);
+    }
+    system_unlisten = () => {
+      if (mq) {
+        if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", on_system_theme_change);
+        else if (typeof mq.removeListener === "function") mq.removeListener(on_system_theme_change);
+      }
+    };
     is_macos = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
     console.log("[startup] loading data...");
     await load_data();
@@ -128,6 +161,7 @@
       window.removeEventListener("resize", on_resize);
       if (unlistenLinksChanged) unlistenLinksChanged();
       if (unlistenMoved) unlistenMoved();
+      if (system_unlisten) system_unlisten();
     };
   });
 
@@ -308,7 +342,21 @@
 
   async function toggle_dark() {
     dark_mode = !dark_mode;
-    await api.setSetting("dark-mode", String(dark_mode));
+    theme_mode = dark_mode ? "dark" : "light";
+    await api.setSetting("theme-mode", theme_mode);
+  }
+
+  function apply_theme() {
+    if (theme_mode === "system") {
+      dark_mode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    } else {
+      dark_mode = (theme_mode === "dark");
+    }
+  }
+
+  async function on_theme_change(mode) {
+    theme_mode = mode;
+    apply_theme();
   }
 
   let filtered_links = $derived(links.items);
@@ -432,7 +480,7 @@
   {/if}
 
   {#if show_settings}
-    <SettingsDialog onclose={() => show_settings = false} />
+    <SettingsDialog onclose={() => show_settings = false} onthemechange={on_theme_change} />
   {/if}
 
   {#if show_close_dialog}
