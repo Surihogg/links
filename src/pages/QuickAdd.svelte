@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import TagInput from "../lib/components/TagInput.svelte";
+  import CategoryInput from "../lib/components/CategoryInput.svelte";
   import { fetchMeta, checkDuplicate, createLink, listCategories } from "../lib/api.js";
   import { waitForBackendReady } from "../lib/ready.js";
   import { emit } from "@tauri-apps/api/event";
@@ -22,6 +23,17 @@
   let message = $state("");
   let pending_fetch = null;
   let has_focused = $state(false);
+
+  function flatten_categories(tree) {
+    const result = [];
+    for (const cat of tree) {
+      result.push({ id: cat.id, name: cat.name });
+      if (cat.children) result.push(...flatten_categories(cat.children));
+    }
+    return result;
+  }
+
+  let flatCategories = $derived(flatten_categories(categories));
 
   onMount(async () => {
     await waitForBackendReady();
@@ -168,12 +180,7 @@
 
     <div class="field">
       <label class="field-label">分组</label>
-      <select bind:value={category_id} placeholder="确定不分个组吗" class="field-input" onchange={() => { if (category_id === "") category_id = null; }}>
-        <option value="">无分组</option>
-        {#each categories as cat}
-          <option value={cat.id}>{cat.name}</option>
-        {/each}
-      </select>
+      <CategoryInput bind:selectedId={category_id} categories={flatCategories} />
     </div>
 
     <div class="field tag-field">
@@ -379,15 +386,6 @@
   .field-textarea {
     resize: none;
     line-height: 1.5;
-  }
-
-  select.field-input {
-    cursor: pointer;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    padding-right: 28px;
   }
 
   .url-field,

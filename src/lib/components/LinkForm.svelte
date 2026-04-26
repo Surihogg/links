@@ -1,5 +1,6 @@
 <script>
   import TagInput from "./TagInput.svelte";
+  import CategoryInput from "./CategoryInput.svelte";
   import { fetchMeta } from "../api.js";
   import { checkDuplicate } from "../api.js";
 
@@ -119,30 +120,6 @@
       e.preventDefault();
     }
   }
-
-  let show_cat_dropdown = $state(false);
-  let cat_dropdown_ref = $state(null);
-
-  function select_category(id) {
-    category_id = id;
-    show_cat_dropdown = false;
-  }
-
-  function on_cat_dropdown_click(e) {
-    e.stopPropagation();
-  }
-
-  $effect(() => {
-    function close_dropdown(e) {
-      if (cat_dropdown_ref && !cat_dropdown_ref.contains(e.target)) {
-        show_cat_dropdown = false;
-      }
-    }
-    if (show_cat_dropdown) {
-      document.addEventListener('click', close_dropdown);
-      return () => document.removeEventListener('click', close_dropdown);
-    }
-  });
 </script>
 
 <div class="modal-overlay" onclick={on_overlay_click} onmousedown={on_overlay_mousedown}>
@@ -179,22 +156,7 @@
 
       <div class="field">
         <label class="field-label">分组</label>
-        <div class="dropdown-wrap" bind:this={cat_dropdown_ref}>
-          <button type="button" class="field-input dropdown-trigger" onclick={() => show_cat_dropdown = !show_cat_dropdown}>
-            <span>{categories.find(c => c.id === category_id)?.name ?? "无分组"}</span>
-            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="transform: rotate({show_cat_dropdown ? 180 : 0}deg); transition: transform var(--transition);">
-              <path d="M1 1l4 4 4-4"/>
-            </svg>
-          </button>
-          {#if show_cat_dropdown}
-            <div class="dropdown-menu" onclick={on_cat_dropdown_click}>
-              <button type="button" class="dropdown-item" class:active={category_id == null} onclick={() => select_category(null)}>无分组</button>
-              {#each categories as cat}
-                <button type="button" class="dropdown-item" class:active={category_id === cat.id} onclick={() => select_category(cat.id)}>{cat.name}</button>
-              {/each}
-            </div>
-          {/if}
-        </div>
+        <CategoryInput bind:selectedId={category_id} {categories} />
       </div>
 
       <div class="field tag-field">
@@ -349,58 +311,6 @@
   .field-textarea {
     resize: none;
     line-height: 1.5;
-  }
-
-  .dropdown-wrap {
-    position: relative;
-  }
-
-  .dropdown-trigger {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    text-align: left;
-    padding-right: 10px;
-  }
-
-  .dropdown-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    z-index: 10;
-    max-height: 200px;
-    overflow-y: auto;
-    background: var(--bg-0);
-    border: 1px solid var(--border-1);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    padding: 4px;
-  }
-
-  .dropdown-item {
-    padding: 7px 10px;
-    border: none;
-    background: none;
-    color: var(--text-1);
-    font-size: 13px;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    text-align: left;
-    transition: background var(--transition);
-  }
-
-  .dropdown-item:hover {
-    background: var(--bg-hover);
-  }
-
-  .dropdown-item.active {
-    background: var(--accent-soft);
-    color: var(--accent);
   }
 
   .url-field,
