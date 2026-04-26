@@ -3,6 +3,7 @@
   import { linksStore, categoriesStore, tagsStore } from "./lib/stores/index.js";
   import * as api from "./lib/api.js";
   import { waitForBackendReady } from "./lib/ready.js";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { emit, listen } from "@tauri-apps/api/event";
   import SearchBar from "./lib/components/SearchBar.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
@@ -34,6 +35,8 @@
   let search_bar;
 
   onMount(async () => {
+    const mainWindow = getCurrentWindow();
+    try { await mainWindow.show(); } catch (e) {}
     console.log("[startup] App onMount start");
     await waitForBackendReady();
     console.log("[startup] backend ready");
@@ -72,8 +75,7 @@
     await load_data();
     console.log("[startup] data loaded");
 
-    const { getCurrentWindow, LogicalSize, PhysicalPosition } = await import("@tauri-apps/api/window");
-    const mainWindow = getCurrentWindow();
+    const { LogicalSize, PhysicalPosition } = await import("@tauri-apps/api/window");
     const unlisten = await listen("main-shown", () => {
       search_bar?.focus();
     });
