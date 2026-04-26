@@ -199,7 +199,7 @@
 </script>
 
 <div class="quick-add {dark_mode ? 'dark' : ''}">
-  <div class="modal-header">
+  <div class="modal-header" data-tauri-drag-region>
     <h2 class="modal-title">添加链接</h2>
     <button class="modal-close" onclick={close_window}>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
