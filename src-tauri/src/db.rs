@@ -145,6 +145,8 @@ pub struct UpdateLinkPayload {
     pub tags: Option<Vec<String>>,
     pub is_favorite: Option<bool>,
     pub is_broken: Option<bool>,
+    pub favicon_url: Option<String>,
+    pub og_image_url: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -364,6 +366,14 @@ impl Db {
         if let Some(v) = payload.is_broken {
             sets.push("is_broken = ?".to_string());
             p.push(Box::new(v as i32));
+        }
+        if let Some(ref v) = payload.favicon_url {
+            sets.push("favicon_url = ?".to_string());
+            p.push(Box::new(v.clone()));
+        }
+        if let Some(ref v) = payload.og_image_url {
+            sets.push("og_image_url = ?".to_string());
+            p.push(Box::new(v.clone()));
         }
 
         if !sets.is_empty() {
@@ -1291,6 +1301,8 @@ impl Default for UpdateLinkPayload {
             tags: None,
             is_favorite: None,
             is_broken: None,
+            favicon_url: None,
+            og_image_url: None,
         }
     }
 }
