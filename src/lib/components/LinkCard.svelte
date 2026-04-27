@@ -616,9 +616,8 @@
   .broken-badge[data-tooltip]:hover::after {
     content: attr(data-tooltip);
     position: absolute;
-    left: 50%;
-    top: 100%;
-    transform: translateX(-50%);
+    left: 0;
+    top: calc(100% + 4px);
     z-index: 50;
     white-space: nowrap;
     padding: 4px 8px;
