@@ -96,3 +96,9 @@ cd src-tauri && cargo test   # Rust 单元测试（db.rs, fetcher.rs, normalize.
 - Windows 构建 CI 仅构建 Windows 包，macOS/Linux 需本地或添加 CI Runner
 - Release 为 Draft 模式，需手动确认发布
 - `db.rs` 含 30+ 个 Rust 单元测试（`cargo test` 可运行），前端暂无测试
+
+
+## 变更与提交约束（新增）
+- 改动提交约束：所有改动不得直接提交到远程仓库。应在本地创建独立分支，完成测试后再合并提交；提交应通过测试并获得人工测试确认后再进行，确保不破坏主线功能。
+- 代码注释与提交信息规范：代码注释使用中文，提交信息统一使用中文，格式示例：feat: 添加新功能 或 fix: 修复问题；描述部分应包含改动原因（why）及影响范围，避免空描述。
+- TODO 工作区开发日志归档：若任务来自 TODO 工作区，完成后将相关条目写入 TODO.md 的开发日志（在工作区 TODO.md 内的 ## 开发日志 小节），按时间戳追加归档，格式为 YYYY-MM-DD HH:MM:SS。
