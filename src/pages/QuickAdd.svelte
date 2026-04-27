@@ -124,14 +124,14 @@
         if (!user_edited.title && meta.title) title = meta.title;
         if (!user_edited.description && meta.description) description = meta.description;
       } else {
-        fetch_error = "这个小站不想被抓取呢，手动填写信息吧";
+        fetch_error = "这个小站很神秘呢，手动补充一下缺失的信息吧";
       }
       fetched_meta = { favicon_url: meta.favicon_url || "", og_image_url: meta.og_image_url || "" };
       if (tags.length === 0 && meta.keywords && meta.keywords.length > 0) {
         tags = meta.keywords.slice(0, 5);
       }
     } catch {
-      fetch_error = "抓取失败了，手动填一下信息吧";
+      fetch_error = "人家不让抓，只能麻烦您动动小手了";
     }
     fetching = false;
     pending_fetch = null;
