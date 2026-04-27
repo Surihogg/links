@@ -198,11 +198,11 @@ npm run tauri build
 
 所有数据（数据库、配置、日志）存放在同一目录：
 
-| 平台 | 路径 |
-|---|---|
-| macOS | `~/Library/Application Support/com.links.desktop/` |
-| Windows | `%APPDATA%\com.links.desktop\` |
-| Linux | `~/.local/share/com.links.desktop/` |
+| 平台 | 路径                                                  |
+|---|-----------------------------------------------------|
+| macOS | `~/Library/Application\ Support/com.links.desktop/` |
+| Windows | `%APPDATA%\com.links.desktop\`                      |
+| Linux | `~/.local/share/com.links.desktop/`                 |
 
 | 文件 | 说明 |
 |---|---|
