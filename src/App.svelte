@@ -385,8 +385,8 @@ async function on_toggle_favorite(link) {
   async function on_import_bookmarks() {
     importing = true;
     try {
-      const count = await api.importBookmarks();
-      if (count > 0) {
+      const [linkCount, catCount] = await api.importBookmarks();
+      if (linkCount > 0 || catCount > 0) {
         await load_data();
       }
     } finally {

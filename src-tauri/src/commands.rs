@@ -229,54 +229,209 @@ pub fn export_links(db: State<'_, Db>, params: ExportParams) -> Result<String, A
     db.export_links(&params)
 }
 
+#[derive(Debug, Default)]
+struct ImportStats {
+    links_imported: u32,
+    categories_created: u32,
+}
+
+#[derive(Debug, Clone)]
+struct BookmarkEntry {
+    url: String,
+    title: String,
+    favicon: String,
+    folder_path: Vec<String>,
+}
+
+fn parse_bookmark_html(html: &str) -> Vec<BookmarkEntry> {
+    let mut entries = Vec::new();
+    let mut folder_stack: Vec<String> = Vec::new();
+
+    for line in html.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let lower = trimmed.to_lowercase();
+
+        if lower.starts_with("<dt><h3") {
+            if let Some(name) = extract_folder_name(trimmed) {
+                folder_stack.push(name);
+            }
+        } else if lower.starts_with("</dl>") {
+            folder_stack.pop();
+        } else if lower.starts_with("<dt><a ") {
+            if let Some(href) = extract_href(trimmed) {
+                if href.starts_with("http") {
+                    let title = extract_link_title(trimmed);
+                    let favicon = extract_icon(trimmed);
+                    entries.push(BookmarkEntry {
+                        url: href,
+                        title,
+                        favicon,
+                        folder_path: folder_stack.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    entries
+}
+
+fn extract_folder_name(text: &str) -> Option<String> {
+    let lower = text.to_lowercase();
+    let h3_start = lower.find("<h3")?;
+    let after_h3 = &lower[h3_start..];
+    let start = after_h3.find('>')? + h3_start + 1;
+    let end = lower.rfind("</h3>")?;
+    let name = text[start..end].trim();
+    if name.is_empty() {
+        return None;
+    }
+    Some(name.to_string())
+}
+
+fn extract_href(text: &str) -> Option<String> {
+    let lower = text.to_lowercase();
+    let start = lower.find("href=\"")? + 6;
+    let rest = &text[start..];
+    let end = rest.find('"')?;
+    let href = rest[..end].to_string();
+    if href.is_empty() {
+        return None;
+    }
+    Some(href)
+}
+
+fn extract_icon(text: &str) -> String {
+    let lower = text.to_lowercase();
+    let Some(start) = lower.find("icon=\"") else {
+        return String::new();
+    };
+    let rest = &text[start + 6..];
+    let Some(end) = rest.find('"') else {
+        return String::new();
+    };
+    rest[..end].to_string()
+}
+
+fn extract_link_title(text: &str) -> String {
+    let lower = text.to_lowercase();
+    let a_start = lower.find("<a");
+    let Some(a_start) = a_start else {
+        return String::new();
+    };
+    let after_a = &lower[a_start..];
+    let Some(start) = after_a.find('>') else {
+        return String::new();
+    };
+    let start = start + a_start + 1;
+    let Some(end) = lower.rfind("</a>") else {
+        return String::new();
+    };
+    text[start..end].trim().to_string()
+}
+
+fn get_or_create_category(
+    name: &str,
+    parent_id: Option<i64>,
+    conn: &rusqlite::Connection,
+) -> Result<(i64, bool), AppError> {
+    let existing: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM categories WHERE name = ? AND (parent_id IS ? OR (parent_id IS NULL AND ? IS NULL))",
+            rusqlite::params![name, parent_id, parent_id],
+            |r| r.get(0),
+        )
+        .ok();
+
+    if let Some(id) = existing {
+        return Ok((id, false));
+    }
+
+    conn.execute(
+        "INSERT INTO categories (name, parent_id) VALUES (?, ?)",
+        rusqlite::params![name, parent_id],
+    )?;
+
+    Ok((conn.last_insert_rowid(), true))
+}
+
+fn import_bookmark_entries(
+    entries: &[BookmarkEntry],
+    conn: &rusqlite::Connection,
+) -> Result<ImportStats, AppError> {
+    let mut stats = ImportStats::default();
+    let tx = conn.unchecked_transaction()?;
+
+    let mut category_cache: std::collections::HashMap<(String, Option<i64>), i64> =
+        std::collections::HashMap::new();
+
+    for entry in entries {
+        let mut parent_id: Option<i64> = None;
+        for folder_name in &entry.folder_path {
+            let cache_key = (folder_name.clone(), parent_id);
+
+            let category_id = if let Some(&id) = category_cache.get(&cache_key) {
+                id
+            } else {
+                let (id, created) = get_or_create_category(folder_name, parent_id, &tx)?;
+                if created {
+                    stats.categories_created += 1;
+                }
+                category_cache.insert(cache_key, id);
+                id
+            };
+
+            parent_id = Some(category_id);
+        }
+
+        let exists: bool = tx
+            .query_row(
+                "SELECT COUNT(*) FROM links WHERE url = ?",
+                rusqlite::params![&entry.url],
+                |r| Ok(r.get::<_, i64>(0)? > 0),
+            )
+            .unwrap_or(false);
+
+        if !exists {
+            tx.execute(
+                "INSERT INTO links (url, title, favicon_url, category_id) VALUES (?, ?, ?, ?)",
+                rusqlite::params![&entry.url, &entry.title, &entry.favicon, parent_id],
+            )?;
+            let id = tx.last_insert_rowid();
+            tx.execute(
+                "INSERT INTO links_fts (rowid, title, description, notes, url) VALUES (?, '', '', '', ?)",
+                rusqlite::params![id, &entry.url],
+            )
+            .ok();
+            stats.links_imported += 1;
+        }
+    }
+
+    tx.commit()?;
+    Ok(stats)
+}
+
 #[tauri::command]
-pub fn import_bookmarks(db: State<'_, Db>) -> Result<u32, AppError> {
+pub fn import_bookmarks(db: State<'_, Db>) -> Result<(u32, u32), AppError> {
     let Some(path) = rfd::FileDialog::new()
         .add_filter("书签文件", &["html", "htm"])
         .set_title("导入浏览器书签")
         .pick_file()
     else {
-        return Ok(0);
+        return Ok((0, 0));
     };
 
     let html = std::fs::read_to_string(&path)?;
-    let doc = scraper::Html::parse_document(&html);
+    let entries = parse_bookmark_html(&html);
 
     let conn = db.0.lock().unwrap();
-    let mut count: u32 = 0;
+    let stats = import_bookmark_entries(&entries, &conn)?;
 
-    for node in doc.select(&scraper::Selector::parse("a").unwrap()) {
-        let Some(href) = node.value().attr("href") else { continue };
-        if href.is_empty() || !href.starts_with("http") {
-            continue;
-        }
-
-        let title = node.text().collect::<String>().trim().to_string();
-        let favicon = node.value().attr("icon").unwrap_or("").to_string();
-
-        if conn.query_row(
-            "SELECT COUNT(*) FROM links WHERE url = ?",
-            rusqlite::params![href],
-            |r| r.get::<_, i64>(0),
-        ).unwrap_or(0) > 0 {
-            continue;
-        }
-
-        conn.execute(
-            "INSERT INTO links (url, title, favicon_url) VALUES (?, ?, ?)",
-            rusqlite::params![href, title, favicon],
-        )?;
-        let id = conn.last_insert_rowid();
-
-        conn.execute(
-            "INSERT INTO links_fts (rowid, title, description, notes, url) VALUES (?, '', '', '', ?)",
-            rusqlite::params![id, href],
-        ).ok();
-
-        count += 1;
-    }
-
-    Ok(count)
+    Ok((stats.links_imported, stats.categories_created))
 }
 
 #[tauri::command]
@@ -400,4 +555,273 @@ pub async fn check_link_status(app: AppHandle, url: String) -> Result<bool, AppE
         log_fetch_failure(&app, &url, "link status check failed");
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_bookmark_html_nested_folders() {
+        let html = r#"
+<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+    <DT><H3 ADD_DATE="1639328511" LAST_MODIFIED="1777320905">书签栏</H3>
+    <DL><p>
+        <DT><H3 ADD_DATE="1777307977" LAST_MODIFIED="1777320920">测试</H3>
+        <DL><p>
+            <DT><A HREF="https://www.iconfont.cn/" ADD_DATE="1777308003" ICON="...">扩展程序</A>
+            <DT><H3 ADD_DATE="1777307985" LAST_MODIFIED="1777320913">人才</H3>
+            <DL><p>
+                <DT><A HREF="https://opencode.ai/docs/zh-cn" ADD_DATE="1777320905" ICON="...">简介 | OpenCode</A>
+            </DL><p>
+        </DL><p>
+        <DT><A HREF="https://www.bilibili.com/video/BV1zmSoBnEYM/" ADD_DATE="1777320712" ICON="...">ddd</A>
+        <DT><A HREF="https://opencode.ai/docs/zh-cn/lsp/" ADD_DATE="1777320725" ICON="...">LSP 服务器 | OpenCode</A>
+    </DL><p>
+</DL><p>
+"#;
+
+        let entries = parse_bookmark_html(html);
+        assert_eq!(entries.len(), 4);
+
+        assert_eq!(entries[0].folder_path, vec!["书签栏", "测试"]);
+        assert_eq!(entries[0].url, "https://www.iconfont.cn/");
+        assert_eq!(entries[0].title, "扩展程序");
+
+        assert_eq!(entries[1].folder_path, vec!["书签栏", "测试", "人才"]);
+        assert_eq!(entries[1].url, "https://opencode.ai/docs/zh-cn");
+        assert_eq!(entries[1].title, "简介 | OpenCode");
+
+        assert_eq!(entries[2].folder_path, vec!["书签栏"]);
+        assert_eq!(entries[2].url, "https://www.bilibili.com/video/BV1zmSoBnEYM/");
+        assert_eq!(entries[2].title, "ddd");
+
+        assert_eq!(entries[3].folder_path, vec!["书签栏"]);
+        assert_eq!(entries[3].url, "https://opencode.ai/docs/zh-cn/lsp/");
+        assert_eq!(entries[3].title, "LSP 服务器 | OpenCode");
+    }
+
+    #[test]
+    fn test_parse_bookmark_html_skips_non_http() {
+        let html = r#"
+<DL><p>
+    <DT><A HREF="javascript:void(0)">JS Link</A>
+    <DT><A HREF="https://example.com">Valid Link</A>
+    <DT><A HREF="about:blank">About Blank</A>
+</DL><p>
+"#;
+
+        let entries = parse_bookmark_html(html);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].url, "https://example.com");
+    }
+
+    #[test]
+    fn test_extract_href() {
+        assert_eq!(
+            extract_href(r#"<A HREF="https://example.com" ICON="...">Title</A>"#),
+            Some("https://example.com".to_string())
+        );
+        assert_eq!(
+            extract_href(r#"<A HREF="">Empty</A>"#),
+            None
+        );
+        assert_eq!(
+            extract_href(r#"<A NAME="anchor">No HREF</A>"#),
+            None
+        );
+    }
+
+    #[test]
+    fn test_extract_link_title() {
+        assert_eq!(
+            extract_link_title(r#"<A HREF="https://example.com">Title Text</A>"#),
+            "Title Text"
+        );
+        assert_eq!(
+            extract_link_title(r#"<A HREF="https://example.com">  Trimmed  </A>"#),
+            "Trimmed"
+        );
+    }
+
+    #[test]
+    fn test_extract_folder_name() {
+        assert_eq!(
+            extract_folder_name(r#"<DT><H3 ADD_DATE="123">Folder Name</H3>"#),
+            Some("Folder Name".to_string())
+        );
+        assert_eq!(
+            extract_folder_name(r#"<DT><H3></H3>"#),
+            None
+        );
+    }
+
+    #[test]
+    fn test_import_bookmark_entries_creates_tree() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+
+        conn.execute_batch(
+            "
+            CREATE TABLE categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+            CREATE TABLE links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                favicon_url TEXT NOT NULL DEFAULT '',
+                og_image_url TEXT NOT NULL DEFAULT '',
+                category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+                is_favorite INTEGER NOT NULL DEFAULT 0,
+                is_broken INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+            CREATE VIRTUAL TABLE links_fts USING fts5(
+                title, description, notes, url,
+                content=links, content_rowid=id
+            );
+            
+            CREATE TRIGGER links_ai AFTER INSERT ON links BEGIN
+                INSERT INTO links_fts(rowid, title, description, notes, url)
+                VALUES (new.id, new.title, new.description, new.notes, new.url);
+            END;
+            "
+        ).unwrap();
+
+        let entries = vec![
+            BookmarkEntry {
+                url: "https://example.com/1".to_string(),
+                title: "Link 1".to_string(),
+                favicon: "".to_string(),
+                folder_path: vec!["Folder A".to_string(), "Subfolder".to_string()],
+            },
+            BookmarkEntry {
+                url: "https://example.com/2".to_string(),
+                title: "Link 2".to_string(),
+                favicon: "".to_string(),
+                folder_path: vec!["Folder A".to_string()],
+            },
+            BookmarkEntry {
+                url: "https://example.com/3".to_string(),
+                title: "Link 3".to_string(),
+                favicon: "".to_string(),
+                folder_path: vec![],
+            },
+        ];
+
+        let stats = import_bookmark_entries(&entries, &conn).unwrap();
+        assert_eq!(stats.links_imported, 3);
+        assert_eq!(stats.categories_created, 2);
+
+        let mut stmt = conn.prepare("SELECT name, parent_id FROM categories ORDER BY id").unwrap();
+        let categories: Vec<(String, Option<i64>)> = stmt
+            .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?)))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert_eq!(categories.len(), 2);
+        assert_eq!(categories[0].0, "Folder A");
+        assert!(categories[0].1.is_none());
+        assert_eq!(categories[1].0, "Subfolder");
+        assert_eq!(categories[1].1, Some(1));
+
+        let mut stmt = conn.prepare("SELECT url, title, category_id FROM links ORDER BY id").unwrap();
+        let links: Vec<(String, String, Option<i64>)> = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<i64>>(2)?,
+                ))
+            })
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert_eq!(links.len(), 3);
+        assert_eq!(links[0].0, "https://example.com/1");
+        assert_eq!(links[0].2, Some(2));
+        assert_eq!(links[1].0, "https://example.com/2");
+        assert_eq!(links[1].2, Some(1));
+        assert_eq!(links[2].0, "https://example.com/3");
+        assert!(links[2].2.is_none());
+    }
+
+    #[test]
+    fn test_import_bookmark_entries_deduplicates_urls() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+
+        conn.execute_batch(
+            "
+            CREATE TABLE categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+            CREATE TABLE links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                title TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                favicon_url TEXT NOT NULL DEFAULT '',
+                og_image_url TEXT NOT NULL DEFAULT '',
+                category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+                is_favorite INTEGER NOT NULL DEFAULT 0,
+                is_broken INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+            );
+            CREATE VIRTUAL TABLE links_fts USING fts5(
+                title, description, notes, url,
+                content=links, content_rowid=id
+            );
+            CREATE TRIGGER links_ai AFTER INSERT ON links BEGIN
+                INSERT INTO links_fts(rowid, title, description, notes, url)
+                VALUES (new.id, new.title, new.description, new.notes, new.url);
+            END;
+            "
+        ).unwrap();
+
+        let entries = vec![
+            BookmarkEntry {
+                url: "https://example.com".to_string(),
+                title: "First".to_string(),
+                favicon: "".to_string(),
+                folder_path: vec!["Folder".to_string()],
+            },
+            BookmarkEntry {
+                url: "https://example.com".to_string(),
+                title: "Duplicate".to_string(),
+                favicon: "".to_string(),
+                folder_path: vec!["Other".to_string()],
+            },
+        ];
+
+        let stats = import_bookmark_entries(&entries, &conn).unwrap();
+        assert_eq!(stats.links_imported, 1);
+        assert_eq!(stats.categories_created, 2);
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM links", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
 }
