@@ -141,7 +141,10 @@ pub(crate) fn resolve_url(base: Option<&url::Url>, href: &str) -> String {
 /// Returns proxy URL like "http://localhost:8080" if configured
 #[cfg(target_os = "windows")]
 pub fn get_windows_system_proxy() -> Option<String> {
+    use std::os::windows::process::CommandExt;
     use std::process::Command;
+
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
 
     log::info!("[fetcher] checking Windows system proxy...");
 
@@ -153,6 +156,7 @@ pub fn get_windows_system_proxy() -> Option<String> {
             "/v",
             "ProxyEnable",
         ])
+        .creation_flags(CREATE_NO_WINDOW)
         .output();
 
     match output {
@@ -180,6 +184,7 @@ pub fn get_windows_system_proxy() -> Option<String> {
             "/v",
             "ProxyServer",
         ])
+        .creation_flags(CREATE_NO_WINDOW)
         .output();
 
     match output {
