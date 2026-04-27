@@ -272,6 +272,8 @@ async function with_scroll_preserve(fn) {
     }
 }
 
+  // 仅用于视图参数变化（切换分组/标签）或跨窗口同步等需要全量刷新的场景，
+  // 普通链接增删改用本地 store mutation 即可，避免 load() 破坏无限滚动。
   async function refresh_current_view() {
     await with_scroll_preserve(async () => {
       if (search_query.trim()) {
@@ -309,15 +311,17 @@ async function with_scroll_preserve(fn) {
     }
   }
 
+  // 不做列表全量刷新，本地 store mutation 已正确更新数据，
+  // 避免 load() 重置为第 1 页破坏无限滚动状态。
   async function on_save_link(data) {
+    show_add_form = false;
+    edit_link = null;
     if (data.id) {
       await linksStore.update(data);
     } else {
       await linksStore.create(data);
     }
-    show_add_form = false;
-    edit_link = null;
-    await refresh_current_view();
+    await categoriesStore.load();
     await tagsStore.load();
   }
 
@@ -328,18 +332,17 @@ async function on_toggle_favorite(link) {
 
   async function on_delete_link(link) {
     await linksStore.remove(link.id);
-    await refresh_current_view();
+    await categoriesStore.load();
   }
 
   async function on_remove_category(link) {
     await linksStore.update({ id: link.id, category_id: -1 });
-    await refresh_current_view();
+    await categoriesStore.load();
   }
 
   async function on_remove_tag(link, tag) {
     const remaining = link.tags.filter(t => t !== tag);
     await linksStore.update({ id: link.id, tags: remaining });
-    await refresh_current_view();
     await tagsStore.load();
   }
 
@@ -359,7 +362,6 @@ async function on_toggle_favorite(link) {
 
   async function on_rename_category(payload) {
     await categoriesStore.update(payload);
-    await refresh_current_view();
   }
 
   async function on_delete_tag(id) {
@@ -372,7 +374,6 @@ async function on_toggle_favorite(link) {
 
   async function on_rename_tag(payload) {
     await tagsStore.update(payload);
-    await refresh_current_view();
   }
 
   async function on_create_tag(name) {
