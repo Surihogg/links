@@ -365,11 +365,16 @@ async fn do_check_link(url: &str) -> Result<bool, AppError> {
     // Use system proxy on Windows (same logic as fetcher)
     #[cfg(target_os = "windows")]
     {
-        if let Some(proxy_url) = crate::fetcher::get_windows_system_proxy() {
-            log::info!("[check_link] using system proxy: {}", proxy_url);
-            let proxy = reqwest::Proxy::all(&proxy_url)
-                .map_err(|e| AppError::General(e.to_string()))?;
-            builder = builder.proxy(proxy);
+        // Check if URL should bypass proxy based on ProxyOverride rules
+        if !crate::fetcher::should_bypass_proxy(url) {
+            if let Some(proxy_url) = crate::fetcher::get_windows_system_proxy() {
+                log::info!("[check_link] using system proxy: {}", proxy_url);
+                let proxy = reqwest::Proxy::all(&proxy_url)
+                    .map_err(|e| AppError::General(e.to_string()))?;
+                builder = builder.proxy(proxy);
+            }
+        } else {
+            log::info!("[check_link] bypassing proxy for internal URL: {}", url);
         }
     }
 

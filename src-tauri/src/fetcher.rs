@@ -17,10 +17,15 @@ pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
     // Try to use system proxy on Windows (read from registry)
     #[cfg(target_os = "windows")]
     {
-        if let Some(proxy_url) = get_windows_system_proxy() {
-            log::info!("[fetcher] using system proxy: {}", proxy_url);
-            let proxy = reqwest::Proxy::all(&proxy_url)?;
-            builder = builder.proxy(proxy);
+        // Check if URL should bypass proxy based on ProxyOverride rules
+        if !should_bypass_proxy(url) {
+            if let Some(proxy_url) = get_windows_system_proxy() {
+                log::info!("[fetcher] using system proxy: {}", proxy_url);
+                let proxy = reqwest::Proxy::all(&proxy_url)?;
+                builder = builder.proxy(proxy);
+            }
+        } else {
+            log::info!("[fetcher] bypassing proxy for internal URL: {}", url);
         }
     }
 
@@ -220,6 +225,113 @@ pub fn get_windows_system_proxy() -> Option<String> {
     }
 
     None
+}
+
+/// Read ProxyOverride (bypass list) from Windows registry
+/// Returns a list of patterns that should bypass the proxy
+#[cfg(target_os = "windows")]
+pub fn get_proxy_override_list() -> Vec<String> {
+    use std::process::Command;
+
+    let output = Command::new("reg")
+        .args([
+            "query",
+            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
+            "/v",
+            "ProxyOverride",
+        ])
+        .output();
+
+    match output {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            log::info!("[fetcher] ProxyOverride output: {}", stdout.trim());
+            for line in stdout.lines() {
+                if line.contains("ProxyOverride") && line.contains("REG_SZ") {
+                    // Find the ProxyOverride value - it's everything after "REG_SZ"
+                    if let Some(pos) = line.find("REG_SZ") {
+                        let value = &line[pos + 6..]; // Skip "REG_SZ" (6 chars)
+                        let patterns: Vec<String> = value
+                            .split(';')
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.trim().to_string())
+                            .collect();
+                        log::info!("[fetcher] found {} proxy override patterns", patterns.len());
+                        return patterns;
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            log::warn!("[fetcher] failed to query ProxyOverride: {}", e);
+        }
+    }
+
+    vec![]
+}
+
+/// Check if a URL should bypass the proxy based on ProxyOverride rules
+#[cfg(target_os = "windows")]
+pub fn should_bypass_proxy(url: &str) -> bool {
+    let parsed = url::Url::parse(url);
+    if parsed.is_err() {
+        return false;
+    }
+    
+    let parsed = parsed.unwrap();
+    let host = parsed.host_str().unwrap_or("");
+    let is_local = parsed.host_str().map(|h| h == "localhost" || h == "127.0.0.1").unwrap_or(false);
+    
+    // Always bypass for local addresses
+    if is_local {
+        return true;
+    }
+    
+    let override_list = get_proxy_override_list();
+    if override_list.is_empty() {
+        return false;
+    }
+    
+    log::info!("[fetcher] checking bypass for host '{}' against {} patterns", host, override_list.len());
+    
+    for pattern in &override_list {
+        // Handle special patterns
+        if pattern == "<local>" {
+            // <local> means bypass for local addresses (no dots in hostname)
+            if !host.contains('.') {
+                return true;
+            }
+            continue;
+        }
+        
+        if pattern.starts_with("*.") {
+            let domain = &pattern[2..]; // Remove "*."
+            if host.ends_with(domain) || host == domain {
+                return true;
+            }
+        }
+        
+        if pattern.ends_with('*') && pattern.contains('.') {
+            let prefix = &pattern[..pattern.len()-1]; // Remove "*"
+            if host.starts_with(prefix) {
+                return true;
+            }
+        }
+        
+        // Handle exact match
+        if host == pattern {
+            return true;
+        }
+        
+        if pattern.starts_with('*') && !pattern.starts_with("*.") {
+            let suffix = &pattern[1..]; // Remove "*"
+            if host.ends_with(suffix) {
+                return true;
+            }
+        }
+    }
+    
+    false
 }
 
 #[cfg(test)]
