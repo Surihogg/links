@@ -7,6 +7,7 @@
 
   const formats = [
     { id: "json", name: "JSON", desc: "结构化数据，可重新导入" },
+    { id: "html", name: "HTML", desc: "浏览器书签格式，可导入 Chrome/Firefox/Safari" },
     { id: "markdown", name: "Markdown", desc: "纯文本格式，方便阅读" },
     { id: "csv", name: "CSV", desc: "表格格式，可在 Excel 中打开" },
   ];
@@ -18,6 +19,7 @@
       let ext = "txt";
       let filename = "links-export";
       if (format === "json") { ext = "json"; }
+      else if (format === "html") { ext = "html"; }
       else if (format === "markdown") { ext = "md"; }
       else if (format === "csv") { ext = "csv"; }
       await saveFile(content, `${filename}.${ext}`);

@@ -837,6 +837,11 @@ impl Db {
     }
 
     pub fn export_links(&self, params: &ExportParams) -> Result<String, AppError> {
+        // HTML 书签格式导出所有数据（不支持过滤）
+        if params.format == "html" {
+            return self.export_bookmark_html();
+        }
+
         let conn = self.0.lock().unwrap();
 
         let mut where_clauses = Vec::new();
@@ -918,6 +923,161 @@ impl Db {
             ))),
         }
     }
+
+    fn export_bookmark_html(&self) -> Result<String, AppError> {
+        let conn = self.0.lock().unwrap();
+
+        let mut cat_stmt = conn.prepare(
+            "SELECT id, name, parent_id, sort_order, created_at, updated_at FROM categories ORDER BY sort_order, updated_at"
+        )?;
+        let cats: Vec<Category> = cat_stmt
+            .query_map([], |row| {
+                Ok(Category {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    parent_id: row.get(2)?,
+                    sort_order: row.get(3)?,
+                    children: vec![],
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(cat_stmt);
+
+        let mut children_of: std::collections::HashMap<i64, Vec<Category>> =
+            std::collections::HashMap::new();
+        let mut cat_roots = Vec::new();
+        for cat in cats {
+            if let Some(pid) = cat.parent_id {
+                children_of.entry(pid).or_default().push(cat);
+            } else {
+                cat_roots.push(cat);
+            }
+        }
+
+        fn build_cat_tree(
+            pid: i64,
+            co: &std::collections::HashMap<i64, Vec<Category>>,
+        ) -> Vec<Category> {
+            co.get(&pid)
+                .map(|cs| {
+                    cs.iter()
+                        .map(|c| Category {
+                            children: build_cat_tree(c.id, co),
+                            ..c.clone()
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        }
+
+        for root in &mut cat_roots {
+            root.children = build_cat_tree(root.id, &children_of);
+        }
+
+        let sql = format!("SELECT {} FROM links l ORDER BY l.updated_at DESC", LINK_COLUMNS);
+        let mut link_stmt = conn.prepare(&sql)?;
+        let links: Vec<Link> = link_stmt
+            .query_map([], row_to_link)?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(link_stmt);
+
+        let mut links_by_cat: std::collections::HashMap<Option<i64>, Vec<&Link>> =
+            std::collections::HashMap::new();
+        for link in &links {
+            links_by_cat.entry(link.category_id).or_default().push(link);
+        }
+
+        Ok(generate_bookmark_html(&cat_roots, &links_by_cat))
+    }
+}
+
+fn generate_bookmark_html(
+    cat_roots: &[Category],
+    links_by_cat: &std::collections::HashMap<Option<i64>, Vec<&Link>>,
+) -> String {
+    let mut html = String::from(
+        "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n\
+         <!-- This is an automatically generated file.\n\
+              It will be read and overwritten.\n\
+              DO NOT EDIT! -->\n\
+         <META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\">\n\
+         <TITLE>Bookmarks</TITLE>\n\
+         <H1>Bookmarks</H1>\n",
+    );
+
+    html.push_str("<DL><p>\n");
+
+    if let Some(root_links) = links_by_cat.get(&None) {
+        for link in root_links {
+            html.push_str(&format_link_html(link, "    "));
+        }
+    }
+
+    for cat in cat_roots {
+        html.push_str(&format_category_html(cat, links_by_cat, "    "));
+    }
+
+    html.push_str("</DL><p>\n");
+    html
+}
+
+fn format_link_html(link: &Link, indent: &str) -> String {
+    let timestamp = chrono::NaiveDateTime::parse_from_str(&link.created_at, "%Y-%m-%d %H:%M:%S")
+        .map(|dt| dt.and_utc().timestamp())
+        .unwrap_or(0);
+
+    let mut attrs = format!(
+        r#"HREF="{}" ADD_DATE="{}""#,
+        escape_html_attr(&link.url),
+        timestamp
+    );
+    if !link.favicon_url.is_empty() {
+        attrs.push_str(&format!(r#" ICON="{}""#, escape_html_attr(&link.favicon_url)));
+    }
+
+    format!(
+        "{}<DT><A {}>{}</A>\n",
+        indent,
+        attrs,
+        escape_html_attr(&link.title)
+    )
+}
+
+fn format_category_html(
+    cat: &Category,
+    links_by_cat: &std::collections::HashMap<Option<i64>, Vec<&Link>>,
+    indent: &str,
+) -> String {
+    let inner_indent = format!("    {}", indent);
+
+    let mut html = format!(
+        "{}<DT><H3>{}</H3>\n{}<DL><p>\n",
+        indent,
+        escape_html_attr(&cat.name),
+        indent
+    );
+
+    if let Some(links) = links_by_cat.get(&Some(cat.id)) {
+        for link in links {
+            html.push_str(&format_link_html(link, &inner_indent));
+        }
+    }
+
+    for child in &cat.children {
+        html.push_str(&format_category_html(child, links_by_cat, &inner_indent));
+    }
+
+    html.push_str(&format!("{}</DL><p>\n", indent));
+    html
+}
+
+fn escape_html_attr(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 #[cfg(test)]
@@ -953,6 +1113,19 @@ mod tests {
             notes: None,
             category_id: None,
             tags: Some(tags.iter().map(|s| s.to_string()).collect()),
+            favicon_url: None,
+            og_image_url: None,
+        }
+    }
+
+    fn make_link_full_cat(url: &str, title: &str, cat_id: Option<i64>) -> CreateLinkPayload {
+        CreateLinkPayload {
+            url: url.to_string(),
+            title: Some(title.to_string()),
+            description: None,
+            notes: None,
+            category_id: cat_id,
+            tags: None,
             favicon_url: None,
             og_image_url: None,
         }
@@ -1287,6 +1460,50 @@ mod tests {
         let csv = db.export_links(&ExportParams { format: "csv".into(), category_id: None, tag: None, favorite_only: None }).unwrap();
         assert!(csv.starts_with("title,url,description"));
         assert!(csv.contains("Test"));
+    }
+
+    #[test]
+    fn test_export_html_basic() {
+        let db = test_db();
+        db.create_link(&make_link_full("https://example.com", "Root Link", "desc", vec![])).unwrap();
+
+        let html = db.export_links(&ExportParams { format: "html".into(), category_id: None, tag: None, favorite_only: None }).unwrap();
+        assert!(html.starts_with("<!DOCTYPE NETSCAPE-Bookmark-file-1>"));
+        assert!(html.contains(r#"<DT><A HREF="https://example.com""#));
+        assert!(html.contains("Root Link"));
+        assert!(html.contains("<DL><p>"));
+        assert!(html.contains("</DL><p>"));
+    }
+
+    #[test]
+    fn test_export_html_with_categories() {
+        let db = test_db();
+        let parent = db.create_category(&CreateCategoryPayload { name: "开发工具".into(), parent_id: None }).unwrap();
+        let child = db.create_category(&CreateCategoryPayload { name: "Rust".into(), parent_id: Some(parent.id) }).unwrap();
+        db.create_link(&make_link_full_cat("https://tauri.app", "Tauri", Some(child.id))).unwrap();
+        db.create_link(&make_link_full_cat("https://example.com", "Root", None)).unwrap();
+
+        let html = db.export_links(&ExportParams { format: "html".into(), category_id: None, tag: None, favorite_only: None }).unwrap();
+        assert!(html.contains("开发工具"));
+        assert!(html.contains("Rust"));
+        assert!(html.contains("Tauri"));
+        assert!(html.contains("Root"));
+
+        // 验证嵌套结构：开发工具 DL 在 Rust DL 之前关闭
+        let dev_start = html.find("开发工具").unwrap();
+        let rust_start = html.find("Rust</H3>").unwrap();
+        assert!(rust_start > dev_start, "Rust should be nested inside 开发工具");
+    }
+
+    #[test]
+    fn test_export_html_escaping() {
+        let db = test_db();
+        db.create_link(&make_link_full("https://example.com?a=1&b=2", "<Script>Alert</Script>", "desc", vec![])).unwrap();
+
+        let html = db.export_links(&ExportParams { format: "html".into(), category_id: None, tag: None, favorite_only: None }).unwrap();
+        assert!(html.contains("&amp;"), "URL 中的 & 应被转义");
+        assert!(html.contains("&lt;Script&gt;"), "标题中的 <> 应被转义");
+        assert!(!html.contains("<Script>Alert</Script></A>"), "不应有未转义的 HTML 标签");
     }
 
     #[test]
