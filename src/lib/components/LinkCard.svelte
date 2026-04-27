@@ -1,5 +1,5 @@
 <script>
-  import { openUrl } from "../api.js";
+  import { openUrl, getSetting } from "../api.js";
   import { copyToClipboard } from "../api.js";
 
   let { link, highlight = "", category_name = null, onedit, ondelete, ontoggle_favorite, onremovecategory, onremovetag } = $props();
@@ -33,8 +33,12 @@
     return safe.replace(new RegExp(`(${escaped})`, "gi"), '<span style="background:#fef08a;border-radius:2px;padding:0 2px;font-weight:600">$1</span>');
   }
 
-  function card_click() {
+  async function card_click() {
     openUrl(link.url);
+    if ((await getSetting("auto-minimize-on-open")) === "true") {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      await getCurrentWindow().hide();
+    }
   }
 
   function toggle_fav(e) {

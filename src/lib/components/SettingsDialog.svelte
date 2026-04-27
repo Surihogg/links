@@ -19,6 +19,7 @@
   let main_shortcut_error = $state(false);
   let autostart_enabled = $state(false);
   let autostart_loaded = $state(false);
+  let auto_minimize = $state(false);
   
 
   const isMac = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
@@ -130,6 +131,12 @@
       autostart_enabled = false;
     }
     autostart_loaded = true;
+    // Load auto-minimize-on-open setting
+    try {
+      auto_minimize = (await api.getSetting("auto-minimize-on-open")) === "true";
+    } catch {
+      auto_minimize = false;
+    }
     loaded = true;
     // Load appearance/theme setting with fallback
     try {
@@ -179,6 +186,11 @@
     } catch {
       // swallow errors; user can retry
     }
+  }
+
+  async function toggleAutoMinimize() {
+    auto_minimize = !auto_minimize;
+    await api.setSetting("auto-minimize-on-open", String(auto_minimize));
   }
 
   function on_overlay_click(e) {
@@ -340,6 +352,15 @@
             </div>
             <button class="btn btn-secondary btn-sm" onclick={toggleAutostart}>
               {autostart_enabled ? '禁用' : '启用'}
+            </button>
+          </div>
+          <div class="format-option autostart-row" style="justify-content: space-between; align-items: center; margin-top: 6px;">
+            <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+              <span class="format-name">打开链接后最小化</span>
+              <span class="format-desc">点击链接跳转时自动最小化到托盘</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick={toggleAutoMinimize}>
+              {auto_minimize ? '禁用' : '启用'}
             </button>
           </div>
         {:else}
