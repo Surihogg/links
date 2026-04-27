@@ -437,7 +437,7 @@ async function on_toggle_favorite(link) {
   let total_count = $derived(links.total);
   let current_title = $derived(
     search_query.trim() ? `搜索: ${search_query}` :
-    selected_tag === "__untagged__" ? "无标签的链接" :
+    selected_tag === "__untagged__" ? "无标签" :
     selected_tag ? `标签: ${selected_tag}` :
     selected_category === "favorite" ? "特别关注" :
     selected_category === "uncategorized" ? "未分组" :

@@ -13,10 +13,27 @@
   // Locally created categories (not yet in parent's list)
   let createdCategories = $state([]);
 
-  // Merge prop categories with locally created ones (dedup by id)
+  // 将树结构扁平化，附带 depth 和 _path（如 "level1/level2"）
+  function flatten_with_depth(cats, depth = 0, parent_path = '') {
+    const result = [];
+    for (const cat of cats) {
+      const path = parent_path ? `${parent_path}/${cat.name}` : cat.name;
+      result.push({ ...cat, depth, _path: path });
+      if (cat.children?.length > 0) {
+        result.push(...flatten_with_depth(cat.children, depth + 1, path));
+      }
+    }
+    return result;
+  }
+
+  // Merge prop categories（树结构）with locally created ones，扁平化并带 depth
   let allCategories = $derived.by(() => {
-    const createdIds = new Set(createdCategories.map(c => c.id));
-    return [...categories.filter(c => !createdIds.has(c.id)), ...createdCategories];
+    const flat = flatten_with_depth(categories);
+    const createdIds = new Set(flat.map(c => c.id));
+    const localFlat = createdCategories
+      .filter(c => !createdIds.has(c.id))
+      .map(c => ({ ...c, depth: 0, _path: c.name }));
+    return [...flat, ...localFlat];
   });
 
   let selectedCategory = $derived(
@@ -33,7 +50,8 @@
     input.trim().length > 0 && allCategories.some(c => c.name.toLowerCase() === input.trim().toLowerCase())
   );
 
-  let showCreateOption = $derived(input.trim().length > 0 && !exactMatch);
+  let showCreateOption = $derived(input.trim().length > 0 && !exactMatch && !input.trim().includes('/'));
+  let showSlashError = $derived(input.trim().includes('/'));
 
   let totalItems = $derived(filteredCategories.length + (showCreateOption ? 1 : 0));
 
@@ -132,7 +150,7 @@
   <div class="cat-input-field" onclick={on_field_click}>
     {#if selectedCategory}
       <span class="cat-pill">
-        {selectedCategory.name}
+        {selectedCategory?._path || selectedCategory.name}
         <button type="button" class="cat-remove" onclick={remove_category}>×</button>
       </span>
     {/if}
@@ -153,7 +171,9 @@
 
   {#if show_dropdown && !selectedCategory}
     <div class="cat-dropdown">
-      {#if filteredCategories.length === 0 && !showCreateOption}
+      {#if showSlashError}
+        <div class="cat-error">分组名不能包含 /</div>
+      {:else if filteredCategories.length === 0 && !showCreateOption}
         <div class="cat-empty">暂无分组</div>
       {:else}
         {#each filteredCategories as cat, i}
@@ -161,6 +181,7 @@
             type="button"
             class="cat-item"
             class:active={i === active_index}
+            style="padding-left: {10 + (cat.depth || 0) * 16}px"
             onclick={() => select_category(cat)}
             onmouseenter={() => active_index = i}
           >
@@ -273,6 +294,14 @@
     text-align: center;
     color: var(--text-3);
     font-size: 12px;
+  }
+
+  .cat-error {
+    padding: 6px 10px;
+    color: var(--danger);
+    font-size: 12px;
+    text-align: center;
+    border-top: 1px solid var(--border-0);
   }
 
   .cat-item {

@@ -103,21 +103,14 @@ function createCategoriesStore() {
     },
     async create(payload) {
       const cat = await api.createCategory(payload);
-      update((s) => [...s, cat]);
+      // 刷新整棵树，确保 parent_id 正确映射到树结构
+      await this.load();
       return cat;
     },
     async update(payload) {
       const cat = await api.updateCategory(payload);
-      update((s) => {
-        function replace(list) {
-          return list.map((c) => {
-            if (c.id === cat.id) return { ...c, name: cat.name, updated_at: cat.updated_at };
-            if (c.children) return { ...c, children: replace(c.children) };
-            return c;
-          });
-        }
-        return replace(s);
-      });
+      // 刷新整棵树，处理 parent_id 变更（拖拽移动）
+      await this.load();
       return cat;
     },
     async remove(id) {

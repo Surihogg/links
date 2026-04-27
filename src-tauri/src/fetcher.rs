@@ -83,11 +83,17 @@ pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
 
     let og_image_url = select_meta_content(&doc, "meta[property=\"og:image\"]").unwrap_or_default();
 
-    let keywords: Vec<String> = select_meta_content(&doc, "meta[name=\"keywords\"]")
-        .unwrap_or_default()
-        .split(',')
+    // Tokenize keywords: split by comma (both EN and CN), space, tab, semicolon, etc.
+    let keywords_raw = select_meta_content(&doc, "meta[name=\"keywords\"]").unwrap_or_default();
+    let keywords: Vec<String> = keywords_raw
+        .split(|c: char| c == ',' || c == '，' || c == ' ' || c == '\t' || c == ';' || c == '；')
         .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+        .filter(|s| !s.is_empty() && s.len() >= 2)
+        .fold(Vec::new(), |mut acc, s| {
+            if !acc.contains(&s) { acc.push(s); }
+            acc
+        })
+        .into_iter()
         .take(8)
         .collect();
 

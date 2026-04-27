@@ -170,7 +170,10 @@ pub struct CreateCategoryPayload {
 pub struct UpdateCategoryPayload {
     pub id: i64,
     pub name: Option<String>,
-    pub parent_id: Option<Option<i64>>,
+    #[serde(default)]
+    pub parent_id: Option<i64>,
+    #[serde(default)]
+    pub unset_parent: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -720,10 +723,15 @@ impl Db {
                 rusqlite::params![name, payload.id],
             )?;
         }
-        if let Some(ref parent_id_opt) = payload.parent_id {
+        if payload.unset_parent {
+            conn.execute(
+                "UPDATE categories SET parent_id = NULL, updated_at = datetime('now','localtime') WHERE id = ?",
+                rusqlite::params![payload.id],
+            )?;
+        } else if let Some(parent_id) = payload.parent_id {
             conn.execute(
                 "UPDATE categories SET parent_id = ?, updated_at = datetime('now','localtime') WHERE id = ?",
-                rusqlite::params![parent_id_opt, payload.id],
+                rusqlite::params![parent_id, payload.id],
             )?;
         }
         let cat = conn.query_row(

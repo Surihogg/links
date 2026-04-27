@@ -22,7 +22,8 @@
         "visible": false,
         "decorations": true,
         "transparent": true,
-        "titleBarStyle": "Overlay"
+        "titleBarStyle": "Overlay",
+        "dragDropEnabled": false
       },
       {
         "label": "quick-add",

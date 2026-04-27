@@ -185,24 +185,29 @@
 
     <div class="card-actions">
       <button class="action-btn" onclick={toggle_fav}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
         </svg>
       </button>
       <button class="action-btn" onclick={edit_link}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z"/>
-          <path d="M14.5 7.5l3 3"/>
+        <svg width="14" height="14" viewBox="0 0 1024 1024" fill="currentColor">
+          <path d="M867.22 413.07c-9.68 0-19.36-3.63-26.82-10.92-15.19-14.82-15.49-39.14-0.68-54.32 46.84-48.02 45.89-125.18-2.12-172.02-23.27-22.7-54.13-34.93-86.46-34.56-32.49 0.4-62.87 13.43-85.56 36.69-14.83 15.19-39.15 15.47-54.32 0.68-15.19-14.81-15.49-39.13-0.68-54.32C687 45.94 812.9 44.4 891.24 120.82c78.33 76.42 79.89 202.32 3.47 280.66-7.52 7.71-17.51 11.59-27.49 11.59z"/>
+          <path d="M819.09 462.01c-9.68 0-19.36-3.63-26.82-10.92L563.13 227.55c-15.19-14.82-15.49-39.14-0.68-54.32 14.82-15.2 39.15-15.47 54.32-0.68L845.92 396.1c15.19 14.82 15.49 39.14 0.68 54.32-7.54 7.72-17.52 11.59-27.51 11.59z"/>
+          <path d="M164.51 674.68c-9.68 0-19.36-3.63-26.82-10.92-15.19-14.82-15.49-39.14-0.68-54.32l473.74-485.6c14.82-15.2 39.15-15.47 54.33-0.67 15.18 14.82 15.48 39.14 0.67 54.33L192.01 663.09c-7.53 7.72-17.52 11.59-27.5 11.59z"/>
+          <path d="M111.34 958.62c-2.31 0-4.65-0.21-7.01-0.64-20.86-3.85-34.66-23.88-30.81-44.74l51.7-280.46c3.85-20.86 23.86-34.7 44.74-30.81 20.86 3.85 34.66 23.88 30.81 44.74l-51.7 280.46c-3.41 18.5-19.56 31.45-37.73 31.45z"/>
+          <path d="M393.86 898.44c-9.68 0-19.36-3.63-26.82-10.92-15.19-14.82-15.49-39.14-0.68-54.32L840.1 347.6c14.82-15.19 39.14-15.49 54.32-0.68 15.19 14.82 15.49 39.13 0.68 54.32l-473.74 485.6c-7.53 7.72-17.51 11.6-27.5 11.6z"/>
+          <path d="M111.3 958.66c-17.79 0-33.76-12.42-37.56-30.52-4.36-20.76 8.93-41.13 29.7-45.49l279.1-58.62c20.8-4.35 41.13 8.93 45.49 29.7 4.36 20.76-8.93 41.13-29.7 45.49l-279.1 58.62c-2.66 0.55-5.31 0.82-7.93 0.82z"/>
+          <path d="M912.71 959.5H592.59c-21.21 0-38.41-17.2-38.41-38.41 0-21.21 17.2-38.41 38.41-38.41h320.12c21.21 0 38.41 17.2 38.41 38.41 0 21.21-17.2 38.41-38.41 38.41z"/>
         </svg>
       </button>
       <button class="action-btn" onclick={toggle_share}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
         </svg>
       </button>
       <button class="action-btn danger" onclick={delete_link}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
         </svg>
       </button>

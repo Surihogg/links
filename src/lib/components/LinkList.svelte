@@ -3,15 +3,17 @@
 
   let { links = [], categories = [], loading = false, highlight = "", has_more = false, onedit, ondelete, ontoggle_favorite, onloadmore, onremovecategory, onremovetag } = $props();
 
+  // 构建分组 id -> 完整路径映射（如 "level1/level2/level3"）
   let cat_map = $derived(() => {
     const map = {};
-    function walk(list) {
+    function walk(list, path) {
       for (const c of list) {
-        map[c.id] = c.name;
-        if (c.children) walk(c.children);
+        const cur = path ? `${path}/${c.name}` : c.name;
+        map[c.id] = cur;
+        if (c.children) walk(c.children, cur);
       }
     }
-    walk(categories);
+    walk(categories, '');
     return map;
   });
 

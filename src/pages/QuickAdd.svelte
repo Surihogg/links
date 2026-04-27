@@ -58,17 +58,6 @@
     pending_fetch = null;
   }
 
-  function flatten_categories(tree) {
-    const result = [];
-    for (const cat of tree) {
-      result.push({ id: cat.id, name: cat.name });
-      if (cat.children) result.push(...flatten_categories(cat.children));
-    }
-    return result;
-  }
-
-  let flatCategories = $derived(flatten_categories(categories));
-
   onMount(async () => {
     await waitForBackendReady();
 
@@ -231,7 +220,7 @@
 
     <div class="field">
       <label class="field-label">分组</label>
-      <CategoryInput bind:selectedId={category_id} categories={flatCategories} />
+      <CategoryInput bind:selectedId={category_id} {categories} />
     </div>
 
     <div class="field tag-field">

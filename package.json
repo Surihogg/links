@@ -17,6 +17,7 @@
     "@sveltejs/vite-plugin-svelte": "^5",
     "@tailwindcss/vite": "^4",
     "@tauri-apps/cli": "^2",
+    "oxlint": "^1.62.0",
     "svelte": "^5",
     "tailwindcss": "^4",
     "typescript": "^5.7",
