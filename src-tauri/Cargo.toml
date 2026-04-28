@@ -1,8 +1,8 @@
 [package]
 name = "Links"
-version = "1.1.2"
+version = "1.1.3"
 description = "A cross-platform local link manager"
-authors = ["you"]
+authors = ["hyatt zhao"]
 edition = "2021"
 rust-version = "1.77.2"
 

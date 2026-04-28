@@ -87,7 +87,7 @@ npm run tauri build        # 完整打包
 cd src-tauri && cargo check  # Rust 语法检查
 cd src-tauri && cargo test   # Rust 单元测试（db.rs, fetcher.rs, normalize.rs）
 ```
-
+ 
 ## 备注
 
 - Vite 开发服务器端口固定 1420，被占用会报错（不会自动换端口）
@@ -103,3 +103,4 @@ cd src-tauri && cargo test   # Rust 单元测试（db.rs, fetcher.rs, normalize.
 - 代码注释与提交信息规范：代码注释使用中文，提交信息统一使用中文，格式示例：feat: 添加新功能 或 fix: 修复问题；描述部分应包含改动原因（why）及影响范围，避免空描述。
 - TODO 工作区开发日志归档：若任务来自 TODO 工作区，完成后将相关条目写入 TODO.md 的开发日志（在工作区 TODO.md 内的 ## 开发日志 小节），按时间戳追加归档，格式为 YYYY-MM-DD HH:MM:SS。
 - Release 文档刷新：每当发布新版本（打 tag vX.Y.Z），必须同步刷新 AGENTS.md、README.md、USER_GUIDE.md 三个文档。更新内容包括版本号引用、新功能描述、工作流变更、弃用/迁移说明、资源链接等，确保文档与代码保持一致。
+  - 版本号分别在 tauri.conf.json 里的 "version"、Cargo.toml和Cargo.lock 里的 package.version、
