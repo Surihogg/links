@@ -4,10 +4,36 @@ use crate::db::{
     PaginatedResult, SearchParams, UpdateCategoryPayload, UpdateLinkPayload, UpdateTagPayload,
 };
 use rusqlite::params;
+use serde_json::Value;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
+pub struct PendingDeepLink(pub Mutex<Option<Value>>);
+
+#[tauri::command]
+pub fn pop_pending_deep_link(state: State<'_, PendingDeepLink>) -> Option<Value> {
+    state.0.lock().unwrap().take()
+}
+
+/// 本地 HTTP 服务的端口与 token，前端用来动态生成 Bookmarklet
+pub struct LocalServerInfo {
+    pub port: u16,
+    pub token: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct LocalServerInfoDto {
+    pub port: u16,
+    pub token: String,
+}
+
+#[tauri::command]
+pub fn get_local_server_info(state: State<'_, LocalServerInfo>) -> LocalServerInfoDto {
+    LocalServerInfoDto { port: state.port, token: state.token.clone() }
+}
 
 fn log_fetch_failure(app: &AppHandle, url: &str, error: &str) {
     let Ok(dir) = app.path().app_data_dir() else { return };

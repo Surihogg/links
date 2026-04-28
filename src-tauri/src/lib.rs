@@ -2,6 +2,7 @@ mod commands;
 mod config;
 mod db;
 mod fetcher;
+mod http_server;
 #[allow(dead_code)]
 mod normalize;
 
@@ -12,6 +13,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use tauri_plugin_deep_link::DeepLinkExt;
 use std::str::FromStr;
 use crate::config::Config;
 
@@ -34,6 +36,15 @@ pub fn run() {
     }
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            // 单实例回调：第二个实例启动时，将焦点转到主窗口
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(
             tauri_plugin_log::Builder::default()
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
@@ -201,6 +212,58 @@ pub fn run() {
 
             let shortcut = Shortcut::from_str(&shortcut_str).expect("failed to parse shortcut");
             app.global_shortcut().register(shortcut)?;
+
+            // 深度链接处理：支持浏览器 Bookmarklet 一键收藏
+            app.manage(commands::PendingDeepLink(std::sync::Mutex::new(None)));
+
+            // 启动本地 HTTP 服务（固定端口 48927，token 持久化到 config）
+            {
+                let cfg = app.state::<Config>();
+                let existing_token = cfg.get("http-server-token");
+                let http_handle = app.handle().clone();
+                match http_server::start(existing_token, move |url, title| {
+                    handle_browser_capture(&http_handle, &url, &title);
+                }) {
+                    Ok((port, token)) => {
+                        log::info!("[http] 本地服务已启动: 127.0.0.1:{}", port);
+                        // 持久化 token 到 config，跨重启复用（bookmarklet 不用重新拖）
+                        let _ = cfg.set("http-server-token", &serde_json::to_string(&token).unwrap_or_default());
+                        let dir = data_dir(&app.handle());
+                        let _ = cfg.save(&dir);
+                        app.manage(commands::LocalServerInfo { port, token });
+                    }
+                    Err(e) => {
+                        log::error!("[http] 本地服务启动失败: {}", e);
+                        // 即使启动失败也注册一个占位，避免前端命令找不到 state
+                        app.manage(commands::LocalServerInfo { port: 0, token: String::new() });
+                    }
+                }
+            }
+
+            {
+                let app_handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    if let Some(url_str) = event.urls().first() {
+                        handle_deep_link(&app_handle, url_str.as_str());
+                    }
+                });
+
+                // 冷启动时通过 get_current 捕获（Windows 必需，macOS 也作为兜底）
+                if let Ok(Some(urls)) = app.deep_link().get_current() {
+                    if let Some(url) = urls.first() {
+                        handle_deep_link(app.handle(), url.as_str());
+                    }
+                }
+
+                // 开发模式下运行时注册协议（Windows/Linux 需要运行时注册）
+                #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+                {
+                    if let Err(e) = app.deep_link().register_all() {
+                        log::warn!("[deep-link] 运行时注册失败: {}", e);
+                    }
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -234,7 +297,115 @@ pub fn run() {
             commands::set_main_shortcut,
             commands::exit_app,
             commands::get_system_proxy,
+            commands::pop_pending_deep_link,
+            commands::get_local_server_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// 纯逻辑版本的深度链接解析（不依赖 Tauri runtime），用于测试
+fn parse_deep_link(raw_url: &str) -> Option<(String, String)> {
+    let parsed = url::Url::parse(raw_url).ok()?;
+    if parsed.scheme() != "links" {
+        return None;
+    }
+    let host = parsed.host_str().unwrap_or("");
+    let path = parsed.path();
+    if host != "add" && path != "/add" && path != "add" {
+        return None;
+    }
+    let params: std::collections::HashMap<String, String> = parsed
+        .query_pairs()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+    let link_url = params.get("url")?.clone();
+    let link_title = params.get("title").cloned().unwrap_or_default();
+    Some((link_url, link_title))
+}
+
+fn handle_deep_link(app: &tauri::AppHandle, raw_url: &str) {
+    let (link_url, link_title) = match parse_deep_link(raw_url) {
+        Some(result) => result,
+        None => {
+            log::warn!("[deep-link] 无法解析: {}", raw_url);
+            return;
+        }
+    };
+    log::info!("[deep-link] 收藏链接: url={}, title={}", link_url, link_title);
+    handle_browser_capture(app, &link_url, &link_title);
+}
+
+fn handle_browser_capture(app: &tauri::AppHandle, link_url: &str, link_title: &str) {
+    let payload = serde_json::json!({
+        "url": link_url,
+        "title": link_title,
+    });
+
+    if let Some(pending) = app.try_state::<commands::PendingDeepLink>() {
+        let mut guard = pending.0.lock().unwrap();
+        // 双轨并行去重：如果已有未消费的相同 URL，不重复写入
+        let is_dup = guard.as_ref().map_or(false, |existing| {
+            existing.get("url").and_then(|v| v.as_str()) == Some(link_url)
+        });
+        if !is_dup {
+            *guard = Some(payload);
+        }
+    }
+
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+    }
+    if let Some(window) = app.get_webview_window("quick-add") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        let _ = window.set_always_on_top(true);
+    }
+    let _ = app.emit("quick-add-shown", ());
+}
+
+#[cfg(test)]
+mod deep_link_tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_basic_deep_link() {
+        let result = parse_deep_link("links://add?url=https%3A%2F%2Fexample.com&title=My%20Page");
+        assert_eq!(result, Some(("https://example.com".into(), "My Page".into())));
+    }
+
+    #[test]
+    fn test_parse_deep_link_with_special_chars() {
+        let result = parse_deep_link(
+            "links://add?url=https%3A%2F%2Fexample.com%2Fpath%3Fq%3Dhello%26lang%3D%E4%B8%AD%E6%96%87&title=Test%20%26%20More",
+        );
+        assert_eq!(
+            result,
+            Some(("https://example.com/path?q=hello&lang=中文".into(), "Test & More".into()))
+        );
+    }
+
+    #[test]
+    fn test_parse_deep_link_no_title() {
+        let result = parse_deep_link("links://add?url=https%3A%2F%2Fexample.com");
+        assert_eq!(result, Some(("https://example.com".into(), "".into())));
+    }
+
+    #[test]
+    fn test_parse_deep_link_wrong_scheme() {
+        let result = parse_deep_link("http://add?url=https://example.com");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_deep_link_wrong_host() {
+        let result = parse_deep_link("links://other?url=https://example.com");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_parse_deep_link_missing_url() {
+        let result = parse_deep_link("links://add?title=NoURL");
+        assert_eq!(result, None);
+    }
 }
