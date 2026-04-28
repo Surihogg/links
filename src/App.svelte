@@ -528,7 +528,11 @@ async function on_toggle_favorite(link) {
         update_info = update;
       }
     } catch (e) {
-      console.warn("[update] check failed:", e);
+      // 开发阶段或无发布版本时 endpoint 返回 404 属于正常情况，不警告
+      const msg = e?.message || String(e);
+      if (!msg.includes("404") && !msg.includes("Not Found")) {
+        console.warn("[update] check failed:", e);
+      }
     }
   }
 

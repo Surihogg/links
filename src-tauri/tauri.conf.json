@@ -72,7 +72,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFFRTZBNDQyQ0NBMUJFNjAKUldSZ3ZxSE1RcVRtcnJ6NWxyTUtieVRTQ0FvOGNCTUlTM2lZNVFZSlAxV2dtN1MrMXRyN1RCVG8K",
       "endpoints": [
         "https://github.com/Surihogg/links/releases/latest/download/latest.json"
       ],

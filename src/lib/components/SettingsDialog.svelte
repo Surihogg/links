@@ -208,8 +208,16 @@
       } else {
         check_status = "当前已是最新版本";
       }
-    } catch {
-      check_status = "检查失败，请稍后重试";
+    } catch (e) {
+      const msg = e?.message || String(e);
+      if (msg.includes("404") || msg.includes("Not Found")) {
+        check_status = "暂无可用更新（未检测到发布版本）";
+      } else if (msg.includes("network") || msg.includes("Failed to fetch") || msg.includes("fetch")) {
+        check_status = "网络连接失败，请检查网络后重试";
+      } else {
+        console.warn("[update] check failed:", e);
+        check_status = "检查失败，请稍后重试";
+      }
     }
     checking_update = false;
   }
