@@ -1,5 +1,6 @@
 <script>
   import { onMount, tick } from "svelte";
+  import { marked } from "marked";
   import { linksStore, categoriesStore, tagsStore } from "./lib/stores/index.js";
   import * as api from "./lib/api.js";
   import { waitForBackendReady } from "./lib/ready.js";
@@ -41,6 +42,7 @@
   let show_update_dialog = $state(false);
   let show_release_notes = $state(false);
   let last_update_notes = $state("");
+  let current_version = $state("");
 
   onMount(async () => {
     const mainWindow = getCurrentWindow();
@@ -89,21 +91,18 @@
       check_for_update();
     }
 
-    // 首次启动更新后显示更新说明
+    // 首次启动更新后显示更新说明（从本地缓存读取，与更新可用时展示的内容一致）
     try {
       const last_version = await api.getSetting("last-known-version");
       const { getVersion } = await import("@tauri-apps/api/app");
-      const current_version = await getVersion();
+      current_version = await getVersion();
       if (last_version && last_version !== current_version) {
         // 版本变化 — 这是更新后的首次启动
-        try {
-          const resp = await fetch(`https://api.github.com/repos/Surihogg/links/releases/tags/v${current_version}`);
-          if (resp.ok) {
-            const data = await resp.json();
-            last_update_notes = data.body || "";
-            show_release_notes = true;
-          }
-        } catch (e) {}
+        const saved_notes = await api.getSetting("last-update-notes");
+        if (saved_notes) {
+          last_update_notes = saved_notes;
+          show_release_notes = true;
+        }
       }
       await api.setSetting("last-known-version", current_version);
     } catch (e) {
@@ -682,7 +681,7 @@ async function on_toggle_favorite(link) {
     <div class="modal-overlay" onclick={() => show_release_notes = false}>
       <div class="modal" onclick={(e) => e.stopPropagation()}>
         <div class="modal-header">
-          <h3 class="modal-title">已更新到最新版本</h3>
+          <h3 class="modal-title">当前版本：v{current_version}</h3>
           <button class="modal-close" onclick={() => show_release_notes = false}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
               <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
@@ -690,9 +689,13 @@ async function on_toggle_favorite(link) {
           </button>
         </div>
         <div class="modal-body">
-          <p class="release-notes-intro">感谢使用 Links！本次更新内容：</p>
-          <div class="release-notes-content">
-            {last_update_notes || "暂无更新说明"}
+          <p class="release-notes-intro">版本更新内容：</p>
+          <div class="release-notes-content markdown-body">
+            {#if last_update_notes}
+              {@html marked(last_update_notes)}
+            {:else}
+              暂无更新说明
+            {/if}
           </div>
         </div>
         <div class="modal-footer">
@@ -872,13 +875,8 @@ async function on_toggle_favorite(link) {
     background: var(--bg-1);
     border-radius: var(--radius-md);
     padding: 16px;
-    font-size: 13px;
-    color: var(--text-1);
-    white-space: pre-wrap;
-    word-break: break-word;
     max-height: 300px;
     overflow-y: auto;
-    line-height: 1.6;
   }
 
   .modal {

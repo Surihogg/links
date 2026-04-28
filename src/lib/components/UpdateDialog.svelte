@@ -1,4 +1,5 @@
 <script>
+  import { marked } from "marked";
   import * as api from "../api.js";
   let { update_info, onclose } = $props();
   let downloading = $state(false);
@@ -8,6 +9,12 @@
 
   async function start_update() {
     downloading = true;
+    // 缓存更新说明到配置，重启后弹窗直接读取，避免与更新可用时的内容不一致
+    try {
+      await api.setSetting("last-update-notes", update_info.body || "");
+    } catch (e) {
+      console.warn("[update] failed to cache release notes:", e);
+    }
     await api.downloadAndInstallUpdate(update_info, (event) => {
       switch (event.event) {
         case "Started":
@@ -50,8 +57,12 @@
     </div>
 
     <div class="modal-body">
-      <div class="release-notes">
-        {update_info.body || "暂无更新说明"}
+      <div class="release-notes markdown-body">
+        {#if update_info.body}
+          {@html marked(update_info.body)}
+        {:else}
+          暂无更新说明
+        {/if}
       </div>
 
       {#if downloading}
@@ -105,13 +116,8 @@
     background: var(--bg-1);
     border-radius: var(--radius-md);
     padding: 16px;
-    font-size: 13px;
-    color: var(--text-1);
-    white-space: pre-wrap;
-    word-break: break-word;
     max-height: 300px;
     overflow-y: auto;
-    line-height: 1.6;
   }
 
   .progress-section {

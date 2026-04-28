@@ -268,3 +268,134 @@ input, textarea, select, button {
 .modal-body {
   padding: 0 20px 20px;
 }
+
+/* ===== Markdown 渲染样式（更新说明等） ===== */
+.markdown-body {
+  font-size: 13px;
+  color: var(--text-1);
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  color: var(--text-0);
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.markdown-body h1 { font-size: 18px; }
+.markdown-body h2 { font-size: 16px; }
+.markdown-body h3 { font-size: 14px; }
+.markdown-body h4 { font-size: 13px; }
+
+.markdown-body h1:first-child,
+.markdown-body h2:first-child {
+  margin-top: 0;
+}
+
+.markdown-body p {
+  margin-bottom: 8px;
+}
+
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin-bottom: 8px;
+  padding-left: 20px;
+}
+
+.markdown-body ul { list-style-type: disc; }
+.markdown-body ol { list-style-type: decimal; }
+
+.markdown-body li {
+  margin-bottom: 4px;
+}
+
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.markdown-body code {
+  background: var(--bg-2);
+  color: var(--accent-text);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: "SF Mono", "Consolas", "Monaco", monospace;
+}
+
+.markdown-body pre {
+  background: var(--bg-2);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+}
+
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-1);
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--border-2);
+  padding-left: 12px;
+  margin-bottom: 8px;
+  color: var(--text-2);
+}
+
+.markdown-body a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
+.markdown-body strong {
+  color: var(--text-0);
+  font-weight: 600;
+}
+
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--border-1);
+  margin: 12px 0;
+}
+
+.markdown-body img {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--border-1);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.markdown-body th {
+  background: var(--bg-2);
+  font-weight: 600;
+  color: var(--text-0);
+}
