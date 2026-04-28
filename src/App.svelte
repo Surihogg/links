@@ -499,13 +499,13 @@ async function on_toggle_favorite(link) {
   // 搜索框筛选条件芯片
   let filter_chip = $derived.by(() => {
     if (selected_tag === "__untagged__") {
-      return { label: "无标签", type: "special" };
+      return { label: "无标签", type: "tag" };
     } else if (selected_tag) {
       return { label: selected_tag, type: "tag" };
     } else if (selected_category === "favorite") {
       return { label: "特别关注", type: "favorite" };
     } else if (selected_category === "uncategorized") {
-      return { label: "未分组", type: "special" };
+      return { label: "未分组", type: "category" };
     } else if (selected_category != null) {
       const cat = categories.find(c => c.id === selected_category);
       return { label: cat?.name ?? "分组", type: "category" };
