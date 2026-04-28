@@ -135,7 +135,12 @@
 
     <form class="modal-body" onsubmit={(e) => { e.preventDefault(); submit(); }}>
       <div class="field url-field">
-        <label class="field-label">URL <span class="required">*</span></label>
+        <div class="field-label-row">
+          <label class="field-label">URL <span class="required">*</span></label>
+          {#if duplicate_warning}
+            <span class="dup-warning">{duplicate_warning}</span>
+          {/if}
+        </div>
         <div class="url-input-wrap">
           <input type="url" bind:value={url} oninput={on_url_input} onkeydown={on_input_keydown} required placeholder="https://..." class="field-input" />
           <button type="button" class="refresh-btn" onclick={refresh_meta} disabled={fetching || !url.trim()} title="重新抓取元数据">
@@ -144,9 +149,6 @@
             </svg>
           </button>
         </div>
-        {#if duplicate_warning}
-          <span class="dup-warning">{duplicate_warning}</span>
-        {/if}
       </div>
 
       <div class="field">
@@ -298,14 +300,15 @@
     position: relative;
   }
 
+  .field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
   .dup-warning {
-    position: absolute;
-    right: 0;
-    top: 100%;
     font-size: 11px;
     color: var(--warning);
-    margin-top: 2px;
-    pointer-events: none;
   }
 
   .field-textarea {
