@@ -134,3 +134,18 @@ export async function isAutostartEnabled() {
   const { isEnabled } = await import("@tauri-apps/plugin-autostart");
   return isEnabled();
 }
+
+// Updater
+export async function checkUpdate() {
+  const { check } = await import("@tauri-apps/plugin-updater");
+  return check();
+}
+
+export async function downloadAndInstallUpdate(update, onProgress) {
+  return update.downloadAndInstall(onProgress);
+}
+
+export async function relaunchApp() {
+  const { relaunch } = await import("@tauri-apps/plugin-process");
+  return relaunch();
+}
