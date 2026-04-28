@@ -2,7 +2,7 @@
   import { openUrl, getSetting } from "../api.js";
   import { copyToClipboard } from "../api.js";
 
-  let { link, highlight = "", category_name = null, onedit, ondelete, ontoggle_favorite, onremovecategory, onremovetag } = $props();
+  let { link, highlight = "", category_name = null, onedit, ondelete, ontoggle_favorite, onremovecategory, onremovetag, onremovenotes } = $props();
   let show_confirm = $state(false);
   let show_share_menu = $state(false);
   let copy_success = $state(false);
@@ -154,7 +154,7 @@
                 onclick={(e) => { e.stopPropagation(); onremovecategory?.(link); }}
               >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chip-icon icon-folder"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chip-icon icon-delete"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+                <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" class="chip-icon icon-delete"><line x1="4" y1="4" x2="10" y2="10"/><line x1="10" y1="4" x2="4" y2="10"/></svg>
               </span>
               {@html hl(category_name)}
             </span>
@@ -165,7 +165,7 @@
                 onclick={(e) => { e.stopPropagation(); onremovetag?.(link, tag); }}
               >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chip-icon icon-tag"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chip-icon icon-delete"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+                <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" class="chip-icon icon-delete"><line x1="4" y1="4" x2="10" y2="10"/><line x1="10" y1="4" x2="4" y2="10"/></svg>
               </span>
               {@html hl(tag)}
             </span>
@@ -177,6 +177,11 @@
             <span class="note-chip">
               <svg class="note-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
               <span class="note-text">{@html hl(link.notes)}</span>
+              <span class="chip-icon-area"
+                onclick={(e) => { e.stopPropagation(); onremovenotes?.(link); }}
+              >
+                <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" class="chip-icon icon-delete"><line x1="4" y1="4" x2="10" y2="10"/><line x1="10" y1="4" x2="4" y2="10"/></svg>
+              </span>
             </span>
           {/if}
         </div>
@@ -474,7 +479,8 @@
 
   .chip-icon.icon-delete {
     display: none;
-    color: var(--danger);
+    opacity: 0.5;
+    transition: opacity var(--transition);
   }
 
   .cat-chip:hover .icon-folder {
@@ -489,6 +495,17 @@
   }
   .tag-chip:hover .icon-delete {
     display: inline;
+  }
+
+  .note-chip:hover .note-icon {
+    display: none;
+  }
+  .note-chip:hover .icon-delete {
+    display: inline;
+  }
+
+  .chip-icon-area:hover .icon-delete {
+    opacity: 1;
   }
 
   .card-actions {

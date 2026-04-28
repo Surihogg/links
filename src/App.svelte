@@ -381,6 +381,10 @@ async function on_toggle_favorite(link) {
     await tagsStore.load();
   }
 
+  async function on_remove_notes(link) {
+    await linksStore.update({ id: link.id, notes: "" });
+  }
+
   async function on_create_category(payload) {
     await categoriesStore.create(payload);
   }
@@ -629,6 +633,7 @@ async function on_toggle_favorite(link) {
         ontoggle_favorite={on_toggle_favorite}
         onremovecategory={on_remove_category}
         onremovetag={on_remove_tag}
+        onremovenotes={on_remove_notes}
       />
 
       <button class="fab" onclick={() => show_add_form = true} title="添加链接">
