@@ -514,9 +514,10 @@ impl Db {
 
         let fts_sql = format!("SELECT {} FROM links l JOIN links_fts fts ON fts.rowid = l.id WHERE links_fts MATCH ?", LINK_COLUMNS);
         let tag_sql = format!("SELECT DISTINCT {} FROM links l JOIN link_tags lt ON lt.link_id = l.id JOIN tags t ON t.id = lt.tag_id WHERE t.name LIKE ?", LINK_COLUMNS);
+        let cat_sql = format!("SELECT {} FROM links l JOIN categories c ON l.category_id = c.id WHERE c.name LIKE ?", LINK_COLUMNS);
         let like_sql = format!("SELECT {} FROM links l WHERE l.title LIKE ? OR l.description LIKE ? OR l.notes LIKE ? OR l.url LIKE ?", LINK_COLUMNS);
 
-        let base_union = format!("{} UNION {} UNION {}", fts_sql, tag_sql, like_sql);
+        let base_union = format!("{} UNION {} UNION {} UNION {}", fts_sql, tag_sql, cat_sql, like_sql);
 
         let mut filter_parts: Vec<String> = Vec::new();
         if let Some(ref cid_opt) = params.category_id {
@@ -551,6 +552,7 @@ impl Db {
                 Box::new(like_p.to_string()),
                 Box::new(like_p.to_string()),
                 Box::new(like_p.to_string()),
+                Box::new(like_p.to_string()),
             ];
             if let Some(Some(cid)) = params.category_id { p.push(Box::new(cid)); }
             if let Some(ref tag) = params.tag { p.push(Box::new(tag.clone())); }
@@ -559,6 +561,7 @@ impl Db {
 
         let build_like_params = |like_p: &str| -> Vec<Box<dyn rusqlite::types::ToSql>> {
             let mut p: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
+                Box::new(like_p.to_string()),
                 Box::new(like_p.to_string()),
                 Box::new(like_p.to_string()),
                 Box::new(like_p.to_string()),
@@ -601,7 +604,7 @@ impl Db {
                 Ok(PaginatedResult { items, total, page, per_page })
             }
             Err(_) => {
-                let fallback_union = format!("{} UNION {} ORDER BY updated_at DESC", tag_sql, like_sql);
+                let fallback_union = format!("{} UNION {} UNION {} ORDER BY updated_at DESC", tag_sql, cat_sql, like_sql);
                 let (fb_query, fb_count) = if filter_parts.is_empty() {
                     (format!("{} LIMIT ? OFFSET ?", fallback_union), format!("SELECT COUNT(*) FROM ({})", fallback_union))
                 } else {
@@ -1430,6 +1433,17 @@ mod tests {
 
         let results = db.search_links(&SearchParams { query: "ello".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None }).unwrap();
         assert!(!results.items.is_empty());
+    }
+
+    #[test]
+    fn test_search_by_category_name() {
+        let db = test_db();
+        let cat = db.create_category(&CreateCategoryPayload { name: "开发工具".into(), parent_id: None }).unwrap();
+        db.create_link(&make_link_full_cat("https://tauri.app", "Tauri App", Some(cat.id))).unwrap();
+
+        let results = db.search_links(&SearchParams { query: "开发工具".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None }).unwrap();
+        assert_eq!(results.items.len(), 1, "应通过分组名搜到该分组下的链接");
+        assert_eq!(results.items[0].url, "https://tauri.app");
     }
 
     #[test]
