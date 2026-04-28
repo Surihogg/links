@@ -34,6 +34,10 @@
   --cat-text: #15803d;
   --cat-idle: #22c55e;
 
+  /* Note / Tag */
+  --note-soft: #f3e8ff;
+  --note-text: #7e22ce;
+
   /* Star / Warning */
   --star: #f59e0b;
   --star-soft: #fef3c7;
@@ -90,6 +94,9 @@
   --cat-text: #86efac;
   --cat-idle: #4ade80;
 
+  --note-soft: #3b0764;
+  --note-text: #c084fc;
+
   --star: #fbbf24;
   --star-soft: #422006;
   --star-text: #fcd34d;
@@ -111,7 +118,6 @@
 
 body {
   font-family: var(--font);
-  background: var(--bg-0);
   color: var(--text-0);
   user-select: none;
   -webkit-font-smoothing: antialiased;
@@ -125,7 +131,7 @@ html, body {
 }
 
 .dark, .dark body, .dark html {
-  background-color: #0a0a0b;
+  background-color: var(--bg-0);
 }
 
 .no-transition,
