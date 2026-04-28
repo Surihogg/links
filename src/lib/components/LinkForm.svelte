@@ -79,7 +79,7 @@
       url: url.trim(),
       title: title.trim() || undefined,
       description: description.trim() || undefined,
-      notes: notes.trim() || undefined,
+      notes: notes.trim(),
       category_id: category_id || -1,
       tags,
       favicon_url: fetched_meta.favicon_url || undefined,
