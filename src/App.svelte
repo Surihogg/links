@@ -277,7 +277,7 @@ async function with_scroll_preserve(fn) {
   async function refresh_current_view() {
     await with_scroll_preserve(async () => {
       if (search_query.trim()) {
-        await linksStore.search({ query: search_query, per_page: 30, ...build_filter_params() });
+        await linksStore.search({ query: search_query, per_page: 30 });
       } else {
         await load_links();
       }
@@ -305,7 +305,7 @@ async function with_scroll_preserve(fn) {
 
   async function on_search(query) {
     if (query.trim()) {
-      await linksStore.search({ query, per_page: 30, ...build_filter_params() });
+      await linksStore.search({ query, per_page: 30 });
     } else {
       await load_links();
     }
@@ -465,7 +465,7 @@ async function on_toggle_favorite(link) {
     if (links.loading || !has_more) return;
     const next_page = current_page + 1;
     if (search_query.trim()) {
-      await linksStore.search({ query: search_query, page: next_page, per_page: 30, ...build_filter_params() }, true);
+      await linksStore.search({ query: search_query, page: next_page, per_page: 30 }, true);
     } else {
       await linksStore.loadMore({ page: next_page, per_page: 30, ...build_filter_params() });
     }
