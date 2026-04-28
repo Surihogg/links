@@ -452,6 +452,20 @@ pub fn exit_app(app: AppHandle) {
     app.exit(0);
 }
 
+/// 获取 Windows 系统代理 URL，供 updater 等场景使用
+/// 非 Windows 平台始终返回 None
+#[tauri::command]
+pub fn get_system_proxy() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        crate::fetcher::get_windows_system_proxy()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        None
+    }
+}
+
 pub const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+L";
 pub const DEFAULT_MAIN_SHORTCUT: &str = "CmdOrCtrl+Shift+J";
 

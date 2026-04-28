@@ -136,9 +136,14 @@ export async function isAutostartEnabled() {
 }
 
 // Updater
+export async function getSystemProxy() {
+  return invoke("get_system_proxy");
+}
+
 export async function checkUpdate() {
   const { check } = await import("@tauri-apps/plugin-updater");
-  return check();
+  const proxy = await getSystemProxy();
+  return check(proxy ? { proxy } : undefined);
 }
 
 export async function downloadAndInstallUpdate(update, onProgress) {

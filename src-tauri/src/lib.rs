@@ -233,6 +233,7 @@ pub fn run() {
             commands::get_main_shortcut,
             commands::set_main_shortcut,
             commands::exit_app,
+            commands::get_system_proxy,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
