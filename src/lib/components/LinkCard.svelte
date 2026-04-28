@@ -442,8 +442,9 @@
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 11px;
-    background: var(--bg-2);
-    color: var(--text-2);
+    background: var(--note-soft);
+    color: var(--note-text);
+    font-weight: 500;
     max-width: 200px;
     overflow: hidden;
   }

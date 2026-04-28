@@ -32,7 +32,7 @@
     <line x1="10.2" y1="10.2" x2="14" y2="14"/>
   </svg>
   {#if filter_chip}
-    <span class="filter-chip" class:filter-chip--category={filter_chip.type === 'category'} class:filter-chip--favorite={filter_chip.type === 'favorite'}>
+    <span class="filter-chip" class:filter-chip--category={filter_chip.type === 'category'} class:filter-chip--tag={filter_chip.type === 'tag'} class:filter-chip--favorite={filter_chip.type === 'favorite'}>
       {filter_chip.label}
       <button class="chip-remove" onclick={onremovefilter}>
         <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
@@ -123,13 +123,16 @@
     font-weight: 500;
     white-space: nowrap;
     flex-shrink: 0;
-    background: var(--accent-soft);
-    color: var(--accent-text);
   }
 
   .filter-chip--category {
     background: var(--cat-soft);
     color: var(--cat-text);
+  }
+
+  .filter-chip--tag {
+    background: var(--accent-soft);
+    color: var(--accent-text);
   }
 
   .filter-chip--favorite {
