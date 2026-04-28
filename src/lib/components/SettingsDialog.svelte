@@ -23,6 +23,8 @@
   let autostart_enabled = $state(false);
   let autostart_loaded = $state(false);
   let auto_minimize = $state(false);
+  // 启动时自动检查更新
+  let auto_check_update = $state(true);
   
 
   const isMac = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
@@ -140,6 +142,12 @@
     } catch {
       auto_minimize = false;
     }
+    // 启动时自动检查更新
+    try {
+      auto_check_update = (await api.getSetting("auto-check-update")) !== "false";
+    } catch {
+      auto_check_update = true;
+    }
     loaded = true;
     // Load appearance/theme setting with fallback
     try {
@@ -194,6 +202,11 @@
   async function toggleAutoMinimize() {
     auto_minimize = !auto_minimize;
     await api.setSetting("auto-minimize-on-open", String(auto_minimize));
+  }
+
+  async function toggleAutoCheckUpdate() {
+    auto_check_update = !auto_check_update;
+    await api.setSetting("auto-check-update", String(auto_check_update));
   }
 
   async function do_check_update() {
@@ -394,7 +407,16 @@
           </div>
           <div class="format-option autostart-row" style="justify-content: space-between; align-items: center; margin-top: 6px;">
             <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
-              <span class="format-name">检查更新</span>
+              <span class="format-name">启动时自动检查更新</span>
+              <span class="format-desc">每次打开应用时自动检测是否有新版本</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick={toggleAutoCheckUpdate}>
+              {auto_check_update ? '禁用' : '启用'}
+            </button>
+          </div>
+          <div class="format-option autostart-row" style="justify-content: space-between; align-items: center; margin-top: 6px;">
+            <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+              <span class="format-name">手动检查更新</span>
               <span class="format-desc">{check_status}</span>
             </div>
             <button class="btn btn-secondary btn-sm" onclick={do_check_update} disabled={checking_update}>

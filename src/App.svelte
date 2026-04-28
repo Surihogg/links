@@ -83,8 +83,11 @@
     await load_data();
     console.log("[startup] data loaded");
 
-    // 检查应用更新
-    check_for_update();
+    // 检查应用更新（受配置控制）
+    const auto_check_update = await api.getSetting("auto-check-update");
+    if (auto_check_update !== "false") {
+      check_for_update();
+    }
 
     // 首次启动更新后显示更新说明
     try {
