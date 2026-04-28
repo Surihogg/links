@@ -468,7 +468,7 @@ async function on_toggle_favorite(link) {
     } else if (selected_tag) {
       return { label: selected_tag, type: "tag" };
     } else if (selected_category === "favorite") {
-      return { label: "特别关注", type: "special" };
+      return { label: "特别关注", type: "favorite" };
     } else if (selected_category === "uncategorized") {
       return { label: "未分组", type: "special" };
     } else if (selected_category != null) {

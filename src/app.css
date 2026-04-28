@@ -36,6 +36,8 @@
 
   /* Star / Warning */
   --star: #f59e0b;
+  --star-soft: #fef3c7;
+  --star-text: #92400e;
   --warning: #d97706;
 
   /* Success */
@@ -89,6 +91,8 @@
   --cat-idle: #4ade80;
 
   --star: #fbbf24;
+  --star-soft: #422006;
+  --star-text: #fcd34d;
   --warning: #fbbf24;
 
   --success: #4ade80;
