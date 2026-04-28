@@ -277,7 +277,7 @@ async function with_scroll_preserve(fn) {
   async function refresh_current_view() {
     await with_scroll_preserve(async () => {
       if (search_query.trim()) {
-        await linksStore.search({ query: search_query, per_page: 30 });
+        await linksStore.search({ query: search_query, per_page: 30, ...build_filter_params() });
       } else {
         await load_links();
       }
@@ -305,7 +305,7 @@ async function with_scroll_preserve(fn) {
 
   async function on_search(query) {
     if (query.trim()) {
-      await linksStore.search({ query, per_page: 30 });
+      await linksStore.search({ query, per_page: 30, ...build_filter_params() });
     } else {
       await load_links();
     }
@@ -461,11 +461,38 @@ async function on_toggle_favorite(link) {
     return params;
   }
 
+  // 搜索框筛选条件芯片
+  let filter_chip = $derived.by(() => {
+    if (selected_tag === "__untagged__") {
+      return { label: "无标签", type: "special" };
+    } else if (selected_tag) {
+      return { label: selected_tag, type: "tag" };
+    } else if (selected_category === "favorite") {
+      return { label: "特别关注", type: "special" };
+    } else if (selected_category === "uncategorized") {
+      return { label: "未分组", type: "special" };
+    } else if (selected_category != null) {
+      const cat = categories.find(c => c.id === selected_category);
+      return { label: cat?.name ?? "分组", type: "category" };
+    }
+    return null;
+  });
+
+  function on_remove_filter() {
+    selected_category = null;
+    selected_tag = null;
+    if (search_query.trim()) {
+      linksStore.search({ query: search_query, per_page: 30 });
+    } else {
+      load_links();
+    }
+  }
+
   async function load_more() {
     if (links.loading || !has_more) return;
     const next_page = current_page + 1;
     if (search_query.trim()) {
-      await linksStore.search({ query: search_query, page: next_page, per_page: 30 }, true);
+      await linksStore.search({ query: search_query, page: next_page, per_page: 30, ...build_filter_params() }, true);
     } else {
       await linksStore.loadMore({ page: next_page, per_page: 30, ...build_filter_params() });
     }
@@ -523,7 +550,7 @@ async function on_toggle_favorite(link) {
           </div>
         {/if}
         <div class="header-right">
-          <SearchBar bind:this={search_bar} bind:query={search_query} onsearch={on_search} />
+          <SearchBar bind:this={search_bar} bind:query={search_query} {filter_chip} onremovefilter={on_remove_filter} onsearch={on_search} />
         </div>
       </header>
 
