@@ -25,7 +25,8 @@
   let auto_minimize = $state(false);
   // 启动时自动检查更新
   let auto_check_update = $state(true);
-  
+  let bookmarklet_copied = $state(false);
+  let bookmarklet_code = $state("");
 
   const isMac = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
 
@@ -149,14 +150,52 @@
       auto_check_update = true;
     }
     loaded = true;
-    // Load appearance/theme setting with fallback
     try {
       const t = await api.getSetting("theme-mode");
       appearance = t || "system";
     } catch {
       appearance = "system";
     }
+    // 拉取本地 HTTP 服务端口与 token，构造 Bookmarklet
+    // 优先 fetch 本地服务（无频率限制），失败时降级到 links:// 自定义协议
+    try {
+      const info = await api.getLocalServerInfo();
+      bookmarklet_code = build_bookmarklet(info.port, info.token);
+    } catch {
+      bookmarklet_code = build_bookmarklet(0, "");
+    }
   });
+
+  function build_bookmarklet(port, token) {
+    const has_local = port > 0 && token.length > 0;
+    const endpoint = has_local
+      ? `http://127.0.0.1:${port}/add`
+      : "";
+    const tok = token;
+    // 双轨并行：Image ping 本地服务（应用运行时秒响应，无协议限流）
+    //           + iframe links://（应用未运行时唤起，作为保底）
+    // 后端 PendingDeepLink 用 take() 只消费一次，不会重复触发
+    return (
+      "javascript:void(function(){" +
+      "var u=encodeURIComponent(location.href)," +
+      "t=encodeURIComponent(document.title)," +
+      "ts=Date.now();" +
+      // 轨道 1：iframe links:// 始终触发（应用未运行时唤起）
+      "try{" +
+      "var i=document.createElement('iframe');i.hidden=1;" +
+      "i.src='links://add?url='+u+'&title='+t+'&_t='+ts;" +
+      "document.body.appendChild(i);" +
+      "setTimeout(function(){i.remove()},2e3);" +
+      "}catch(e){}" +
+      // 轨道 2：Image ping 本地服务（应用运行时无频率限制）
+      `var endpoint=${JSON.stringify(endpoint)},tok=${JSON.stringify(tok)};` +
+      "if(endpoint){" +
+      "var img=new Image();" +
+      "img.src=endpoint+'?url='+u+'&title='+t+'&t='+tok+'&_='+ts;" +
+      "}" +
+      "}())"
+    );
+  }
 
   const behaviors = [
     { id: "ask", name: "每次询问", desc: "关闭时弹出对话框选择" },
@@ -207,6 +246,16 @@
   async function toggleAutoCheckUpdate() {
     auto_check_update = !auto_check_update;
     await api.setSetting("auto-check-update", String(auto_check_update));
+  }
+
+  async function copy_bookmarklet() {
+    try {
+      await navigator.clipboard.writeText(bookmarklet_code);
+      bookmarklet_copied = true;
+      setTimeout(() => bookmarklet_copied = false, 2000);
+    } catch {
+      // 剪贴板失败时静默处理
+    }
   }
 
   async function do_check_update() {
@@ -426,6 +475,31 @@
         {:else}
           <div class="format-loading">加载中...</div>
         {/if}
+
+        <div class="section-label" style="margin-top: 20px;">浏览器收藏</div>
+        <div class="bookmarklet-section">
+          <div class="bookmarklet-desc">
+            将下方按钮拖拽到浏览器书签栏，即可在任何网页一键收藏到 Links ✨
+          </div>
+          <div class="bookmarklet-row">
+            <a
+              class="bookmarklet-btn"
+              class:disabled={!bookmarklet_code}
+              href={bookmarklet_code || "#"}
+              title={bookmarklet_code ? "拖拽我到书签栏" : "正在准备..."}
+              onclick={(e) => { e.preventDefault(); }}
+            >
+              扔给Links
+            </a>
+            <button class="btn btn-secondary btn-sm" onclick={copy_bookmarklet} disabled={!bookmarklet_code}>
+              {bookmarklet_copied ? '已复制 ✓' : '复制代码'}
+            </button>
+          </div>
+          <div class="bookmarklet-tip">
+            💡 在浏览器书签栏里点击“扔给Links”会跳转到快速添加；Links未运行时会自动唤起应用<p>
+            （但由于浏览器有安全限制，限定了一定时间内无法连续触发应用冷启动，有概率出现点击书签后没反应，为了更好的体验，建议您启动应用后保持常驻）
+          </div>
+        </div>
       </div>
 
       <div class="modal-footer">
@@ -620,5 +694,62 @@
     font-size: 11px;
     color: var(--danger);
     width: 100%;
+  }
+
+  .bookmarklet-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .bookmarklet-desc {
+    font-size: 12px;
+    color: var(--text-3);
+    line-height: 1.5;
+  }
+
+  .bookmarklet-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .bookmarklet-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-md);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: grab;
+    transition: all var(--transition);
+    white-space: nowrap;
+  }
+
+  .bookmarklet-btn:hover {
+    background: var(--accent);
+    color: white;
+  }
+
+  .bookmarklet-btn:active {
+    cursor: grabbing;
+  }
+
+  .bookmarklet-btn.disabled {
+    opacity: 0.5;
+    cursor: wait;
+    pointer-events: none;
+  }
+
+  .bookmarklet-tip {
+    font-size: 11px;
+    color: var(--text-3);
+    line-height: 1.4;
   }
 </style>

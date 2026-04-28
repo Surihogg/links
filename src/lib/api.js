@@ -154,3 +154,11 @@ export async function relaunchApp() {
   const { relaunch } = await import("@tauri-apps/plugin-process");
   return relaunch();
 }
+
+export async function popPendingDeepLink() {
+  return invoke("pop_pending_deep_link");
+}
+
+export async function getLocalServerInfo() {
+  return invoke("get_local_server_info");
+}
