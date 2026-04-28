@@ -32,7 +32,7 @@
     <line x1="10.2" y1="10.2" x2="14" y2="14"/>
   </svg>
   {#if filter_chip}
-    <span class="filter-chip" class:filter-chip--category={filter_chip.type === 'category'}>
+    <span class="filter-chip" class:filter-chip--category={filter_chip.type === 'category'} class:filter-chip--favorite={filter_chip.type === 'favorite'}>
       {filter_chip.label}
       <button class="chip-remove" onclick={onremovefilter}>
         <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
@@ -43,7 +43,7 @@
   {/if}
   <input
     type="text"
-    placeholder={filter_chip ? "在条件下搜索~" : "找找看~"}
+    placeholder="找找看~"
     bind:value={query}
     bind:this={input_el}
     {oninput}
@@ -70,9 +70,7 @@
     padding: 0 10px;
     height: 34px;
     transition: all var(--transition);
-    min-width: 240px;
-    max-width: 400px;
-    width: auto;
+    width: 240px;
   }
 
   .search-wrap:focus-within {
@@ -132,6 +130,11 @@
   .filter-chip--category {
     background: var(--cat-soft);
     color: var(--cat-text);
+  }
+
+  .filter-chip--favorite {
+    background: var(--star-soft);
+    color: var(--star-text);
   }
 
   .chip-remove {
