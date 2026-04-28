@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import TagInput from "../lib/components/TagInput.svelte";
   import CategoryInput from "../lib/components/CategoryInput.svelte";
-  import { fetchMeta, checkDuplicate, createLink, listCategories, getSetting } from "../lib/api.js";
+  import { fetchMeta, checkDuplicate, createLink, listCategories, getSetting, popPendingDeepLink } from "../lib/api.js";
   import { waitForBackendReady } from "../lib/ready.js";
   import { emit, listen } from "@tauri-apps/api/event";
 
@@ -80,12 +80,38 @@
     const unlistenTheme = await listen("theme-changed", (e) => {
       apply_theme(e.payload);
     });
-    const unlistenShown = await listen("quick-add-shown", () => {
+    const unlistenShown = await listen("quick-add-shown", async () => {
       reset_form();
+      // 拉取 Rust 端缓存的 deep link 数据（Bookmarklet 收藏场景）
+      try {
+        const pending = await popPendingDeepLink();
+        if (pending?.url) {
+          url = pending.url;
+          if (pending.title) {
+            title = pending.title;
+            user_edited.title = true;
+          }
+          on_url_input();
+        }
+      } catch { /* 无 pending 则忽略 */ }
       setTimeout(() => url_input?.focus(), 50);
     });
 
     listCategories().then(c => categories = c);
+
+    // 冷启动兜底：前端就绪后主动拉取 Rust 端缓存的 deep link
+    try {
+      const pending = await popPendingDeepLink();
+      if (pending?.url) {
+        url = pending.url;
+        if (pending.title) {
+          title = pending.title;
+          user_edited.title = true;
+        }
+        on_url_input();
+      }
+    } catch { /* 无 pending 则忽略 */ }
+
     const handle_keydown = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -199,7 +225,12 @@
 
   <form class="modal-body" onsubmit={(e) => { e.preventDefault(); submit(); }}>
     <div class="field url-field">
-      <label class="field-label">URL <span class="required">*</span></label>
+      <div class="field-label-row">
+        <label class="field-label">URL <span class="required">*</span></label>
+        {#if duplicate_warning}
+          <span class="dup-warning">{duplicate_warning}</span>
+        {/if}
+      </div>
       <div class="url-input-wrap">
         <input bind:this={url_input} type="url" bind:value={url} oninput={on_url_input} required placeholder="https://..." class="field-input" />
         <button type="button" class="refresh-btn" onclick={refresh_meta} disabled={fetching || !url.trim()} title="重新抓取元数据">
@@ -208,9 +239,6 @@
           </svg>
         </button>
       </div>
-      {#if duplicate_warning}
-        <span class="dup-warning">{duplicate_warning}</span>
-      {/if}
     </div>
 
     <div class="field">
@@ -412,14 +440,15 @@
     position: relative;
   }
 
+  .field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
   .dup-warning {
-    position: absolute;
-    right: 0;
-    top: 100%;
     font-size: 11px;
     color: var(--warning);
-    margin-top: 2px;
-    pointer-events: none;
   }
 
   .field-textarea {
