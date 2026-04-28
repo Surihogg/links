@@ -1,5 +1,8 @@
 <script>
   import { categoriesStore } from '../stores/index.js';
+  import { getVersion } from '@tauri-apps/api/app';
+  let version = $state('');
+  getVersion().then(v => version = v);
   let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, onrename_cat, ontag_delete, onrename_tag, oncreate_tag, dark = false, ontoggle_dark, onexport, onimport, onsettings, importing = false, has_update = false, onupdate } = $props();
   let expanded = $state(new Set());
   let show_new = $state(false);
@@ -377,6 +380,9 @@
   <div class="sidebar-brand">
     <span class="brand-icon">◈</span>
     <span class="brand-text">Links</span>
+    {#if version}
+      <span class="brand-version">v{version}</span>
+    {/if}
     {#if has_update}
       <button class="brand-update" onclick={onupdate} data-tooltip="有新版本可用" aria-label="有新版本可用">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -691,6 +697,14 @@
     color: var(--text-0);
     letter-spacing: -0.5px;
     font-family: "Georgia", "Times New Roman", serif;
+  }
+
+  .brand-version {
+    font-size: 11px;
+    color: var(--text-3);
+    font-weight: 400;
+    margin-left: 2px;
+    align-self: center;
   }
 
   .brand-settings {
