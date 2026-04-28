@@ -1,13 +1,16 @@
 <script>
   import { onMount } from "svelte";
   import * as api from "../api.js";
-  let { onclose, onthemechange } = $props();
+  let { onclose, onthemechange, oncheckupdate } = $props();
   let close_behavior = $state(null);
   let loaded = $state(false);
   // Appearance (theme) state for the dialog
   let appearance = $state("system");
 
   let shortcut_raw = $state(null);
+  // 检查更新状态
+  let checking_update = $state(false);
+  let check_status = $state("检查是否有新版本可用");
   let shortcut_loaded = $state(false);
   let recording = $state(false);
   let recorded_shortcut = $state(null);
@@ -193,6 +196,24 @@
     await api.setSetting("auto-minimize-on-open", String(auto_minimize));
   }
 
+  async function do_check_update() {
+    checking_update = true;
+    check_status = "正在检查更新...";
+    try {
+      const result = await api.checkUpdate();
+      if (result) {
+        // 有新版本，通知父组件展示更新弹窗
+        check_status = "发现新版本！";
+        oncheckupdate?.(result);
+      } else {
+        check_status = "当前已是最新版本";
+      }
+    } catch {
+      check_status = "检查失败，请稍后重试";
+    }
+    checking_update = false;
+  }
+
   function on_overlay_click(e) {
     if (e.target === e.currentTarget) onclose?.();
   }
@@ -361,6 +382,15 @@
             </div>
             <button class="btn btn-secondary btn-sm" onclick={toggleAutoMinimize}>
               {auto_minimize ? '禁用' : '启用'}
+            </button>
+          </div>
+          <div class="format-option autostart-row" style="justify-content: space-between; align-items: center; margin-top: 6px;">
+            <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+              <span class="format-name">检查更新</span>
+              <span class="format-desc">{check_status}</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick={do_check_update} disabled={checking_update}>
+              {checking_update ? '检查中...' : '检查'}
             </button>
           </div>
         {:else}

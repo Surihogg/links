@@ -1,6 +1,6 @@
 <script>
   import { categoriesStore } from '../stores/index.js';
-  let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, onrename_cat, ontag_delete, onrename_tag, oncreate_tag, dark = false, ontoggle_dark, onexport, onimport, onsettings, importing = false } = $props();
+  let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, onrename_cat, ontag_delete, onrename_tag, oncreate_tag, dark = false, ontoggle_dark, onexport, onimport, onsettings, importing = false, has_update = false, onupdate } = $props();
   let expanded = $state(new Set());
   let show_new = $state(false);
   let new_name = $state("");
@@ -377,6 +377,13 @@
   <div class="sidebar-brand">
     <span class="brand-icon">◈</span>
     <span class="brand-text">Links</span>
+    {#if has_update}
+      <button class="brand-update" onclick={onupdate} data-tooltip="有新版本可用" aria-label="有新版本可用">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+        </svg>
+      </button>
+    {/if}
     <button class="brand-settings" onclick={onsettings}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
@@ -704,6 +711,48 @@
   .brand-settings:hover {
     color: var(--text-1);
     background: var(--bg-hover);
+  }
+
+  .brand-update {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .brand-update:hover {
+    background: var(--accent-soft);
+  }
+
+  .brand-update[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 4px;
+    padding: 4px 8px;
+    background: var(--text-0);
+    color: var(--bg-0);
+    font-size: 11px;
+    border-radius: 4px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
   }
 
   .sidebar-nav {

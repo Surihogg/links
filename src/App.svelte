@@ -11,6 +11,7 @@
   import LinkForm from "./lib/components/LinkForm.svelte";
   import ExportDialog from "./lib/components/ExportDialog.svelte";
   import SettingsDialog from "./lib/components/SettingsDialog.svelte";
+  import UpdateDialog from "./lib/components/UpdateDialog.svelte";
 
   let is_macos = $state(false);
 
@@ -33,6 +34,13 @@
   let show_settings = $state(false);
   let show_close_dialog = $state(false);
   let search_bar;
+
+  // 更新相关状态
+  let update_available = $state(false);
+  let update_info = $state(null);
+  let show_update_dialog = $state(false);
+  let show_release_notes = $state(false);
+  let last_update_notes = $state("");
 
   onMount(async () => {
     const mainWindow = getCurrentWindow();
@@ -74,6 +82,30 @@
     console.log("[startup] loading data...");
     await load_data();
     console.log("[startup] data loaded");
+
+    // 检查应用更新
+    check_for_update();
+
+    // 首次启动更新后显示更新说明
+    try {
+      const last_version = await api.getSetting("last-known-version");
+      const { getVersion } = await import("@tauri-apps/api/app");
+      const current_version = await getVersion();
+      if (last_version && last_version !== current_version) {
+        // 版本变化 — 这是更新后的首次启动
+        try {
+          const resp = await fetch(`https://api.github.com/repos/Surihogg/links/releases/tags/v${current_version}`);
+          if (resp.ok) {
+            const data = await resp.json();
+            last_update_notes = data.body || "";
+            show_release_notes = true;
+          }
+        } catch (e) {}
+      }
+      await api.setSetting("last-known-version", current_version);
+    } catch (e) {
+      console.warn("[update] version check failed:", e);
+    }
 
     const { LogicalSize, PhysicalPosition } = await import("@tauri-apps/api/window");
     const unlisten = await listen("main-shown", () => {
@@ -488,6 +520,26 @@ async function on_toggle_favorite(link) {
     }
   }
 
+  async function check_for_update() {
+    try {
+      const update = await api.checkUpdate();
+      if (update) {
+        update_available = true;
+        update_info = update;
+      }
+    } catch (e) {
+      console.warn("[update] check failed:", e);
+    }
+  }
+
+  function on_update_click() {
+    show_update_dialog = true;
+  }
+
+  function on_update_close() {
+    show_update_dialog = false;
+  }
+
   async function load_more() {
     if (links.loading || !has_more) return;
     const next_page = current_page + 1;
@@ -505,6 +557,8 @@ async function on_toggle_favorite(link) {
     if (show_add_form) { show_add_form = false; return; }
     if (edit_link) { edit_link = null; return; }
     if (show_close_dialog) { show_close_dialog = false; return; }
+    if (show_update_dialog) { show_update_dialog = false; return; }
+    if (show_release_notes) { show_release_notes = false; return; }
   }
 </script>
 
@@ -534,6 +588,8 @@ async function on_toggle_favorite(link) {
       onimport={on_import_bookmarks}
       onsettings={() => show_settings = true}
       {importing}
+      has_update={update_available}
+      onupdate={on_update_click}
     />
 
     <main class="main-content">
@@ -590,7 +646,7 @@ async function on_toggle_favorite(link) {
   {/if}
 
   {#if show_settings}
-    <SettingsDialog onclose={() => show_settings = false} onthemechange={on_theme_change} />
+    <SettingsDialog onclose={() => show_settings = false} onthemechange={on_theme_change} oncheckupdate={(info) => { update_available = true; update_info = info; show_update_dialog = true; }} />
   {/if}
 
   {#if show_close_dialog}
@@ -601,6 +657,34 @@ async function on_toggle_favorite(link) {
         <div class="close-actions">
           <button class="btn btn-primary" style="flex:1" onclick={close_to_tray}>最小化到托盘</button>
           <button class="btn btn-secondary" style="flex:1" onclick={close_exit}>退出应用</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if show_update_dialog && update_info}
+    <UpdateDialog update_info={update_info} onclose={on_update_close} />
+  {/if}
+
+  {#if show_release_notes}
+    <div class="modal-overlay" onclick={() => show_release_notes = false}>
+      <div class="modal" onclick={(e) => e.stopPropagation()}>
+        <div class="modal-header">
+          <h3 class="modal-title">已更新到最新版本</h3>
+          <button class="modal-close" onclick={() => show_release_notes = false}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="release-notes-intro">感谢使用 Links！本次更新内容：</p>
+          <div class="release-notes-content">
+            {last_update_notes || "暂无更新说明"}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" onclick={() => show_release_notes = false}>知道了</button>
         </div>
       </div>
     </div>
@@ -765,4 +849,44 @@ async function on_toggle_favorite(link) {
   }
 
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  .release-notes-intro {
+    font-size: 13px;
+    color: var(--text-2);
+    margin-bottom: 12px;
+  }
+
+  .release-notes-content {
+    background: var(--bg-1);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    font-size: 13px;
+    color: var(--text-1);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+    line-height: 1.6;
+  }
+
+  .modal {
+    max-width: 420px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-body {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px 20px;
+    flex-shrink: 0;
+  }
 </style>
