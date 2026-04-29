@@ -237,7 +237,10 @@ pub fn get_windows_system_proxy() -> Option<String> {
 /// Returns a list of patterns that should bypass the proxy
 #[cfg(target_os = "windows")]
 pub fn get_proxy_override_list() -> Vec<String> {
+    use std::os::windows::process::CommandExt;
     use std::process::Command;
+
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
 
     let output = Command::new("reg")
         .args([
@@ -246,6 +249,7 @@ pub fn get_proxy_override_list() -> Vec<String> {
             "/v",
             "ProxyOverride",
         ])
+        .creation_flags(CREATE_NO_WINDOW)
         .output();
 
     match output {
