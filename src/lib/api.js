@@ -155,6 +155,14 @@ export async function relaunchApp() {
   return relaunch();
 }
 
+// 从 GitHub Releases API 获取指定 tag 的 release notes（Markdown 正文）
+export async function fetchReleaseNotes(tag) {
+  const res = await fetch(`https://api.github.com/repos/Surihogg/links/releases/tags/${tag}`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.body || "";
+}
+
 export async function popPendingDeepLink() {
   return invoke("pop_pending_deep_link");
 }

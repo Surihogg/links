@@ -39,6 +39,7 @@
   // 更新相关状态
   let update_available = $state(false);
   let update_info = $state(null);
+  let release_notes = $state("");
   let show_update_dialog = $state(false);
   let show_release_notes = $state(false);
   let last_update_notes = $state("");
@@ -91,16 +92,23 @@
       check_for_update();
     }
 
-    // 首次启动更新后显示更新说明（从本地缓存读取，与更新可用时展示的内容一致）
+    // 首次启动更新后显示更新说明（优先从 GitHub API 获取，缓存兜底）
     try {
       const last_version = await api.getSetting("last-known-version");
       const { getVersion } = await import("@tauri-apps/api/app");
       current_version = await getVersion();
       if (last_version && last_version !== current_version) {
-        // 版本变化 — 这是更新后的首次启动
-        const saved_notes = await api.getSetting("last-update-notes");
-        if (saved_notes) {
-          last_update_notes = saved_notes;
+        let notes = "";
+        try {
+          notes = await api.fetchReleaseNotes(`v${current_version}`) || "";
+        } catch (e) {
+          console.warn("[update] failed to fetch release notes for post-update:", e);
+        }
+        if (!notes) {
+          notes = await api.getSetting("last-update-notes") || "";
+        }
+        if (notes) {
+          last_update_notes = notes;
           show_release_notes = true;
         }
       }
@@ -526,12 +534,22 @@ async function on_toggle_favorite(link) {
     }
   }
 
+  async function fetch_github_notes(version) {
+    try {
+      const notes = await api.fetchReleaseNotes(`v${version}`);
+      if (notes) release_notes = notes;
+    } catch (e) {
+      console.warn("[update] failed to fetch release notes from GitHub:", e);
+    }
+  }
+
   async function check_for_update() {
     try {
       const update = await api.checkUpdate();
       if (update) {
         update_available = true;
         update_info = update;
+        fetch_github_notes(update.version);
       }
     } catch (e) {
       // 开发阶段或无发布版本时 endpoint 返回 404 属于正常情况，不警告
@@ -657,7 +675,7 @@ async function on_toggle_favorite(link) {
   {/if}
 
   {#if show_settings}
-    <SettingsDialog onclose={() => show_settings = false} onthemechange={on_theme_change} oncheckupdate={(info) => { update_available = true; update_info = info; show_update_dialog = true; }} />
+    <SettingsDialog onclose={() => show_settings = false} onthemechange={on_theme_change} oncheckupdate={async (info) => { update_available = true; update_info = info; await fetch_github_notes(info.version); show_update_dialog = true; }} />
   {/if}
 
   {#if show_close_dialog}
@@ -674,7 +692,7 @@ async function on_toggle_favorite(link) {
   {/if}
 
   {#if show_update_dialog && update_info}
-    <UpdateDialog update_info={update_info} onclose={on_update_close} />
+    <UpdateDialog update_info={update_info} {release_notes} onclose={on_update_close} />
   {/if}
 
   {#if show_release_notes}
