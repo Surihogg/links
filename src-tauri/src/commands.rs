@@ -239,6 +239,13 @@ pub fn open_url(url: String) -> Result<(), AppError> {
 }
 
 #[tauri::command]
+pub fn open_data_dir(app: AppHandle) -> Result<(), AppError> {
+    let dir = app.path().app_data_dir()
+        .map_err(|e| AppError::General(e.to_string()))?;
+    open::that(&dir).map_err(|e| AppError::General(e.to_string()))
+}
+
+#[tauri::command]
 pub fn save_file(content: String, filename: String) -> Result<(), AppError> {
     let Some(path) = rfd::FileDialog::new()
         .set_file_name(&filename)

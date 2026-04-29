@@ -286,6 +286,7 @@ pub fn run() {
             commands::tags_autocomplete,
             commands::export_links,
             commands::open_url,
+            commands::open_data_dir,
             commands::save_file,
             commands::fetch_metadata,
             commands::import_bookmarks,

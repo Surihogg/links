@@ -260,16 +260,10 @@
 
   async function do_check_update() {
     checking_update = true;
-    check_status = "正在检查更新...";
+    check_status = "正在检查...";
     try {
-      const result = await api.checkUpdate();
-      if (result) {
-        // 有新版本，通知父组件展示更新弹窗
-        check_status = "发现新版本！";
-        oncheckupdate?.(result);
-      } else {
-        check_status = "当前已是最新版本";
-      }
+      if (oncheckupdate) await oncheckupdate(update_info);
+      check_status = "已是最新版本 ✨";
     } catch (e) {
       const msg = e?.message || String(e);
       if (msg.includes("404") || msg.includes("Not Found")) {
@@ -277,11 +271,18 @@
       } else if (msg.includes("network") || msg.includes("Failed to fetch") || msg.includes("fetch")) {
         check_status = "网络连接失败，请检查网络后重试";
       } else {
-        console.warn("[update] check failed:", e);
         check_status = "检查失败，请稍后重试";
       }
     }
     checking_update = false;
+  }
+
+  async function open_data_dir() {
+    try {
+      await api.openDataDir();
+    } catch {
+      // silently fail
+    }
   }
 
   function on_overlay_click(e) {
@@ -471,6 +472,13 @@
             <button class="btn btn-secondary btn-sm" onclick={do_check_update} disabled={checking_update}>
               {checking_update ? '检查中...' : '检查'}
             </button>
+          </div>
+          <div class="format-option autostart-row" style="justify-content: space-between; align-items: center; margin-top: 6px;">
+            <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+              <span class="format-name">数据文件夹</span>
+              <span class="format-desc">在文件管理器中打开数据库和配置文件所在目录</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick={open_data_dir}>打开</button>
           </div>
         {:else}
           <div class="format-loading">加载中...</div>

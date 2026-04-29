@@ -64,6 +64,10 @@ export async function openUrl(url) {
   return invoke("open_url", { url });
 }
 
+export async function openDataDir() {
+  return invoke("open_data_dir");
+}
+
 export async function saveFile(content, filename) {
   return invoke("save_file", { content, filename });
 }
