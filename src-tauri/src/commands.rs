@@ -267,6 +267,7 @@ struct BookmarkEntry {
     title: String,
     favicon: String,
     folder_path: Vec<String>,
+    add_date: Option<i64>,
 }
 
 fn parse_bookmark_html(html: &str) -> Vec<BookmarkEntry> {
@@ -292,11 +293,13 @@ fn parse_bookmark_html(html: &str) -> Vec<BookmarkEntry> {
                 if href.starts_with("http") {
                     let title = extract_link_title(trimmed);
                     let favicon = extract_icon(trimmed);
+                    let add_date = extract_add_date(trimmed);
                     entries.push(BookmarkEntry {
                         url: href,
                         title,
                         favicon,
                         folder_path: folder_stack.clone(),
+                        add_date,
                     });
                 }
             }
@@ -341,6 +344,22 @@ fn extract_icon(text: &str) -> String {
         return String::new();
     };
     rest[..end].to_string()
+}
+
+fn extract_add_date(text: &str) -> Option<i64> {
+    let lower = text.to_lowercase();
+    let start = lower.find("add_date=\"")? + 10;
+    let rest = &text[start..];
+    let end = rest.find('"')?;
+    rest[..end].parse::<i64>().ok()
+}
+
+fn timestamp_to_local(timestamp: i64) -> String {
+    let naive = chrono::NaiveDateTime::from_timestamp_opt(timestamp, 0);
+    naive.map_or_else(
+        || chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        |n| n.format("%Y-%m-%d %H:%M:%S").to_string(),
+    )
 }
 
 fn extract_link_title(text: &str) -> String {
@@ -423,9 +442,13 @@ fn import_bookmark_entries(
             .unwrap_or(false);
 
         if !exists {
+            let date_str = entry
+                .add_date
+                .map(timestamp_to_local)
+                .unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
             tx.execute(
-                "INSERT INTO links (url, title, favicon_url, category_id) VALUES (?, ?, ?, ?)",
-                rusqlite::params![&entry.url, &entry.title, &entry.favicon, parent_id],
+                "INSERT INTO links (url, title, favicon_url, category_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                rusqlite::params![&entry.url, &entry.title, &entry.favicon, parent_id, &date_str, &date_str],
             )?;
             let id = tx.last_insert_rowid();
             tx.execute(
@@ -630,18 +653,22 @@ mod tests {
         assert_eq!(entries[0].folder_path, vec!["书签栏", "测试"]);
         assert_eq!(entries[0].url, "https://www.iconfont.cn/");
         assert_eq!(entries[0].title, "扩展程序");
+        assert_eq!(entries[0].add_date, Some(1777308003));
 
         assert_eq!(entries[1].folder_path, vec!["书签栏", "测试", "人才"]);
         assert_eq!(entries[1].url, "https://opencode.ai/docs/zh-cn");
         assert_eq!(entries[1].title, "简介 | OpenCode");
+        assert_eq!(entries[1].add_date, Some(1777320905));
 
         assert_eq!(entries[2].folder_path, vec!["书签栏"]);
         assert_eq!(entries[2].url, "https://www.bilibili.com/video/BV1zmSoBnEYM/");
         assert_eq!(entries[2].title, "ddd");
+        assert_eq!(entries[2].add_date, Some(1777320712));
 
         assert_eq!(entries[3].folder_path, vec!["书签栏"]);
         assert_eq!(entries[3].url, "https://opencode.ai/docs/zh-cn/lsp/");
         assert_eq!(entries[3].title, "LSP 服务器 | OpenCode");
+        assert_eq!(entries[3].add_date, Some(1777320725));
     }
 
     #[test]
@@ -746,18 +773,21 @@ mod tests {
                 title: "Link 1".to_string(),
                 favicon: "".to_string(),
                 folder_path: vec!["Folder A".to_string(), "Subfolder".to_string()],
+                add_date: None,
             },
             BookmarkEntry {
                 url: "https://example.com/2".to_string(),
                 title: "Link 2".to_string(),
                 favicon: "".to_string(),
                 folder_path: vec!["Folder A".to_string()],
+                add_date: None,
             },
             BookmarkEntry {
                 url: "https://example.com/3".to_string(),
                 title: "Link 3".to_string(),
                 favicon: "".to_string(),
                 folder_path: vec![],
+                add_date: None,
             },
         ];
 
@@ -846,12 +876,14 @@ mod tests {
                 title: "First".to_string(),
                 favicon: "".to_string(),
                 folder_path: vec!["Folder".to_string()],
+                add_date: None,
             },
             BookmarkEntry {
                 url: "https://example.com".to_string(),
                 title: "Duplicate".to_string(),
                 favicon: "".to_string(),
                 folder_path: vec!["Other".to_string()],
+                add_date: None,
             },
         ];
 

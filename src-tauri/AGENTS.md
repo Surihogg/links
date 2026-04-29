@@ -14,6 +14,7 @@ Tauri 2.x Rust 后端。SQLite 数据持久化 + URL 元数据抓取 + 系统集
 | 配置管理 | `config.rs` | `Config(Mutex<HashMap>)` 读写 config.json |
 | URL 标准化 | `normalize.rs` | 去重用标准化（**未接入**，`#[allow(dead_code)]`） |
 | 应用启动/插件/托盘 | `lib.rs` | Tauri Builder 配置、setup 钩子、命令注册表 |
+| Rust 入口点 | `main.rs` | 调用 `app_lib::run()`，设置 windows_subsystem |
 | 依赖/构建配置 | `Cargo.toml` | tauri 2.10.3, rusqlite 0.31 bundled, reqwest rustls |
 
 ## 约定
@@ -35,9 +36,10 @@ Tauri 2.x Rust 后端。SQLite 数据持久化 + URL 元数据抓取 + 系统集
 
 ## 备注
 
-- `db.rs` 约 1245 行（含测试），是最大文件；`search_links` 有 FTS5 → 标签 → LIKE 三级降级
+- `db.rs` 约 1547 行（含测试），是最大文件；`search_links` 有 FTS5 → 标签 → LIKE 三级降级
 - `fetcher.rs` 截取前 2MB HTML 防止 OOM，标题/描述分别截断 500/2000 字符
 - `normalize.rs` 实现完整但未使用，去重目前用 `find_by_url` 的尾部斜杠容错
 - `is_broken` 列通过 `ALTER TABLE ADD COLUMN` 添加（非正式迁移），migrate 函数中 `.ok()` 忽略重复添加
 - Windows 代理：`fetcher.rs` 从注册表读取 `ProxyEnable` / `ProxyServer`
 - 抓取失败日志：`commands.rs` 的 `log_fetch_failure` 写入 `fail_links.log`（非 tauri-plugin-log）
+- `main.rs` 仅做入口转发，含 `#![windows_subsystem = "windows"]` 指令（禁止移除）

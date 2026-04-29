@@ -1,7 +1,7 @@
 # Links 项目知识库
 
-**生成时间:** 2026-04-26
-**提交:** 3ede9cd
+**生成时间:** 2026-04-29
+**提交:** 6836b78
 **分支:** main
 
 ## 概述
@@ -29,10 +29,11 @@ links/
 | 应用启动流程 | `src-tauri/src/lib.rs` | 插件注册、DB 初始化、托盘、快捷键 |
 | 前端 API 层 | `src/lib/api.js` | 所有 invoke 调用的 JS 绑定 |
 | 状态管理 | `src/lib/stores/index.js` | links / categories / tags 三个 store |
-| UI 组件 | `src/lib/components/` | 8 个 Svelte 组件 |
+| UI 组件 | `src/lib/components/` | 10 个 Svelte 组件 |
 | 窗口配置 | `src-tauri/tauri.conf.json` | 主窗口 + quick-add 窗口 |
 | 构建配置 | `vite.config.js` | 双入口 rollup（main + quick-add） |
 | CI 流程 | `.github/workflows/release.yml` | Windows 自动构建 |
+| 自动化 Skill | `.sisyphus/skills/` | version-bump 等自定义工作流 |
 
 ## 代码地图
 
@@ -95,8 +96,8 @@ cd src-tauri && cargo test   # Rust 单元测试（db.rs, fetcher.rs, normalize.
 - `normalize.rs` 标记为 `#[allow(dead_code)]`，URL 标准化功能未接入去重流程
 - Windows 构建 CI 仅构建 Windows 包，macOS/Linux 需本地或添加 CI Runner
 - Release 为 Draft 模式，需手动确认发布
-- `db.rs` 含 30+ 个 Rust 单元测试（`cargo test` 可运行），前端暂无测试
-
+- `db.rs` 约 1547 行（含测试），是最大文件；含 30+ 个 Rust 单元测试（`cargo test` 可运行），前端暂无测试
+- `commands.rs` 约 867 行，`fetcher.rs` 约 544 行（含 Windows 代理逻辑）
 
 ## 变更与提交约束（新增）
 - 改动提交约束：所有改动不得直接提交到远程仓库。应在本地创建独立分支，完成测试后再合并提交；提交应通过测试并获得人工测试确认后再进行，确保不破坏主线功能。
