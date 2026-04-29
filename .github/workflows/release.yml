@@ -53,6 +53,6 @@ jobs:
           tagName: v__VERSION__
           releaseName: "Links v__VERSION__"
           releaseBody: "见下方附件下载安装。"
-          releaseDraft: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
