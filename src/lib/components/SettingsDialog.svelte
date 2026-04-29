@@ -172,26 +172,38 @@
       ? `http://127.0.0.1:${port}/add`
       : "";
     const tok = token;
-    // 双轨并行：Image ping 本地服务（应用运行时秒响应，无协议限流）
-    //           + iframe links://（应用未运行时唤起，作为保底）
+    // HTTP 优先策略：应用运行时走 fetch（不触发 OS 协议，避免 macOS 激活主窗口），
+    // fetch 失败时回退到 iframe 深链接并延迟提示用户；无 HTTP 端点时仅走深链接（冷启动唤起）。
     // 后端 PendingDeepLink 用 take() 只消费一次，不会重复触发
     return (
       "javascript:void(function(){" +
       "var u=encodeURIComponent(location.href)," +
       "t=encodeURIComponent(document.title)," +
       "ts=Date.now();" +
-      // 轨道 1：iframe links:// 始终触发（应用未运行时唤起）
-      "try{" +
-      "var i=document.createElement('iframe');i.hidden=1;" +
+      "function dl(){try{var i=document.createElement('iframe');i.hidden=1;" +
       "i.src='links://add?url='+u+'&title='+t+'&_t='+ts;" +
       "document.body.appendChild(i);" +
-      "setTimeout(function(){i.remove()},2e3);" +
-      "}catch(e){}" +
-      // 轨道 2：Image ping 本地服务（应用运行时无频率限制）
-      `var endpoint=${JSON.stringify(endpoint)},tok=${JSON.stringify(tok)};` +
-      "if(endpoint){" +
-      "var img=new Image();" +
-      "img.src=endpoint+'?url='+u+'&title='+t+'&t='+tok+'&_='+ts;" +
+      "setTimeout(function(){i.remove()},2e3);}catch(e){}}" +
+      // 页面内 toast 提示：CSP 拦截或应用未运行时告知用户
+      "function tip(m){var d=document.createElement('div');d.textContent=m;" +
+      "d.style.cssText='position:fixed;top:16px;right:16px;z-index:2147483647;padding:12px 20px;" +
+      "background:#1e1e2e;color:#cdd6f4;border-radius:8px;font:14px/1.5 system-ui,sans-serif;" +
+      "box-shadow:0 4px 16px rgba(0,0,0,.3);max-width:340px;cursor:pointer;transition:opacity .3s';" +
+      "d.onclick=function(){d.remove()};" +
+      "document.body.appendChild(d);" +
+      "setTimeout(function(){d.style.opacity='0';setTimeout(function(){d.remove()},300)},5e3)}" +
+      "var ep=" + JSON.stringify(endpoint) + ",tk=" + JSON.stringify(tok) + ";" +
+      "if(ep){" +
+      "fetch(ep+'?url='+u+'&title='+t+'&t='+tk+'&_='+ts)" +
+      ".then(function(r){if(!r.ok)throw new Error()})" +
+      ".catch(function(){dl();setTimeout(function(){" +
+      "tip('Links：这个网站可能把咱拦截了T.T，试试快捷键添加链接吧~')" +
+      "},500)});" +
+      "}else{" +
+      "dl();" +
+      "setTimeout(function(){" +
+      "tip('Links：最好开启Links喔~')" +
+      "},1e3);" +
       "}" +
       "}())"
     );
