@@ -25,6 +25,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -44,6 +46,64 @@ jobs:
 
       - run: npm install
 
+      - name: 生成 Release Notes
+        id: notes
+        shell: bash
+        run: |
+          # 获取上一个 tag（排除当前 HEAD 自身的 tag）
+          PREV_TAG=$(git tag --sort=-version:refname | head -1)
+          # 如果当前 commit 正好有 tag，取第二个
+          CURRENT_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "")
+          if [ "$PREV_TAG" = "$CURRENT_TAG" ] || [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+          fi
+
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+            echo "📝 生成 ${PREV_TAG}..HEAD 的 Release Notes"
+          else
+            RANGE="HEAD~30..HEAD"
+            echo "📝 未找到历史 tag，取最近 30 条提交"
+          fi
+
+          # 获取提交信息（过滤 merge commit 和 version bump）
+          COMMITS=$(git log "$RANGE" --pretty=format:"%s" --no-merges | grep -v "^chore: bump version" || true)
+
+          if [ -z "$COMMITS" ]; then
+            echo "body=见下方附件下载安装。" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 按类型分类
+          FEAT=$(echo "$COMMITS" | grep "^feat:" | sed 's/^feat: /- /') || true
+          FIX=$(echo "$COMMITS" | grep "^fix:" | sed 's/^fix: /- /') || true
+          DOCS=$(echo "$COMMITS" | grep "^docs:" | sed 's/^docs: /- /') || true
+          OTHER=$(echo "$COMMITS" | grep -vE "^(feat|fix|docs|chore):" | sed 's/^/- /') || true
+
+          BODY=""
+          if [ -n "$FEAT" ]; then
+            BODY="${BODY}## ✨ 新功能\n${FEAT}\n\n"
+          fi
+          if [ -n "$FIX" ]; then
+            BODY="${BODY}## 🐛 修复\n${FIX}\n\n"
+          fi
+          if [ -n "$DOCS" ]; then
+            BODY="${BODY}## 📝 文档\n${DOCS}\n\n"
+          fi
+          if [ -n "$OTHER" ]; then
+            BODY="${BODY}## 📦 其他变更\n${OTHER}\n\n"
+          fi
+
+          BODY="${BODY}---\n见下方附件下载安装。"
+
+          # 多行输出到 GITHUB_OUTPUT
+          {
+            echo "body<<RELEASE_NOTES_EOF"
+            printf "%b" "$BODY"
+            echo ""
+            echo "RELEASE_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,7 +112,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: "Links v__VERSION__"
-          releaseBody: "见下方附件下载安装。"
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
