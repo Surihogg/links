@@ -36,9 +36,13 @@ pub fn run() {
     }
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            // 单实例回调：第二个实例启动时，将焦点转到主窗口
-            if let Some(w) = app.get_webview_window("main") {
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            let is_deep_link = argv.iter().any(|a| a.starts_with("links://"));
+            if is_deep_link {
+                if let Some(url) = argv.iter().find(|a| a.starts_with("links://")) {
+                    handle_deep_link(app, url);
+                }
+            } else if let Some(w) = app.get_webview_window("main") {
                 let _ = w.show();
                 let _ = w.unminimize();
                 let _ = w.set_focus();
@@ -345,7 +349,6 @@ fn handle_browser_capture(app: &tauri::AppHandle, link_url: &str, link_title: &s
 
     if let Some(pending) = app.try_state::<commands::PendingDeepLink>() {
         let mut guard = pending.0.lock().unwrap();
-        // 双轨并行去重：如果已有未消费的相同 URL，不重复写入
         let is_dup = guard.as_ref().map_or(false, |existing| {
             existing.get("url").and_then(|v| v.as_str()) == Some(link_url)
         });
@@ -354,9 +357,11 @@ fn handle_browser_capture(app: &tauri::AppHandle, link_url: &str, link_title: &s
         }
     }
 
-    if let Some(main) = app.get_webview_window("main") {
-        let _ = main.show();
+    // 隐藏主窗口：防止深链接触发 macOS 应用激活时将主窗口带到前台
+    if let Some(main_win) = app.get_webview_window("main") {
+        let _ = main_win.hide();
     }
+
     if let Some(window) = app.get_webview_window("quick-add") {
         let _ = window.show();
         let _ = window.set_focus();
