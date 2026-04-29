@@ -26,6 +26,17 @@
   let categories = $derived($categoriesStore);
   let tags = $derived($tagsStore);
 
+  function find_category_by_id(id, nodes = categories) {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      if (node.children?.length > 0) {
+        const found = find_category_by_id(id, node.children);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
   let selected_category = $state(null);
   let selected_tag = $state(null);
   let search_query = $state("");
@@ -487,7 +498,7 @@ async function on_toggle_favorite(link) {
     selected_tag ? `标签: ${selected_tag}` :
     selected_category === "favorite" ? "特别关注" :
     selected_category === "uncategorized" ? "未分组" :
-    selected_category != null ? categories.find(c => c.id === selected_category)?.name ?? "链接" :
+    selected_category != null ? find_category_by_id(selected_category)?.name ?? "链接" :
     "全部链接"
   );
 
@@ -518,7 +529,7 @@ async function on_toggle_favorite(link) {
     } else if (selected_category === "uncategorized") {
       return { label: "未分组", type: "category" };
     } else if (selected_category != null) {
-      const cat = categories.find(c => c.id === selected_category);
+      const cat = find_category_by_id(selected_category);
       return { label: cat?.name ?? "分组", type: "category" };
     }
     return null;

@@ -467,7 +467,6 @@
         style="padding-left: 8px"
         onclick={() => onselect?.('uncategorized')}
       >
-        <span class="cat-toggle-spacer"></span>
         <span class="cat-icon-area">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 2" class="cat-icon icon-static"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
         </span>
@@ -485,28 +484,33 @@
         <button
           class="nav-item cat-item"
           class:active={selected_id === cat.id}
+          class:expanded={cat.children?.length > 0 && expanded.has(cat.id)}
           class:dragging={drag_id === cat.id}
           class:drop-target={drop_target_id === cat.id && drag_id !== cat.id && !is_descendant(drag_id, cat.id)}
           style="padding-left: {8 + cat.depth * 12}px"
           data-cat-id={cat.id}
-          onclick={() => { if (editing_cat_id !== cat.id) onselect?.(cat.id); }}
+          onclick={() => {
+            if (editing_cat_id !== cat.id) {
+              if (cat.children?.length > 0) toggle(cat.id);
+              onselect?.(cat.id);
+            }
+          }}
           onmouseleave={() => { reset_cat_delete(); }}
           onpointerdown={(e) => handle_pointer_down(e, cat)}
         >
           {#if cat.children?.length > 0}
-            <span class="cat-toggle" onclick={(e) => { e.stopPropagation(); toggle(cat.id); }} onpointerdown={(e) => e.stopPropagation()}>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({expanded.has(cat.id) ? 90 : 0}deg); transition: transform var(--transition);">
-                <path d="M3 1l4 4-4 4"/>
+            <span class="cat-child-indicator" style="transform: rotate({expanded.has(cat.id) ? 90 : 0}deg)">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2.5 1l3.5 3-3.5 3"/>
               </svg>
             </span>
-          {:else}
-            <span class="cat-toggle-spacer"></span>
           {/if}
           <span class="cat-icon-area"
             onclick={(e) => handle_delete_cat(e, cat.id)}
             onpointerdown={(e) => e.stopPropagation()}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon icon-folder"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon icon-open-folder"><path d="M3 7h1.5l1.2-1.8c.2-.4.6-.7 1.1-.7H9l2 2h8c1.1 0 2 .9 2 2v8c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V7z"/></svg>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon icon-delete"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
           </span>
           {#if editing_cat_id === cat.id}
@@ -835,11 +839,25 @@
     color: var(--danger);
   }
 
-  .icon-folder, .icon-tag {
+  .icon-folder, .icon-tag, .icon-open-folder {
     display: block;
   }
 
+  .icon-open-folder {
+    display: none;
+  }
+
+  .cat-item.expanded .icon-folder {
+    display: none;
+  }
+
+  .cat-item.expanded .icon-open-folder {
+    display: block;
+    opacity: 0.7;
+  }
+
   .nav-item:hover .cat-icon-area .icon-folder,
+  .nav-item:hover .cat-icon-area .icon-open-folder,
   .nav-item:hover .tag-icon-area .icon-tag {
     display: none;
   }
@@ -917,6 +935,10 @@
     font-weight: 500;
   }
 
+  .cat-item.expanded {
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
   .cat-item.dragging {
     opacity: 0.4;
   }
@@ -954,6 +976,10 @@
   :global(.dark) .cat-item.active {
     background: var(--cat-soft);
     color: var(--cat-text);
+  }
+
+  :global(.dark) .cat-item.expanded {
+    box-shadow: inset 3px 0 0 var(--accent);
   }
 
   .tag-item {
@@ -1028,18 +1054,23 @@
   }
 
   .cat-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 12px;
-    height: 12px;
-    flex-shrink: 0;
-    color: var(--text-3);
+    display: none;
   }
 
   .cat-toggle-spacer {
-    width: 12px;
+    display: none;
+  }
+
+  .cat-child-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 8px;
+    height: 8px;
     flex-shrink: 0;
+    margin-right: 4px;
+    color: var(--text-3);
+    transition: transform 0.15s ease;
   }
 
   .cat-name, .cat-delete-hint {
