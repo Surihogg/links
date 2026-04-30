@@ -171,6 +171,10 @@ export async function popPendingDeepLink() {
   return invoke("pop_pending_deep_link");
 }
 
+export async function checkStartupDeepLink() {
+  return invoke("check_startup_deep_link");
+}
+
 export async function getLocalServerInfo() {
   return invoke("get_local_server_info");
 }

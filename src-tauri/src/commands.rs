@@ -11,11 +11,23 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 pub struct PendingDeepLink(pub Mutex<Option<Value>>);
 
 #[tauri::command]
 pub fn pop_pending_deep_link(state: State<'_, PendingDeepLink>) -> Option<Value> {
     state.0.lock().unwrap().take()
+}
+
+/// 冷启动时收到深链接的标记（独立于 PendingDeepLink 数据，不受 QuickAdd 消费影响）
+pub struct StartupDeepLinkReceived(pub AtomicBool);
+
+/// 检查并重置冷启动深链接标记。主窗口据此决定是否显示。
+/// 返回 true 表示本次启动是由深链接触发的，应只显示 quick-add。
+#[tauri::command]
+pub fn check_startup_deep_link(state: State<'_, StartupDeepLinkReceived>) -> bool {
+    state.0.swap(false, Ordering::SeqCst)
 }
 
 /// 本地 HTTP 服务的端口与 token，前端用来动态生成 Bookmarklet

@@ -219,6 +219,7 @@ pub fn run() {
 
             // 深度链接处理：支持浏览器 Bookmarklet 一键收藏
             app.manage(commands::PendingDeepLink(std::sync::Mutex::new(None)));
+            app.manage(commands::StartupDeepLinkReceived(std::sync::atomic::AtomicBool::new(false)));
 
             // 启动本地 HTTP 服务（固定端口 48927，token 持久化到 config）
             {
@@ -303,6 +304,7 @@ pub fn run() {
             commands::exit_app,
             commands::get_system_proxy,
             commands::pop_pending_deep_link,
+            commands::check_startup_deep_link,
             commands::get_local_server_info,
         ])
         .run(tauri::generate_context!())
@@ -357,7 +359,11 @@ fn handle_browser_capture(app: &tauri::AppHandle, link_url: &str, link_title: &s
         }
     }
 
-    // 隐藏主窗口：防止深链接触发 macOS 应用激活时将主窗口带到前台
+    // 标记冷启动深链接（独立于 PendingDeepLink 数据，不受 QuickAdd 消费影响）
+    if let Some(flag) = app.try_state::<commands::StartupDeepLinkReceived>() {
+        flag.0.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
     if let Some(main_win) = app.get_webview_window("main") {
         let _ = main_win.hide();
     }
