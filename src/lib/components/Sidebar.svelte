@@ -487,7 +487,7 @@
           class:expanded={cat.children?.length > 0 && expanded.has(cat.id)}
           class:dragging={drag_id === cat.id}
           class:drop-target={drop_target_id === cat.id && drag_id !== cat.id && !is_descendant(drag_id, cat.id)}
-          style="padding-left: {8 + cat.depth * 12}px"
+          style="--indent: {cat.depth * 12}px; padding-left: {8 + cat.depth * 12}px"
           data-cat-id={cat.id}
           onclick={() => {
             if (editing_cat_id !== cat.id) {
@@ -935,8 +935,15 @@
     font-weight: 500;
   }
 
-  .cat-item.expanded {
-    box-shadow: inset 3px 0 0 var(--accent);
+  .cat-item.expanded::before {
+    content: '';
+    position: absolute;
+    left: var(--indent, 0px);
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--cat-text);
+    border-radius: 0 2px 2px 0;
   }
 
   .cat-item.dragging {
@@ -978,8 +985,8 @@
     color: var(--cat-text);
   }
 
-  :global(.dark) .cat-item.expanded {
-    box-shadow: inset 3px 0 0 var(--accent);
+  :global(.dark) .cat-item.expanded::before {
+    background: var(--cat-text);
   }
 
   .tag-item {
