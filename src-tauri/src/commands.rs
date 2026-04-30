@@ -483,21 +483,188 @@ fn import_bookmark_entries(
     Ok(stats)
 }
 
+fn get_or_create_category_by_name(
+    conn: &rusqlite::Connection,
+    name: &str,
+    parent_id: Option<i64>,
+) -> Result<(i64, bool), AppError> {
+    let existing: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM categories WHERE name = ? AND IFNULL(parent_id, -1) = IFNULL(?, -1)",
+            rusqlite::params![name, parent_id],
+            |r| r.get(0),
+        )
+        .ok();
+    if let Some(id) = existing {
+        return Ok((id, false));
+    }
+    conn.execute(
+        "INSERT INTO categories (name, parent_id) VALUES (?, ?)",
+        rusqlite::params![name, parent_id],
+    )?;
+    Ok((conn.last_insert_rowid(), true))
+}
+
+fn import_json_entries(
+    links: &[crate::db::Link],
+    categories: &[crate::db::FlatCategory],
+    conn: &rusqlite::Connection,
+) -> Result<ImportStats, AppError> {
+    let mut stats = ImportStats::default();
+    let tx = conn.unchecked_transaction()?;
+
+    // 按 parent_id 排序确保父分组先于子分组创建
+    let mut sorted_cats: Vec<&crate::db::FlatCategory> = categories.iter().collect();
+    sorted_cats.sort_by(|a, b| {
+        a.parent_id
+            .unwrap_or(0)
+            .cmp(&b.parent_id.unwrap_or(0))
+    });
+
+    // 建立导出文件中 old_category_id → 当前库 new_category_id 的映射
+    let mut cat_id_map: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
+    for cat in &sorted_cats {
+        let parent_id = cat.parent_id.and_then(|pid| cat_id_map.get(&pid).copied());
+        let (new_id, created) = get_or_create_category_by_name(&tx, &cat.name, parent_id)?;
+        cat_id_map.insert(cat.id, new_id);
+        if created {
+            stats.categories_created += 1;
+        }
+    }
+
+    for link in links {
+        if link.url.trim().is_empty() {
+            continue;
+        }
+
+        let exists: bool = tx
+            .query_row(
+                "SELECT COUNT(*) FROM links WHERE url = ?",
+                rusqlite::params![&link.url],
+                |r| Ok(r.get::<_, i64>(0)? > 0),
+            )
+            .unwrap_or(false);
+        if exists {
+            continue;
+        }
+
+        let category_id = link
+            .category_id
+            .and_then(|id| cat_id_map.get(&id).copied());
+
+        let date_str = if !link.created_at.is_empty() {
+            link.created_at.clone()
+        } else {
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+        };
+        let updated_str = if !link.updated_at.is_empty() {
+            link.updated_at.clone()
+        } else {
+            date_str.clone()
+        };
+
+        tx.execute(
+            "INSERT INTO links (url, title, description, notes, favicon_url, og_image_url, category_id, is_favorite, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            rusqlite::params![
+                &link.url,
+                &link.title,
+                &link.description,
+                &link.notes,
+                &link.favicon_url,
+                &link.og_image_url,
+                category_id,
+                link.is_favorite as i32,
+                &date_str,
+                &updated_str,
+            ],
+        )?;
+        let id = tx.last_insert_rowid();
+        tx.execute(
+            "INSERT INTO links_fts (rowid, title, description, notes, url) VALUES (?, ?, ?, ?, ?)",
+            rusqlite::params![id, &link.title, &link.description, &link.notes, &link.url],
+        )
+        .ok();
+
+        if !link.tags.is_empty() {
+            let tag_ids = ensure_tags(&tx, &link.tags);
+            for tid in tag_ids {
+                tx.execute(
+                    "INSERT OR IGNORE INTO link_tags (link_id, tag_id) VALUES (?, ?)",
+                    rusqlite::params![id, tid],
+                )?;
+            }
+        }
+
+        stats.links_imported += 1;
+    }
+
+    tx.commit()?;
+    Ok(stats)
+}
+
+fn ensure_tags(
+    conn: &rusqlite::Connection,
+    tag_names: &[String],
+) -> Vec<i64> {
+    let mut ids = Vec::new();
+    for name in tag_names {
+        if name.trim().is_empty() {
+            continue;
+        }
+        let existing: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM tags WHERE name = ?",
+                rusqlite::params![name],
+                |r| r.get(0),
+            )
+            .ok();
+        if let Some(id) = existing {
+            ids.push(id);
+        } else {
+            conn.execute(
+                "INSERT INTO tags (name) VALUES (?)",
+                rusqlite::params![name],
+            )
+            .ok();
+            ids.push(conn.last_insert_rowid());
+        }
+    }
+    ids
+}
+
 #[tauri::command]
 pub fn import_bookmarks(db: State<'_, Db>) -> Result<(u32, u32), AppError> {
     let Some(path) = rfd::FileDialog::new()
-        .add_filter("书签文件", &["html", "htm"])
-        .set_title("导入浏览器书签")
+        .add_filter("书签文件", &["html", "htm", "json"])
+        .set_title("导入")
         .pick_file()
     else {
         return Ok((0, 0));
     };
 
-    let html = std::fs::read_to_string(&path)?;
-    let entries = parse_bookmark_html(&html);
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
 
     let conn = db.0.lock().unwrap();
-    let stats = import_bookmark_entries(&entries, &conn)?;
+
+    let stats = if ext == "json" {
+        let content = std::fs::read_to_string(&path)?;
+        // 新格式：{ links: [...], categories: [...] }
+        if let Ok(export) = serde_json::from_str::<crate::db::JsonExport>(&content) {
+            import_json_entries(&export.links, &export.categories, &conn)?
+        } else {
+            // 旧格式：裸数组 [...]
+            let links: Vec<crate::db::Link> = serde_json::from_str(&content)?;
+            import_json_entries(&links, &[], &conn)?
+        }
+    } else {
+        let html = std::fs::read_to_string(&path)?;
+        let entries = parse_bookmark_html(&html);
+        import_bookmark_entries(&entries, &conn)?
+    };
 
     Ok((stats.links_imported, stats.categories_created))
 }

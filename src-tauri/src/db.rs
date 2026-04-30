@@ -228,6 +228,19 @@ pub struct ExportParams {
     pub favorite_only: Option<bool>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FlatCategory {
+    pub id: i64,
+    pub name: String,
+    pub parent_id: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JsonExport {
+    pub links: Vec<Link>,
+    pub categories: Vec<FlatCategory>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("{0}")]
@@ -889,7 +902,23 @@ impl Db {
         }
 
         match params.format.as_str() {
-            "json" => Ok(serde_json::to_string_pretty(&links)?),
+            "json" => {
+                let cat_sql = "SELECT id, name, parent_id FROM categories ORDER BY sort_order, id";
+                let cats: Vec<FlatCategory> = conn
+                    .prepare(cat_sql)?
+                    .query_map([], |row| Ok(FlatCategory {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        parent_id: row.get(2)?,
+                    }))?
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let export = JsonExport {
+                    links,
+                    categories: cats,
+                };
+                Ok(serde_json::to_string_pretty(&export)?)
+            }
             "markdown" => {
                 let mut md = String::from("# Links Export\n\n");
                 for link in &links {
