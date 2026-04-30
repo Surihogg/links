@@ -274,8 +274,13 @@
     checking_update = true;
     check_status = "正在检查...";
     try {
-      if (oncheckupdate) await oncheckupdate(update_info);
-      check_status = "已是最新版本 ✨";
+      const update = await api.checkUpdate();
+      if (update) {
+        if (oncheckupdate) await oncheckupdate(update);
+        check_status = "发现新版本！";
+      } else {
+        check_status = "已是最新版本 ✨";
+      }
     } catch (e) {
       const msg = e?.message || String(e);
       if (msg.includes("404") || msg.includes("Not Found")) {
