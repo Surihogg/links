@@ -46,6 +46,7 @@
   let show_settings = $state(false);
   let show_close_dialog = $state(false);
   let search_bar;
+  let selected_link_index = $state(-1);
 
   // 更新相关状态
   let update_available = $state(false);
@@ -58,10 +59,13 @@
 
   onMount(async () => {
     const mainWindow = getCurrentWindow();
-    try { await mainWindow.show(); } catch (e) {}
     console.log("[startup] App onMount start");
     await waitForBackendReady();
     console.log("[startup] backend ready");
+    const isDeepLinkStartup = await api.checkStartupDeepLink();
+    if (!isDeepLinkStartup) {
+      try { await mainWindow.show(); } catch (e) {}
+    }
     // Load theme setting with backward-compatibility
     let savedTheme = await api.getSetting("theme-mode");
     if (!savedTheme) {
@@ -342,6 +346,7 @@ async function with_scroll_preserve(fn) {
     selected_category = id;
     selected_tag = null;
     search_query = "";
+    selected_link_index = -1;
     load_links();
   }
 
@@ -353,10 +358,12 @@ async function with_scroll_preserve(fn) {
       selected_category = null;
     }
     search_query = "";
+    selected_link_index = -1;
     load_links();
   }
 
   async function on_search(query) {
+    selected_link_index = -1;
     if (query.trim()) {
       await linksStore.search({ query, per_page: 30, ...build_filter_params() });
     } else {
@@ -384,6 +391,7 @@ async function on_toggle_favorite(link) {
 }
 
   async function on_delete_link(link) {
+    selected_link_index = -1;
     await linksStore.remove(link.id);
     await categoriesStore.load();
   }
@@ -538,6 +546,7 @@ async function on_toggle_favorite(link) {
   function on_remove_filter() {
     selected_category = null;
     selected_tag = null;
+    selected_link_index = -1;
     if (search_query.trim()) {
       linksStore.search({ query: search_query, per_page: 30 });
     } else {
@@ -589,7 +598,56 @@ async function on_toggle_favorite(link) {
     }
   }
 
-  function on_global_keydown(e) {
+  async function on_global_keydown(e) {
+    // 键盘导航：上下箭头、Enter、Space
+    const nav_keys = ["ArrowUp", "ArrowDown", "Enter", " "];
+    if (nav_keys.includes(e.key)) {
+      // 仅在无模态框/表单打开时处理
+      const any_modal_open = show_settings || show_export || show_add_form || edit_link || show_close_dialog || show_update_dialog || show_release_notes;
+      if (!any_modal_open) {
+        const active_tag = document.activeElement?.tagName;
+        const in_input = active_tag === "INPUT" || active_tag === "TEXTAREA" || active_tag === "SELECT";
+        const count = filtered_links.length;
+        // 箭头键在搜索框聚焦时也生效（单行输入框中箭头键无其他用途）
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          if (count === 0) return;
+          document.activeElement?.blur();
+          selected_link_index = Math.min(selected_link_index + 1, count - 1);
+          scroll_selected_into_view();
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          if (count === 0) return;
+          document.activeElement?.blur();
+          selected_link_index = Math.max(selected_link_index - 1, 0);
+          scroll_selected_into_view();
+          return;
+        }
+        // Enter 和 Space 仅在非输入框聚焦时生效
+        if (!in_input) {
+          if (e.key === "Enter" && selected_link_index >= 0 && selected_link_index < count) {
+            e.preventDefault();
+            const link = filtered_links[selected_link_index];
+            api.openUrl(link.url);
+            selected_link_index = -1;
+            if ((await api.getSetting("auto-minimize-on-open")) === "true") {
+              const { getCurrentWindow } = await import("@tauri-apps/api/window");
+              await getCurrentWindow().hide();
+            }
+            return;
+          }
+          if (e.key === " " && selected_link_index >= 0 && selected_link_index < count) {
+            e.preventDefault();
+            edit_link = filtered_links[selected_link_index];
+            selected_link_index = -1;
+            return;
+          }
+        }
+      }
+    }
+
     if (e.key !== "Escape") return;
     if (show_settings) { show_settings = false; return; }
     if (show_export) { show_export = false; return; }
@@ -598,6 +656,18 @@ async function on_toggle_favorite(link) {
     if (show_close_dialog) { show_close_dialog = false; return; }
     if (show_update_dialog) { show_update_dialog = false; return; }
     if (show_release_notes) { show_release_notes = false; return; }
+  }
+
+  function scroll_selected_into_view() {
+    // 使用 requestAnimationFrame 确保 DOM 已更新后再滚动
+    requestAnimationFrame(() => {
+      const list_el = document.querySelector('.link-list');
+      if (!list_el) return;
+      const cards = list_el.querySelectorAll('.link-card[data-link-id]');
+      if (selected_link_index >= 0 && selected_link_index < cards.length) {
+        cards[selected_link_index].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    });
   }
 </script>
 
@@ -655,6 +725,7 @@ async function on_toggle_favorite(link) {
         loading={links.loading}
         highlight={search_query}
         has_more={has_more}
+        selected_index={selected_link_index}
         onloadmore={load_more}
         onedit={(link) => edit_link = link}
         ondelete={on_delete_link}

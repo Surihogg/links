@@ -2,7 +2,7 @@
   import { openUrl, getSetting } from "../api.js";
   import { copyToClipboard } from "../api.js";
 
-  let { link, highlight = "", category_name = null, onedit, ondelete, ontoggle_favorite, onremovecategory, onremovetag, onremovenotes } = $props();
+  let { link, highlight = "", category_name = null, selected = false, onedit, ondelete, ontoggle_favorite, onremovecategory, onremovetag, onremovenotes } = $props();
   let show_confirm = $state(false);
   let show_share_menu = $state(false);
   let copy_success = $state(false);
@@ -103,7 +103,7 @@
   }
 </script>
 
-<div class="link-card" data-link-id={link.id}>
+<div class="link-card" class:selected data-link-id={link.id}>
   {#if link.is_favorite}
     <div class="bookmark-corner" data-tooltip="取消标记" onclick={toggle_fav}>
       <svg width="10" height="14" viewBox="0 0 10 14" fill="var(--star)" stroke="none">
@@ -254,6 +254,13 @@
   }
 
   .link-card:hover { background: var(--bg-hover); }
+
+  .link-card.selected {
+    background: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  .link-card.selected .card-main { border-top-color: transparent; }
 
   .link-card:first-child .card-main { border-top: none; }
 
@@ -520,6 +527,7 @@
   }
 
   .link-card:hover .card-actions .action-btn { opacity: 1; }
+  .link-card.selected .card-actions .action-btn { opacity: 1; }
 
   .action-btn {
     width: 28px;
