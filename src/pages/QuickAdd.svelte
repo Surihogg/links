@@ -81,11 +81,12 @@
       apply_theme(e.payload);
     });
     const unlistenShown = await listen("quick-add-shown", async () => {
+      // 每次显示都清空表单
+      reset_form();
       // 拉取 Rust 端缓存的 deep link 数据（Bookmarklet 收藏场景）
       try {
         const pending = await popPendingDeepLink();
         if (pending?.url) {
-          reset_form();
           url = pending.url;
           if (pending.title) {
             title = pending.title;

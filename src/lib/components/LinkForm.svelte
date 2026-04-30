@@ -21,6 +21,11 @@
   let fetched_meta = $state({ favicon_url: "", og_image_url: "" });
   let fetched_url = "";
   let pending_fetch = null;
+  let url_input;
+
+  $effect(() => {
+    if (url_input) setTimeout(() => url_input.focus(), 50);
+  });
 
   function mark_edited(field) {
     return (e) => { user_edited[field] = true; };
@@ -103,7 +108,7 @@
   async function refresh_meta() {
     const u = url.trim();
     if (!u) return;
-    user_edited = { title: false, description: false };
+    // 不重置 user_edited，保留用户已手动编辑的字段
     await do_fetch(u);
   }
 
@@ -142,7 +147,7 @@
           {/if}
         </div>
         <div class="url-input-wrap">
-          <input type="url" bind:value={url} oninput={on_url_input} onkeydown={on_input_keydown} required placeholder="https://..." class="field-input" />
+          <input type="url" bind:this={url_input} bind:value={url} oninput={on_url_input} onkeydown={on_input_keydown} required placeholder="https://..." class="field-input" />
           <button type="button" class="refresh-btn" onclick={refresh_meta} disabled={fetching || !url.trim()} title="重新抓取元数据">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class={fetching ? 'spin-anim' : ''}>
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
