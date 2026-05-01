@@ -30,7 +30,7 @@
     if (!highlight || !text) return esc(text);
     const safe = esc(text);
     const escaped = highlight.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return safe.replace(new RegExp(`(${escaped})`, "gi"), '<span style="background:#fef08a;border-radius:2px;padding:0 2px;font-weight:600">$1</span>');
+    return safe.replace(new RegExp(`(${escaped})`, "gi"), '<span class="search-hl">$1</span>');
   }
 
   async function card_click() {
@@ -660,4 +660,5 @@
     color: var(--text-2);
     pointer-events: none;
   }
+
 </style>
