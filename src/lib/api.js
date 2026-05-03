@@ -147,7 +147,13 @@ export async function getSystemProxy() {
 export async function checkUpdate() {
   const { check } = await import("@tauri-apps/plugin-updater");
   const proxy = await getSystemProxy();
-  return check(proxy ? { proxy } : undefined);
+  const result = await Promise.race([
+    check(proxy ? { proxy } : undefined),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("检查更新超时，请检查网络连接")), 15000)
+    ),
+  ]);
+  return result;
 }
 
 export async function downloadAndInstallUpdate(update, onProgress) {

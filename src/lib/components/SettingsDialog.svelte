@@ -286,7 +286,7 @@
       const msg = e?.message || String(e);
       if (msg.includes("404") || msg.includes("Not Found")) {
         check_status = "暂无可用更新（未检测到发布版本）";
-      } else if (msg.includes("network") || msg.includes("Failed to fetch") || msg.includes("fetch")) {
+      } else if (msg.includes("network") || msg.includes("Failed to fetch") || msg.includes("fetch") || msg.includes("超时")) {
         check_status = "网络连接失败，请检查网络后重试";
       } else {
         check_status = "检查失败，请稍后重试";
