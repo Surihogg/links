@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Links 快速收藏",
+  "version": "1.0.0",
+  "description": "一键将当前网页收藏到 Links 桌面应用（需要v1.1.9及以上版本）",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
