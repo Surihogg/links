@@ -42,10 +42,33 @@ pub fn run() {
                 if let Some(url) = argv.iter().find(|a| a.starts_with("links://")) {
                     handle_deep_link(app, url);
                 }
-            } else if let Some(w) = app.get_webview_window("main") {
-                let _ = w.show();
-                let _ = w.unminimize();
-                let _ = w.set_focus();
+            } else {
+                // macOS 深链接不在 argv 中（通过 Apple Event 传递），延迟 200ms 再判断
+                // 如果 on_open_url 在此期间触发了 handle_browser_capture，就不显示主窗口
+                #[cfg(target_os = "macos")]
+                {
+                    let app_clone = app.clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                        let pending = app_clone.try_state::<commands::PendingDeepLink>();
+                        let has_pending = pending
+                            .map(|p| p.0.lock().unwrap().is_some())
+                            .unwrap_or(false);
+                        if !has_pending {
+                            if let Some(w) = app_clone.get_webview_window("main") {
+                                let _ = w.show();
+                                let _ = w.unminimize();
+                                let _ = w.set_focus();
+                            }
+                        }
+                    });
+                }
+                #[cfg(not(target_os = "macos"))]
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.unminimize();
+                    let _ = w.set_focus();
+                }
             }
         }))
         .plugin(tauri_plugin_deep_link::init())
