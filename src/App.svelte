@@ -212,12 +212,38 @@
 
     // 监听 quick-add 窗口的保存事件
     let unlistenLinksChanged;
+    let unlistenSpotlightLocate;
     try {
       const { listen } = await import("@tauri-apps/api/event");
       unlistenLinksChanged = await listen("links-changed", () => {
         refresh_current_view();
         categoriesStore.load();
         tagsStore.load();
+      });
+      unlistenSpotlightLocate = await listen("spotlight-locate", async (e) => {
+        const { link_id } = e.payload;
+        // 显示主窗口并聚焦
+        try { await mainWindow.show(); } catch {}
+        try { await mainWindow.setFocus(); } catch {}
+        // 清除筛选
+        selected_category = null;
+        selected_tag = null;
+        search_query = "";
+        selected_link_index = -1;
+        // 加载所有链接（最多100条）
+        await linksStore.load({ per_page: 100 });
+        // 等待 DOM 更新
+        await tick();
+        await new Promise(r => requestAnimationFrame(r));
+        // 查找链接索引
+        const index = filtered_links.findIndex(l => l.id === link_id);
+        if (index >= 0) {
+          selected_link_index = index;
+          scroll_selected_into_view();
+          edit_link = filtered_links[index];
+        } else {
+          console.warn("[spotlight-locate] link not found:", link_id);
+        }
       });
     } catch (e) {}
 
@@ -227,6 +253,7 @@
       window.removeEventListener("resize", on_resize);
       if (unlisten) unlisten();
       if (unlistenLinksChanged) unlistenLinksChanged();
+      if (unlistenSpotlightLocate) unlistenSpotlightLocate();
       if (unlistenMoved) unlistenMoved();
       if (system_unlisten) system_unlisten();
     };
