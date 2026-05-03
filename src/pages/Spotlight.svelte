@@ -6,7 +6,7 @@
   import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
 
   const WIN_WIDTH = 560;
-  const WIN_MIN_HEIGHT = 64;
+  const WIN_MIN_HEIGHT = 66;
   const WIN_MAX_HEIGHT = 420;
 
   let query = $state("");
@@ -34,7 +34,7 @@
     await new Promise(r => requestAnimationFrame(r));
     const el = document.querySelector(".results-container");
     if (!el) return;
-    const search_h = 66;
+    const search_h = 78;
     const content_h = el.scrollHeight;
     const total_h = search_h + content_h;
     const h = Math.max(WIN_MIN_HEIGHT, Math.min(total_h, WIN_MAX_HEIGHT));
