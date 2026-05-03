@@ -27,6 +27,7 @@
   let auto_check_update = $state(true);
   let bookmarklet_copied = $state(false);
   let bookmarklet_code = $state("");
+  let ext_step = $state(0);
 
   const isMac = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
 
@@ -525,6 +526,41 @@
             （但由于浏览器有安全限制，限定了一定时间内无法连续触发应用冷启动，有概率出现点击书签后没反应，为了更好的体验，建议您启动应用后保持常驻）
           </div>
         </div>
+
+        <div class="section-label" style="margin-top: 20px;">浏览器扩展</div>
+        <div class="ext-section">
+          <div class="ext-desc">
+            安装浏览器扩展后，在任意网页点击扩展图标即可一键收藏到 Links，比书签更方便 ✨
+          </div>
+          <div class="ext-steps">
+            {#if ext_step === 0}
+              <div class="ext-step">
+                <span class="ext-step-num">1</span>
+                <span>从 <a href="https://github.com/Surihogg/links/releases" target="_blank" rel="noopener" class="ext-link">GitHub Releases</a> 下载浏览器扩展 zip 包</span>
+              </div>
+              <div class="ext-step">
+                <span class="ext-step-num">2</span>
+                <span>解压 zip 到任意文件夹</span>
+              </div>
+              <div class="ext-step">
+                <span class="ext-step-num">3</span>
+                <span>打开 <code>chrome://extensions</code>，开启右上角「开发者模式」</span>
+              </div>
+              <div class="ext-step">
+                <span class="ext-step-num">4</span>
+                <span>点击「加载已解压的扩展程序」，选择解压后的文件夹</span>
+              </div>
+            {:else}
+              <div class="ext-step">
+                <span class="ext-step-num">✓</span>
+                <span>扩展已安装，在任意网页点击工具栏的 Links 图标即可收藏</span>
+              </div>
+            {/if}
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick={() => ext_step = ext_step === 0 ? 1 : 0}>
+            {ext_step === 0 ? '我已安装，隐藏步骤' : '查看安装步骤'}
+          </button>
+        </div>
       </div>
 
       <div class="modal-footer">
@@ -776,5 +812,55 @@
     font-size: 11px;
     color: var(--text-3);
     line-height: 1.4;
+  }
+
+  .ext-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ext-desc {
+    font-size: 12px;
+    color: var(--text-2);
+    line-height: 1.6;
+  }
+
+  .ext-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ext-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-1);
+    line-height: 1.6;
+  }
+
+  .ext-step-num {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .ext-link {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .ext-link:hover {
+    text-decoration: underline;
   }
 </style>
