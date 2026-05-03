@@ -157,10 +157,15 @@ pub fn run() {
 
             let cfg = config::Config::load(&dir).unwrap_or_else(|_| config::Config::empty());
 
-            // Windows 上 quick-add 窗口需要移除原生标题栏（macOS 通过 titleBarStyle: Overlay 隐藏）
+            // Windows 上 quick-add / spotlight 窗口需要移除原生标题栏（macOS 通过 titleBarStyle: Overlay 隐藏）
             #[cfg(target_os = "windows")]
-            if let Some(quick_add) = app.get_webview_window("quick-add") {
-                let _ = quick_add.set_decorations(false);
+            {
+                if let Some(quick_add) = app.get_webview_window("quick-add") {
+                    let _ = quick_add.set_decorations(false);
+                }
+                if let Some(spotlight) = app.get_webview_window("spotlight") {
+                    let _ = spotlight.set_decorations(false);
+                }
             }
 
             let mut window_width: f64 = 900.0;
