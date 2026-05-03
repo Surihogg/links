@@ -42,6 +42,24 @@
         "minimizable": false,
         "maximizable": false,
         "skipTaskbar": true
+      },
+      {
+        "label": "spotlight",
+        "title": "\u200B",
+        "url": "spotlight.html",
+        "width": 560,
+        "height": 64,
+        "center": false,
+        "visible": false,
+        "decorations": true,
+        "transparent": true,
+        "titleBarStyle": "Overlay",
+        "alwaysOnTop": true,
+        "resizable": false,
+        "closable": false,
+        "minimizable": false,
+        "maximizable": false,
+        "skipTaskbar": true
       }
     ],
     "security": {

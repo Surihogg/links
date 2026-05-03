@@ -94,6 +94,9 @@ pub fn run() {
                     let main_str = cfg
                         .get("main-shortcut")
                         .unwrap_or_else(|| commands::DEFAULT_MAIN_SHORTCUT.to_string());
+                    let spotlight_str = cfg
+                        .get("spotlight-shortcut")
+                        .unwrap_or_else(|| commands::DEFAULT_SPOTLIGHT_SHORTCUT.to_string());
                     drop(cfg);
 
                     let quick_add: Shortcut = match quick_add_str.parse() {
@@ -101,6 +104,10 @@ pub fn run() {
                         Err(_) => return,
                     };
                     let main_shortcut: Shortcut = match main_str.parse() {
+                        Ok(s) => s,
+                        Err(_) => return,
+                    };
+                    let spotlight_sc: Shortcut = match spotlight_str.parse() {
                         Ok(s) => s,
                         Err(_) => return,
                     };
@@ -117,6 +124,22 @@ pub fn run() {
                             let _ = w.unminimize();
                             let _ = w.set_focus();
                             let _ = app.emit("main-shown", ());
+                        }
+                    } else if *shortcut == spotlight_sc {
+                        if let Some(window) = app.get_webview_window("spotlight") {
+                            let _ = window.set_size(tauri::LogicalSize::new(560.0, 64.0));
+                            if let Ok(Some(monitor)) = window.current_monitor() {
+                                let size = monitor.size();
+                                let scale = monitor.scale_factor();
+                                let logical_w = size.width as f64 / scale;
+                                let logical_h = size.height as f64 / scale;
+                                let x = ((logical_w - 560.0) / 2.0).max(0.0);
+                                let y = (logical_h * 0.25).max(0.0);
+                                let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition::new(x, y)));
+                            }
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            let _ = app.emit("spotlight-shown", ());
                         }
                     }
                 })
@@ -188,6 +211,14 @@ pub fn run() {
                 Shortcut::from_str(commands::DEFAULT_MAIN_SHORTCUT).expect("invalid default shortcut")
             });
             app.global_shortcut().register(main_shortcut).ok();
+
+            let spotlight_shortcut_str = cfg
+                .get("spotlight-shortcut")
+                .unwrap_or_else(|| commands::DEFAULT_SPOTLIGHT_SHORTCUT.to_string());
+            let spotlight_shortcut = Shortcut::from_str(&spotlight_shortcut_str).unwrap_or_else(|_| {
+                Shortcut::from_str(commands::DEFAULT_SPOTLIGHT_SHORTCUT).expect("invalid default spotlight shortcut")
+            });
+            app.global_shortcut().register(spotlight_shortcut).ok();
             app.manage(cfg);
 
             log::info!("[startup] initializing database...");
@@ -329,6 +360,8 @@ pub fn run() {
             commands::pop_pending_deep_link,
             commands::check_startup_deep_link,
             commands::get_local_server_info,
+            commands::get_spotlight_shortcut,
+            commands::set_spotlight_shortcut,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

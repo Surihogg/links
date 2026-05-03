@@ -703,6 +703,7 @@ pub fn get_system_proxy() -> Option<String> {
 
 pub const DEFAULT_SHORTCUT: &str = "CmdOrCtrl+Shift+L";
 pub const DEFAULT_MAIN_SHORTCUT: &str = "CmdOrCtrl+Shift+J";
+pub const DEFAULT_SPOTLIGHT_SHORTCUT: &str = "CmdOrCtrl+Shift+K";
 
 #[tauri::command]
 pub fn get_shortcut(config: State<'_, Config>) -> Result<String, AppError> {
@@ -755,6 +756,27 @@ pub fn copy_to_clipboard(content: String) -> Result<(), AppError> {
         .set_text(content)
         .map_err(|e| AppError::General(e.to_string()))?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_spotlight_shortcut(config: State<'_, Config>) -> Result<String, AppError> {
+    Ok(config.get("spotlight-shortcut").unwrap_or_else(|| DEFAULT_SPOTLIGHT_SHORTCUT.to_string()))
+}
+
+#[tauri::command]
+pub fn set_spotlight_shortcut(app: AppHandle, config: State<'_, Config>, shortcut: String) -> Result<String, AppError> {
+    let parsed: tauri_plugin_global_shortcut::Shortcut = shortcut
+        .parse()
+        .map_err(|e: <tauri_plugin_global_shortcut::Shortcut as std::str::FromStr>::Err| AppError::General(e.to_string()))?;
+    let old = config.get("spotlight-shortcut").unwrap_or_else(|| DEFAULT_SPOTLIGHT_SHORTCUT.to_string());
+    let _ = app.global_shortcut().unregister(old.as_str());
+    app.global_shortcut()
+        .register(parsed)
+        .map_err(|e| AppError::General(e.to_string()))?;
+    config.set("spotlight-shortcut", &shortcut)?;
+    let dir = app.path().app_data_dir().expect("failed to resolve app data dir");
+    config.save(&dir)?;
+    Ok(parsed.to_string())
 }
 
 #[tauri::command]

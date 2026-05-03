@@ -20,6 +20,11 @@
   let main_recording = $state(false);
   let main_recorded_shortcut = $state(null);
   let main_shortcut_error = $state(false);
+  let spotlight_shortcut = $state(null);
+  let spotlight_shortcut_loaded = $state(false);
+  let spotlight_recording = $state(false);
+  let spotlight_recorded_shortcut = $state(null);
+  let spotlight_shortcut_error = $state(false);
   let autostart_enabled = $state(false);
   let autostart_loaded = $state(false);
   let auto_minimize = $state(false);
@@ -87,6 +92,18 @@
     main_shortcut_error = false;
   }
 
+  function start_spotlight_recording() {
+    spotlight_recorded_shortcut = null;
+    spotlight_shortcut_error = false;
+    spotlight_recording = true;
+  }
+
+  function cancel_spotlight_recording() {
+    spotlight_recorded_shortcut = null;
+    spotlight_recording = false;
+    spotlight_shortcut_error = false;
+  }
+
   async function save_shortcut() {
     if (!recorded_shortcut) return;
     shortcut_error = false;
@@ -115,6 +132,20 @@
     }
   }
 
+  async function save_spotlight_shortcut() {
+    if (!spotlight_recorded_shortcut) return;
+    spotlight_shortcut_error = false;
+    try {
+      const result = await api.setSpotlightShortcut(spotlight_recorded_shortcut);
+      spotlight_shortcut = result;
+      spotlight_recording = false;
+      spotlight_recorded_shortcut = null;
+    } catch {
+      spotlight_shortcut_error = true;
+      spotlight_recorded_shortcut = null;
+    }
+  }
+
   onMount(async () => {
     const val = await api.getSetting("close-behavior");
     close_behavior = val || "ask";
@@ -131,6 +162,12 @@
       main_shortcut = null;
     }
     main_shortcut_loaded = true;
+    try {
+      spotlight_shortcut = await api.getSpotlightShortcut();
+    } catch {
+      spotlight_shortcut = null;
+    }
+    spotlight_shortcut_loaded = true;
     // Load autostart state
     try {
       autostart_enabled = await api.isAutostartEnabled();
@@ -319,6 +356,12 @@
       const res = buildShortcutFromEvent(e);
       if (res) main_recorded_shortcut = res;
     }
+    if (spotlight_recording) {
+      e.preventDefault();
+      e.stopPropagation();
+      const res = buildShortcutFromEvent(e);
+      if (res) spotlight_recorded_shortcut = res;
+    }
   }
 </script>
 
@@ -366,7 +409,7 @@
         {/if}
 
         <div class="section-label" style="margin-top: 16px;">快捷键</div>
-        {#if shortcut_loaded && main_shortcut_loaded}
+        {#if shortcut_loaded && main_shortcut_loaded && spotlight_shortcut_loaded}
           <div class="shortcut-section">
             <div class="shortcut-row">
               <div class="shortcut-info">
@@ -415,6 +458,31 @@
                 <div class="shortcut-actions">
                   <button class="btn btn-secondary btn-sm" onclick={cancel_main_recording}>取消</button>
                   <button class="btn btn-primary btn-sm" disabled={!main_recorded_shortcut} onclick={save_main_shortcut}>保存</button>
+                </div>
+              {/if}
+            </div>
+            <div class="shortcut-row" style="margin-top: 10px;">
+              <div class="shortcut-info">
+                <span class="format-name">全局搜索</span>
+                <span class="format-desc">唤起 Spotlight 搜索窗口</span>
+              </div>
+              {#if !spotlight_recording}
+                <div class="shortcut-display">{formatShortcut(spotlight_shortcut) || "未设置"}</div>
+                <button class="btn btn-secondary btn-sm" onclick={start_spotlight_recording}>修改</button>
+              {:else}
+                <div class="shortcut-display recording-area">
+                  {#if spotlight_recorded_shortcut}
+                    {formatShortcut(spotlight_recorded_shortcut)}
+                  {:else}
+                    请按下新的快捷键...
+                  {/if}
+                </div>
+                {#if spotlight_shortcut_error}
+                  <span class="shortcut-error">快捷键设置失败，请重试</span>
+                {/if}
+                <div class="shortcut-actions">
+                  <button class="btn btn-secondary btn-sm" onclick={cancel_spotlight_recording}>取消</button>
+                  <button class="btn btn-primary btn-sm" disabled={!spotlight_recorded_shortcut} onclick={save_spotlight_shortcut}>保存</button>
                 </div>
               {/if}
             </div>

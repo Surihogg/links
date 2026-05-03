@@ -13,6 +13,7 @@ export default defineConfig({
       input: {
         main: "index.html",
         "quick-add": "quick-add.html",
+        spotlight: "spotlight.html",
       },
     },
   },

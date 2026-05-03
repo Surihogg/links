@@ -184,3 +184,11 @@ export async function checkStartupDeepLink() {
 export async function getLocalServerInfo() {
   return invoke("get_local_server_info");
 }
+
+export async function getSpotlightShortcut() {
+  return invoke("get_spotlight_shortcut");
+}
+
+export async function setSpotlightShortcut(shortcut) {
+  return invoke("set_spotlight_shortcut", { shortcut });
+}
