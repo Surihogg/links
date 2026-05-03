@@ -295,8 +295,6 @@
     height: 100vh;
     background: var(--bg-0);
     border: 1px solid var(--border-0);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
     overflow: hidden;
   }
 
