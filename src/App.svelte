@@ -216,6 +216,8 @@
       const { listen } = await import("@tauri-apps/api/event");
       unlistenLinksChanged = await listen("links-changed", () => {
         refresh_current_view();
+        categoriesStore.load();
+        tagsStore.load();
       });
     } catch (e) {}
 
@@ -651,8 +653,8 @@ async function on_toggle_favorite(link) {
     if (e.key !== "Escape") return;
     if (show_settings) { show_settings = false; return; }
     if (show_export) { show_export = false; return; }
-    if (show_add_form) { show_add_form = false; return; }
-    if (edit_link) { edit_link = null; return; }
+    if (show_add_form) { show_add_form = false; categoriesStore.load(); tagsStore.load(); return; }
+    if (edit_link) { edit_link = null; categoriesStore.load(); tagsStore.load(); return; }
     if (show_close_dialog) { show_close_dialog = false; return; }
     if (show_update_dialog) { show_update_dialog = false; return; }
     if (show_release_notes) { show_release_notes = false; return; }
@@ -745,11 +747,11 @@ async function on_toggle_favorite(link) {
   </div>
 
   {#if show_add_form}
-    <LinkForm categories={categories} onsave={on_save_link} oncancel={() => show_add_form = false} />
+    <LinkForm categories={categories} onsave={on_save_link} oncancel={() => { show_add_form = false; categoriesStore.load(); tagsStore.load(); }} />
   {/if}
 
   {#if edit_link}
-    <LinkForm link={edit_link} categories={categories} onsave={on_save_link} oncancel={() => edit_link = null} />
+    <LinkForm link={edit_link} categories={categories} onsave={on_save_link} oncancel={() => { edit_link = null; categoriesStore.load(); tagsStore.load(); }} />
   {/if}
 
   {#if show_export}

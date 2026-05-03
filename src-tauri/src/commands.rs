@@ -619,6 +619,10 @@ fn ensure_tags(
             )
             .ok();
         if let Some(id) = existing {
+            conn.execute(
+                "UPDATE tags SET updated_at = datetime('now','localtime') WHERE id = ?",
+                rusqlite::params![id],
+            ).ok();
             ids.push(id);
         } else {
             conn.execute(

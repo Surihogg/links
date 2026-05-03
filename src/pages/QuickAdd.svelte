@@ -207,6 +207,7 @@
 
   async function close_window() {
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await emit("links-changed");
     await getCurrentWindow().hide();
   }
 

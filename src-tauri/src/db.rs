@@ -302,6 +302,10 @@ pub(crate) fn ensure_tags(conn: &Connection, tags: &[String]) -> Vec<i64> {
         }
         conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", rusqlite::params![tag])
             .ok();
+        conn.execute(
+            "UPDATE tags SET updated_at = datetime('now','localtime') WHERE name = ?",
+            rusqlite::params![tag],
+        ).ok();
         if let Ok(id) = conn.query_row("SELECT id FROM tags WHERE name = ?", rusqlite::params![tag], |r| r.get::<_, i64>(0)) {
             ids.push(id);
         }
@@ -708,6 +712,32 @@ impl Db {
 
     pub fn create_category(&self, payload: &CreateCategoryPayload) -> Result<Category, AppError> {
         let conn = self.0.lock().unwrap();
+
+        let existing: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM categories WHERE name = ? AND IFNULL(parent_id, -1) = IFNULL(?, -1)",
+                rusqlite::params![payload.name, payload.parent_id],
+                |r| r.get(0),
+            )
+            .ok();
+        if let Some(id) = existing {
+            return conn.query_row(
+                "SELECT id, name, parent_id, sort_order, created_at, updated_at FROM categories WHERE id = ?",
+                rusqlite::params![id],
+                |row| {
+                    Ok(Category {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        parent_id: row.get(2)?,
+                        sort_order: row.get(3)?,
+                        children: vec![],
+                        created_at: row.get(4)?,
+                        updated_at: row.get(5)?,
+                    })
+                },
+            ).map_err(AppError::from);
+        }
+
         conn.execute(
             "INSERT INTO categories (name, parent_id) VALUES (?, ?)",
             rusqlite::params![payload.name, payload.parent_id],
@@ -791,16 +821,23 @@ impl Db {
 
     pub fn create_tag(&self, name: &str) -> Result<Tag, AppError> {
         let conn = self.0.lock().unwrap();
-        // Check if tag already exists to avoid UNIQUE constraint on insert
         if let Ok(mut stmt) = conn.prepare("SELECT id, name, updated_at FROM tags WHERE name = ?") {
             let mut rows = stmt.query(rusqlite::params![name])?;
             if let Some(row) = rows.next()? {
-                return Ok(Tag { id: row.get(0)?, name: row.get(1)?, updated_at: row.get(2)? });
+                let id: i64 = row.get(0)?;
+                conn.execute(
+                    "UPDATE tags SET updated_at = datetime('now','localtime') WHERE id = ?",
+                    rusqlite::params![id],
+                ).ok();
+                return Ok(Tag { id, name: row.get(1)?, updated_at: row.get(2)? });
             }
         }
-        // Insert new tag
         conn.execute("INSERT INTO tags (name) VALUES (?)", rusqlite::params![name])?;
         let id = conn.last_insert_rowid();
+        conn.execute(
+            "UPDATE tags SET updated_at = datetime('now','localtime') WHERE id = ?",
+            rusqlite::params![id],
+        ).ok();
         let tag = conn.query_row(
             "SELECT id, name, updated_at FROM tags WHERE id = ?",
             rusqlite::params![id],

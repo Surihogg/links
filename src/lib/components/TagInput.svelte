@@ -1,5 +1,5 @@
 <script>
-  import { autocompleteTags } from "../api.js";
+  import { autocompleteTags, createTag } from "../api.js";
 
   let { tags = $bindable([]), onchange } = $props();
   let input = $state("");
@@ -30,12 +30,12 @@
     active_index = -1;
   }
 
-  function add_tag(name) {
+  async function add_tag(name) {
     const t = name.trim();
-    if (t && !tags.includes(t)) {
-      tags = [...tags, t];
-      onchange?.(tags);
-    }
+    if (!t || tags.includes(t)) return;
+    createTag(t).catch(() => {});
+    tags = [...tags, t];
+    onchange?.(tags);
     input = "";
     show_suggestions = false;
   }
