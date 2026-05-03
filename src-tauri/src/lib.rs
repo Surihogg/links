@@ -97,6 +97,9 @@ pub fn run() {
                     let spotlight_str = cfg
                         .get("spotlight-shortcut")
                         .unwrap_or_else(|| commands::DEFAULT_SPOTLIGHT_SHORTCUT.to_string());
+                    let hide_str = cfg
+                        .get("hide-shortcut")
+                        .unwrap_or_else(|| commands::DEFAULT_HIDE_SHORTCUT.to_string());
                     drop(cfg);
 
                     let quick_add: Shortcut = match quick_add_str.parse() {
@@ -108,6 +111,10 @@ pub fn run() {
                         Err(_) => return,
                     };
                     let spotlight_sc: Shortcut = match spotlight_str.parse() {
+                        Ok(s) => s,
+                        Err(_) => return,
+                    };
+                    let hide_sc: Shortcut = match hide_str.parse() {
                         Ok(s) => s,
                         Err(_) => return,
                     };
@@ -124,6 +131,10 @@ pub fn run() {
                             let _ = w.unminimize();
                             let _ = w.set_focus();
                             let _ = app.emit("main-shown", ());
+                        }
+                    } else if *shortcut == hide_sc {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.hide();
                         }
                     } else if *shortcut == spotlight_sc {
                         if let Some(window) = app.get_webview_window("spotlight") {
@@ -224,6 +235,15 @@ pub fn run() {
                 Shortcut::from_str(commands::DEFAULT_SPOTLIGHT_SHORTCUT).expect("invalid default spotlight shortcut")
             });
             app.global_shortcut().register(spotlight_shortcut).ok();
+
+            let hide_shortcut_str = cfg
+                .get("hide-shortcut")
+                .unwrap_or_else(|| commands::DEFAULT_HIDE_SHORTCUT.to_string());
+            let hide_shortcut = Shortcut::from_str(&hide_shortcut_str).unwrap_or_else(|_| {
+                Shortcut::from_str(commands::DEFAULT_HIDE_SHORTCUT).expect("invalid default hide shortcut")
+            });
+            app.global_shortcut().register(hide_shortcut).ok();
+
             app.manage(cfg);
 
             log::info!("[startup] initializing database...");
@@ -367,6 +387,8 @@ pub fn run() {
             commands::get_local_server_info,
             commands::get_spotlight_shortcut,
             commands::set_spotlight_shortcut,
+            commands::get_hide_shortcut,
+            commands::set_hide_shortcut,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -25,6 +25,11 @@
   let spotlight_recording = $state(false);
   let spotlight_recorded_shortcut = $state(null);
   let spotlight_shortcut_error = $state(false);
+  let hide_shortcut = $state(null);
+  let hide_shortcut_loaded = $state(false);
+  let hide_recording = $state(false);
+  let hide_recorded_shortcut = $state(null);
+  let hide_shortcut_error = $state(false);
   let autostart_enabled = $state(false);
   let autostart_loaded = $state(false);
   let auto_minimize = $state(false);
@@ -146,6 +151,32 @@
     }
   }
 
+  function start_hide_recording() {
+    hide_recorded_shortcut = null;
+    hide_shortcut_error = false;
+    hide_recording = true;
+  }
+
+  function cancel_hide_recording() {
+    hide_recorded_shortcut = null;
+    hide_recording = false;
+    hide_shortcut_error = false;
+  }
+
+  async function save_hide_shortcut() {
+    if (!hide_recorded_shortcut) return;
+    hide_shortcut_error = false;
+    try {
+      const result = await api.setHideShortcut(hide_recorded_shortcut);
+      hide_shortcut = result;
+      hide_recording = false;
+      hide_recorded_shortcut = null;
+    } catch {
+      hide_shortcut_error = true;
+      hide_recorded_shortcut = null;
+    }
+  }
+
   onMount(async () => {
     const val = await api.getSetting("close-behavior");
     close_behavior = val || "ask";
@@ -168,6 +199,12 @@
       spotlight_shortcut = null;
     }
     spotlight_shortcut_loaded = true;
+    try {
+      hide_shortcut = await api.getHideShortcut();
+    } catch {
+      hide_shortcut = null;
+    }
+    hide_shortcut_loaded = true;
     // Load autostart state
     try {
       autostart_enabled = await api.isAutostartEnabled();
@@ -362,6 +399,12 @@
       const res = buildShortcutFromEvent(e);
       if (res) spotlight_recorded_shortcut = res;
     }
+    if (hide_recording) {
+      e.preventDefault();
+      e.stopPropagation();
+      const res = buildShortcutFromEvent(e);
+      if (res) hide_recorded_shortcut = res;
+    }
   }
 </script>
 
@@ -409,7 +452,7 @@
         {/if}
 
         <div class="section-label" style="margin-top: 16px;">快捷键</div>
-        {#if shortcut_loaded && main_shortcut_loaded && spotlight_shortcut_loaded}
+        {#if shortcut_loaded && main_shortcut_loaded && spotlight_shortcut_loaded && hide_shortcut_loaded}
           <div class="shortcut-section">
             <div class="shortcut-row">
               <div class="shortcut-info">
@@ -483,6 +526,31 @@
                 <div class="shortcut-actions">
                   <button class="btn btn-secondary btn-sm" onclick={cancel_spotlight_recording}>取消</button>
                   <button class="btn btn-primary btn-sm" disabled={!spotlight_recorded_shortcut} onclick={save_spotlight_shortcut}>保存</button>
+                </div>
+              {/if}
+            </div>
+            <div class="shortcut-row" style="margin-top: 10px;">
+              <div class="shortcut-info">
+                <span class="format-name">隐藏窗口</span>
+                <span class="format-desc">隐藏主程序窗口</span>
+              </div>
+              {#if !hide_recording}
+                <div class="shortcut-display">{formatShortcut(hide_shortcut) || "未设置"}</div>
+                <button class="btn btn-secondary btn-sm" onclick={start_hide_recording}>修改</button>
+              {:else}
+                <div class="shortcut-display recording-area">
+                  {#if hide_recorded_shortcut}
+                    {formatShortcut(hide_recorded_shortcut)}
+                  {:else}
+                    请按下新的快捷键...
+                  {/if}
+                </div>
+                {#if hide_shortcut_error}
+                  <span class="shortcut-error">快捷键设置失败，请重试</span>
+                {/if}
+                <div class="shortcut-actions">
+                  <button class="btn btn-secondary btn-sm" onclick={cancel_hide_recording}>取消</button>
+                  <button class="btn btn-primary btn-sm" disabled={!hide_recorded_shortcut} onclick={save_hide_shortcut}>保存</button>
                 </div>
               {/if}
             </div>
@@ -570,31 +638,6 @@
           <div class="format-loading">加载中...</div>
         {/if}
 
-        <div class="section-label" style="margin-top: 20px;">浏览器收藏</div>
-        <div class="bookmarklet-section">
-          <div class="bookmarklet-desc">
-            将下方按钮拖拽到浏览器书签栏，即可在任何网页一键收藏到 Links ✨
-          </div>
-          <div class="bookmarklet-row">
-            <a
-              class="bookmarklet-btn"
-              class:disabled={!bookmarklet_code}
-              href={bookmarklet_code || "#"}
-              title={bookmarklet_code ? "拖拽我到书签栏" : "正在准备..."}
-              onclick={(e) => { e.preventDefault(); }}
-            >
-              扔给Links
-            </a>
-            <button class="btn btn-secondary btn-sm" onclick={copy_bookmarklet} disabled={!bookmarklet_code}>
-              {bookmarklet_copied ? '已复制 ✓' : '复制代码'}
-            </button>
-          </div>
-          <div class="bookmarklet-tip">
-            💡 在浏览器书签栏里点击“扔给Links”会跳转到快速添加；Links未运行时会自动唤起应用<p>
-            （但由于浏览器有安全限制，限定了一定时间内无法连续触发应用冷启动，有概率出现点击书签后没反应，为了更好的体验，建议您启动应用后保持常驻）
-          </div>
-        </div>
-
         <div class="section-label" style="margin-top: 20px;">浏览器扩展</div>
         <div class="ext-section">
           <div class="ext-desc">
@@ -628,6 +671,31 @@
           <button class="btn btn-secondary btn-sm" onclick={() => ext_step = ext_step === 0 ? 1 : 0}>
             {ext_step === 0 ? '我已安装，隐藏步骤' : '查看安装步骤'}
           </button>
+        </div>
+
+        <div class="section-label" style="margin-top: 20px;">浏览器收藏</div>
+        <div class="bookmarklet-section">
+          <div class="bookmarklet-desc">
+            将下方按钮拖拽到浏览器书签栏，即可在任何网页一键收藏到 Links ✨
+          </div>
+          <div class="bookmarklet-row">
+            <a
+              class="bookmarklet-btn"
+              class:disabled={!bookmarklet_code}
+              href={bookmarklet_code || "#"}
+              title={bookmarklet_code ? "拖拽我到书签栏" : "正在准备..."}
+              onclick={(e) => { e.preventDefault(); }}
+            >
+              扔给Links
+            </a>
+            <button class="btn btn-secondary btn-sm" onclick={copy_bookmarklet} disabled={!bookmarklet_code}>
+              {bookmarklet_copied ? '已复制 ✓' : '复制代码'}
+            </button>
+          </div>
+          <div class="bookmarklet-tip">
+            💡 在浏览器书签栏里点击“扔给Links”会跳转到快速添加；Links未运行时会自动唤起应用<p>
+            （但由于浏览器有安全限制，限定了一定时间内无法连续触发应用冷启动，有概率出现点击书签后没反应，为了更好的体验，建议您启动应用后保持常驻）
+          </div>
         </div>
       </div>
 

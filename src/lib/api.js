@@ -192,3 +192,11 @@ export async function getSpotlightShortcut() {
 export async function setSpotlightShortcut(shortcut) {
   return invoke("set_spotlight_shortcut", { shortcut });
 }
+
+export async function getHideShortcut() {
+  return invoke("get_hide_shortcut");
+}
+
+export async function setHideShortcut(shortcut) {
+  return invoke("set_hide_shortcut", { shortcut });
+}
