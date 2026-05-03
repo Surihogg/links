@@ -25,6 +25,8 @@
   let dark_mode = $state(false);
   let theme_mode = $state("system");
   let url_input;
+  let ime_guard = $state(false);
+  let ime_timer = null;
 
   function apply_theme(mode) {
     if (mode !== undefined) theme_mode = mode;
@@ -113,6 +115,15 @@
       }
     } catch { /* 无 pending 则忽略 */ }
 
+    const handle_composition_start = () => { ime_guard = true; clearTimeout(ime_timer); };
+    const handle_composition_end = () => {
+      ime_guard = true;
+      clearTimeout(ime_timer);
+      ime_timer = setTimeout(() => ime_guard = false, 200);
+    };
+    document.addEventListener("compositionstart", handle_composition_start, true);
+    document.addEventListener("compositionend", handle_composition_end, true);
+
     const handle_keydown = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -121,6 +132,9 @@
     };
     window.addEventListener("keydown", handle_keydown);
     return () => {
+      clearTimeout(ime_timer);
+      document.removeEventListener("compositionstart", handle_composition_start, true);
+      document.removeEventListener("compositionend", handle_composition_end, true);
       window.removeEventListener("keydown", handle_keydown);
       unlistenTheme();
       unlistenShown();
@@ -225,7 +239,7 @@
     </button>
   </div>
 
-  <form class="modal-body" onsubmit={(e) => { e.preventDefault(); submit(); }}>
+  <form class="modal-body" onsubmit={(e) => { e.preventDefault(); if (ime_guard) return; submit(); }}>
     <div class="field url-field">
       <div class="field-label-row">
         <label class="field-label">URL <span class="required">*</span></label>

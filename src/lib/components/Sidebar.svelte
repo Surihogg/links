@@ -450,7 +450,7 @@
           bind:value={new_name}
           placeholder={cat_placeholder}
           class="new-cat-input"
-          onkeydown={(e) => { if (e.key === 'Escape') { show_new = false; new_name = ""; cat_placeholder = "给我一点输入"; } }}
+          onkeydown={(e) => { if (e.key === 'Enter' && e.isComposing) return; if (e.key === 'Escape') { show_new = false; new_name = ""; cat_placeholder = "给我一点输入"; } }}
           autofocus
         />
       </form>
@@ -578,7 +578,7 @@
           bind:value={new_tag_name}
           placeholder={tag_placeholder}
           class="new-cat-input"
-          onkeydown={(e) => { if (e.key === 'Escape') { show_new_tag = false; new_tag_name = ""; tag_placeholder = "给我一点输入"; } }}
+          onkeydown={(e) => { if (e.key === 'Enter' && e.isComposing) return; if (e.key === 'Escape') { show_new_tag = false; new_tag_name = ""; tag_placeholder = "给我一点输入"; } }}
           autofocus
         />
       </form>

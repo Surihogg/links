@@ -5,6 +5,24 @@
   import { checkDuplicate } from "../api.js";
 
   let { link = null, categories = [], onsave, oncancel } = $props();
+  let ime_guard = $state(false);
+  let ime_timer = null;
+
+  $effect(() => {
+    const onStart = () => { ime_guard = true; clearTimeout(ime_timer); };
+    const onEnd = () => {
+      ime_guard = true;
+      clearTimeout(ime_timer);
+      ime_timer = setTimeout(() => ime_guard = false, 200);
+    };
+    document.addEventListener("compositionstart", onStart, true);
+    document.addEventListener("compositionend", onEnd, true);
+    return () => {
+      document.removeEventListener("compositionstart", onStart, true);
+      document.removeEventListener("compositionend", onEnd, true);
+      clearTimeout(ime_timer);
+    };
+  });
 
   let url = $state(link?.url ?? "");
   let title = $state(link?.title ?? "");
@@ -138,7 +156,7 @@
       </button>
     </div>
 
-    <form class="modal-body" onsubmit={(e) => { e.preventDefault(); submit(); }}>
+    <form class="modal-body" onsubmit={(e) => { e.preventDefault(); if (ime_guard) return; submit(); }}>
       <div class="field url-field">
         <div class="field-label-row">
           <label class="field-label">URL <span class="required">*</span></label>

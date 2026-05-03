@@ -9,6 +9,8 @@
   let input_el = $state(null);
   let creating = $state(false);
   let blur_timeout = null;
+  let ime_guard = $state(false);
+  let ime_timer = null;
 
   // Locally created categories (not yet in parent's list)
   let createdCategories = $state([]);
@@ -101,7 +103,14 @@
     setTimeout(() => input_el?.focus(), 50);
   }
 
+  function oncompositionend() {
+    ime_guard = true;
+    clearTimeout(ime_timer);
+    ime_timer = setTimeout(() => ime_guard = false, 200);
+  }
+
   function onkeydown(e) {
+    if (e.isComposing) return;
     if (selectedCategory) {
       if (e.key === "Backspace" || e.key === "Delete") {
         e.preventDefault();
@@ -119,6 +128,7 @@
       e.preventDefault();
       active_index = Math.max(active_index - 1, -1);
     } else if (e.key === "Enter") {
+      if (ime_guard) return;
       e.preventDefault();
       if (active_index >= 0) {
         if (active_index < filteredCategories.length) {
@@ -161,6 +171,7 @@
       readonly={!!selectedCategory}
       oninput={oninput_handler}
       onkeydown={onkeydown}
+      oncompositionend={oncompositionend}
       onfocus={onfocus_handler}
       onblur={onblur_handler}
       placeholder={selectedCategory ? "" : "搜索或创建分组"}

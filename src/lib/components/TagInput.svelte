@@ -7,6 +7,8 @@
   let show_suggestions = $state(false);
   let active_index = $state(-1);
   let blur_timeout = null;
+  let ime_guard = $state(false);
+  let ime_timer = null;
 
   let exactMatch = $derived(
     input.trim().length > 0 && suggestions.some(s => s.name.toLowerCase() === input.trim().toLowerCase())
@@ -45,8 +47,17 @@
     onchange?.(tags);
   }
 
+  function oncompositionend() {
+    ime_guard = true;
+    clearTimeout(ime_timer);
+    ime_timer = setTimeout(() => ime_guard = false, 200);
+  }
+
   function onkeydown(e) {
+    if (e.isComposing) return;
     if (e.key === "Enter" || e.key === ",") {
+      if (ime_guard) return;
+
       e.preventDefault();
       if (active_index >= 0) {
         if (active_index < suggestions.length) {
@@ -84,6 +95,7 @@
       value={input}
       oninput={oninput}
       onkeydown={onkeydown}
+      oncompositionend={oncompositionend}
       onfocus={onfocus_handler}
       onblur={() => { blur_timeout = setTimeout(() => show_suggestions = false, 150); }}
       placeholder={tags.length === 0 ? "搜索或创建标签" : ""}
