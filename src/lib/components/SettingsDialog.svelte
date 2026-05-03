@@ -536,7 +536,7 @@
             {#if ext_step === 0}
               <div class="ext-step">
                 <span class="ext-step-num">1</span>
-                <span>从 <a href="https://github.com/Surihogg/links/releases" target="_blank" rel="noopener" class="ext-link">GitHub Releases</a> 下载浏览器扩展 zip 包</span>
+                <span>从 <button type="button" onclick={() => api.openUrl('https://github.com/Surihogg/links/releases')} class="ext-link">GitHub Releases</button> 下载浏览器扩展 zip 包</span>
               </div>
               <div class="ext-step">
                 <span class="ext-step-num">2</span>
@@ -857,10 +857,16 @@
 
   .ext-link {
     color: var(--accent);
-    text-decoration: none;
+    font-size: inherit;
+    font-family: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
   }
 
   .ext-link:hover {
-    text-decoration: underline;
+    opacity: 0.8;
   }
 </style>
