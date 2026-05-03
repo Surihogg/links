@@ -116,3 +116,15 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: 上传浏览器扩展
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          cd browser-extension
+          zip -r "../links-browser-extension-v${VERSION}.zip" .
+          cd ..
+          gh release upload "v${VERSION}" "links-browser-extension-v${VERSION}.zip" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
