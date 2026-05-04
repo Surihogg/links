@@ -9,6 +9,8 @@
 - **本地优先**：所有数据存储在本地 SQLite 数据库，不依赖任何云服务
 - **轻量高效**：Tauri + Rust 后端，安装包约 5MB，内存占用极低
 - **快速捕获**：全局快捷键 `Cmd+Shift+L`（macOS）/ `Ctrl+Shift+L`（Windows）随时唤起快速添加窗口
+- **全局搜索**：`Cmd+Shift+K`（macOS）/ `Ctrl+Shift+K`（Windows）唤起 Spotlight 搜索浮层，即时搜索并打开链接
+- **自动更新**：内置更新检查，新版本发布后一键安装
 - **自动抓取**：粘贴 URL 后自动抓取页面标题、描述、favicon 和封面图
 - **全文搜索**：基于 SQLite FTS5，支持中文和标签搜索，搜索结果高亮
 - **安全可靠**：链接去重检测、失效检测，数据损坏自动重建
@@ -26,13 +28,19 @@
 | 链接分享 | 复制到剪贴板，支持 URL / Markdown / HTML 三种格式 |
 | 去重检测 | URL 重复时自动提示，编辑时排除自身 |
 | 失效检测 | 添加时自动检测可达性，卡片显示警告图标 |
-| 书签导入 | 支持 Chrome / Firefox / Safari 书签 HTML 导入 |
-| 数据导出 | JSON / Markdown / CSV，原生文件保存对话框 |
+| 书签导入 | 支持 Chrome / Firefox / Safari 书签 HTML + JSON + CSV 导入 |
+| 数据导出 | JSON / Markdown / CSV / 浏览器书签 HTML，原生文件保存对话框 |
 | 暗色模式 | CSS 变量驱动，持久化到 config.json |
 | 全局快捷键 | 快速添加窗口，随时保存链接，支持自定义快捷键 |
 | 系统托盘 | 最小化到托盘后台运行，左键点击显示主窗口 |
 | 配置管理 | 窗口大小/位置记忆、关闭行为、暗色模式等，持久化到 config.json |
 | 跨平台 | macOS / Windows / Linux |
+| 全局搜索 | Spotlight 搜索浮层，快捷键唤起，即时搜索，键盘导航，Enter 打开 / Cmd+Enter 定位到主窗口 |
+| 浏览器扩展 | Chrome 扩展一键收藏，通过深度链接唤起快速添加窗口 |
+| 自动更新 | 启动检查 + 手动检查，Release Notes 弹窗，一键下载安装 |
+| 键盘导航 | 主窗口上下键选中链接，回车打开，空格编辑；Spotlight 箭头导航 |
+| 导入增强 | 支持 Chrome / Firefox / Safari 书签 HTML，以及 JSON / CSV 文件导入 |
+| 导出增强 | JSON / Markdown / CSV / 浏览器书签 HTML 四种格式 |
 
 ## 技术栈
 
@@ -48,29 +56,32 @@
 
 ```
 links/
-├── .github/workflows/     # CI/CD：自动构建 Windows 安装包
+├── .github/workflows/     # CI/CD：macOS + Windows 自动构建
 │   └── release.yml
 │
 ├── src-tauri/              # Rust 后端
 │   ├── src/
 │   │   ├── main.rs         # 入口，调用 app_lib::run()
-│   │   ├── lib.rs          # Tauri builder：插件、命令注册、数据库初始化、全局快捷键、系统托盘
+│   │   ├── lib.rs          # Tauri builder：插件、命令注册、数据库初始化、全局快捷键、系统托盘；支持深度链接和单实例处理
 │   │   ├── db.rs           # SQLite 建表/迁移、数据模型、Db(Mutex<Connection>) 封装、CRUD、搜索、导出
 │   │   ├── fetcher.rs      # URL 元数据异步抓取、Windows 系统代理
+│   │   ├── http_server.rs   # 浏览器扩展本地 HTTP 服务（端口 + 令牌鉴权）
 │   │   ├── commands.rs     # 所有 Tauri 命令、快捷键管理、剪贴板、去重/失效检测
 │   │   ├── config.rs       # config.json 读写、Config(Mutex<HashMap>) 封装
 │   │   └── normalize.rs    # URL 标准化（去重比较用）
 │   ├── Cargo.toml          # Rust 依赖：tauri, rusqlite, reqwest, scraper, tokio...
-│   ├── tauri.conf.json     # 窗口、构建、打包配置（主窗口 + quick-add 窗口）
+│   ├── tauri.conf.json     # 窗口、构建、打包配置（主窗口 + quick-add + spotlight 窗口）
 │   └── capabilities/       # Tauri 权限配置
 │
 ├── src/                    # Svelte 前端
 │   ├── main.js             # 主窗口挂载入口
 │   ├── quick-add.js        # 快速添加窗口入口
+│   ├── spotlight.js        # 全局搜索窗口入口
 │   ├── App.svelte          # 主布局（侧边栏 + 内容区 + FAB）
 │   ├── app.css             # CSS 变量设计系统 + 明暗主题
 │   ├── lib/
 │   │   ├── api.js          # Tauri invoke 封装（全部后端命令的 JS 绑定）
+│   │   ├── ready.js        # 启动就绪辅助脚本
 │   │   ├── stores/index.js # Svelte stores（links / categories / tags）
 │   │   └── components/     # UI 组件
 │   │       ├── LinkCard.svelte      # 链接卡片
@@ -78,16 +89,20 @@ links/
 │   │       ├── LinkList.svelte      # 链接列表
 │   │       ├── SearchBar.svelte     # 搜索栏
 │   │       ├── Sidebar.svelte       # 侧边栏（分组 + 标签）
-│   │       ├── TagInput.svelte      # 标签输入
-│   │       ├── ExportDialog.svelte  # 导出对话框
+│   │   ├── TagInput.svelte      # 标签输入
+│   │   ├── CategoryInput.svelte  # 分组选择输入
+│   │   ├── ExportDialog.svelte  # 导出对话框
 │   │       └── SettingsDialog.svelte # 设置对话框
 │   └── pages/
-│       └── QuickAdd.svelte # 快速添加页面
+│       ├── QuickAdd.svelte      # 快速添加页面
+│       └── Spotlight.svelte     # 全局搜索页面
 │
 ├── index.html              # 主窗口 HTML（含启动动画）
 ├── quick-add.html          # 快速添加窗口 HTML
+├── spotlight.html          # 全局搜索窗口 HTML
+├── browser-extension/     # Chrome 浏览器扩展源码
 ├── package.json            # 前端依赖与脚本
-├── vite.config.js          # Vite 配置（双入口：main + quick-add）
+├── vite.config.js          # Vite 配置（三入口：main + quick-add + spotlight）
 ├── svelte.config.js        # Svelte 预处理配置
 ├── tsconfig.json           # TypeScript 严格模式配置
 ├── generate-icons.py       # 图标生成脚本
@@ -130,13 +145,21 @@ links/
 | `categories_create/update/delete` | 分组 CRUD |
 | `tags_list/create/delete` | 标签 CRUD |
 | `tags_autocomplete` | 标签模糊搜索 |
-| `export_links` | 导出为 JSON / Markdown / CSV |
-| `import_bookmarks` | 导入浏览器书签 HTML |
+| `export_links` | 导出为 JSON / Markdown / CSV / 浏览器书签 HTML |
+| `import_bookmarks` | 导入浏览器书签 HTML / JSON |
 | `open_url` | 在默认浏览器中打开 |
 | `save_file` | 原生文件保存对话框 |
 | `fetch_metadata` | 手动触发元数据抓取 |
 | `get_setting / set_setting` | 读写配置项 |
 | `get_shortcut / set_shortcut` | 快捷键管理 |
+| `get_main_shortcut / set_main_shortcut` | 主窗口快捷键管理 |
+| `get_spotlight_shortcut / set_spotlight_shortcut` | Spotlight 快捷键管理 |
+| `get_hide_shortcut / set_hide_shortcut` | 隐藏窗口快捷键管理 |
+| `open_data_dir` | 在文件管理器中打开数据目录 |
+| `get_system_proxy` | 获取系统代理设置（Windows） |
+| `pop_pending_deep_link` | 获取并清除待处理的深度链接数据 |
+| `check_startup_deep_link` | 检查启动是否由深度链接触发 |
+| `get_local_server_info` | 获取本地 HTTP 服务端口和令牌 |
 | `exit_app` | 安全退出应用 |
 
 ## 快速开始
@@ -187,12 +210,13 @@ npm run tauri build
 
 项目配置了 GitHub Actions 自动构建（`.github/workflows/release.yml`）：
 
-- 触发条件：推送到 `main` 分支或手动触发
-- 构建平台：Windows（当前仅 Windows）
+- 触发条件：推送 `v*` tag 或手动触发
+- 构建平台：macOS（aarch64 + x86_64）+ Windows
 - 产出：自动创建 GitHub Release Draft，附带安装包附件
-- 发布流程：Draft 需手动确认后发布
+- Windows 构建附带浏览器扩展 zip 附件
+- Release 为 Draft 模式，需手动确认发布
 
-如需支持 macOS / Linux 自动构建，需添加对应的 CI Runner。
+如需支持更多平台自动构建，需添加对应的 CI Runner。
 
 ## 数据存储
 
@@ -244,6 +268,22 @@ await invoke("get_setting", { key: "close-behavior" });
 **数据库损坏**：删除 `links.db`（含 `-wal` `-shm`）后重启自动重建
 
 **元数据抓取失败**：检查 `fail_links.log`，Windows 用户确认系统代理设置
+
+## 版本历史
+
+### v1.2.0 (2026-05-04)
+- ✨ 全局搜索（Spotlight）：`Cmd+Shift+K` 唤起搜索浮层，即时搜索，键盘导航
+- ✨ 浏览器扩展：Chrome 扩展一键收藏链接
+- ✨ 自动更新：启动检查 + 手动检查，Release Notes 弹窗
+- ✨ 主窗口键盘导航：上下键选中，回车打开，空格编辑
+- ✨ 导入增强：支持 JSON 文件导入，自动创建分组和标签
+- ✨ 导出增强：支持导出为浏览器书签 HTML 格式
+- ✨ 分组拖拽移动：支持拖拽调整分组顺序和层级
+- ✨ 分组展开阶梯缩进 + 绿色指示条
+- 🔧 搜索增强：支持按分组名搜索，筛选条件芯片
+- 🔧 暗色模式下搜索高亮颜色适配
+- 🔧 输入法回车适配（创建分组/标签时）
+- 🔧 CI/CD 支持 macOS + Windows 双平台构建和签名
 
 ## License
 

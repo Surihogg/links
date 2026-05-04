@@ -32,33 +32,6 @@
 
 ## 版本计划
 
-### v1.2.x — 全局搜索（Spotlight）
-
-> 目标：类似 macOS Spotlight 的全局搜索浮层，快捷键 `Cmd+Shift+K` 唤起，
-> 支持即时搜索已有链接 + URL 检测后快速添加。
-
-**Phase 1 — 窗口与基础设施**
-
-- [ ] 新增第三个窗口 `spotlight`：tauri.conf.json、spotlight.html、spotlight.js、Spotlight.svelte
-- [ ] Vite 三入口构建（main + quick-add + spotlight）
-- [ ] 窗口属性：560×自适应高度、居中、alwaysOnTop、skipTaskbar、transparent、不可调整大小、无原生标题栏
-- [ ] 全局快捷键 `CmdOrCtrl+Shift+K` 注册与配置（复用现有快捷键管理体系）
-- [ ] 窗口生命周期：快捷键唤起 → 显示并聚焦输入框；Escape / 点击窗口外部区域 → 隐藏
-
-**Phase 2 — 搜索与结果展示**
-
-- [ ] 搜索输入：debounce 150ms，复用 `links_search` 命令（FTS5 + 标签 + 分组 + LIKE）
-- [ ] 结果列表：每条显示标题、域名、标签；列表高度随结果数量伸缩，超过 7 条可滚动
-- [ ] 键盘导航：↑↓ 箭头切换高亮，Enter 执行当前项动作
-- [ ] 动作：`Enter` → 在浏览器中打开链接 URL 并关闭搜索窗口；`Cmd+Enter` → 定位到主窗口对应链接（打开主窗口并筛选）
-- [ ] 空状态：搜索无结果时显示提示文案
-
-**Phase 3 — URL 检测与快速添加** （可能不需要）
-
-- [ ] URL 检测：仅 `http://` 或 `https://` 开头触发
-- [ ] 检测到 URL 时在结果区顶部显示"＋ 添加此链接"入口
-- [ ] 选择添加 → 打开 quick-add 窗口并预填 URL → 搜索窗口关闭
-
 ### v1.3.x — 统计与行为追踪
 
 > 目标：为用户提供链接使用维度的数据洞察，支持按访问频率和最近访问排序。
@@ -80,6 +53,29 @@
 **不在本版本范围**：趋势图表、停留时长统计、搜索热词记录（留待后续版本评估）
 
 ## 开发日志
+
+## 2026-05-04
+
+### v1.2.x — 全局搜索（Spotlight）
+
+> 目标：类似 macOS Spotlight 的全局搜索浮层，快捷键 `Cmd+Shift+K` 唤起，
+> 支持即时搜索已有链接 + URL 检测后快速添加。
+
+**Phase 1 — 窗口与基础设施**
+
+- [x] 新增第三个窗口 `spotlight`：tauri.conf.json、spotlight.html、spotlight.js、Spotlight.svelte
+- [x] Vite 三入口构建（main + quick-add + spotlight）
+- [x] 窗口属性：560×自适应高度、居中、alwaysOnTop、skipTaskbar、transparent、不可调整大小、无原生标题栏
+- [x] 全局快捷键 `CmdOrCtrl+Shift+K` 注册与配置（复用现有快捷键管理体系）
+- [x] 窗口生命周期：快捷键唤起 → 显示并聚焦输入框；Escape / 点击窗口外部区域 → 隐藏
+
+**Phase 2 — 搜索与结果展示**
+
+- [x] 搜索输入：debounce 150ms，复用 `links_search` 命令（FTS5 + 标签 + 分组 + LIKE）
+- [x] 结果列表：每条显示标题、域名、标签；列表高度随结果数量伸缩，超过 7 条可滚动
+- [x] 键盘导航：↑↓ 箭头切换高亮，Enter 执行当前项动作
+- [x] 动作：`Enter` → 在浏览器中打开链接 URL 并关闭搜索窗口；`Cmd+Enter` → 定位到主窗口对应链接（打开主窗口并筛选）
+- [x] 空状态：搜索无结果时显示提示文案
 
 ## 2026-05-03
 

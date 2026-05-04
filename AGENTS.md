@@ -1,7 +1,7 @@
 # Links 项目知识库
 
-**生成时间:** 2026-04-29
-**提交:** 6836b78
+**生成时间:** 2026-05-04
+**提交:** 6a358b7
 **分支:** main
 
 ## 概述
@@ -14,8 +14,10 @@
 links/
 ├── src-tauri/        # Rust 后端（独立 Cargo 项目）
 ├── src/              # Svelte 前端（Vite 构建）
-├── .github/          # CI/CD（仅 Windows Release）
-└── index.html        # 主窗口入口
+├── .github/          # CI/CD（macOS + Windows 自动构建）
+├── spotlight.html    # 全局搜索浮层入口
+├── browser-extension/  # 浏览器扩展源码，Chrome Web Store 发布
+├── index.html        # 主窗口入口
 ```
 
 ## 查找指引
@@ -25,15 +27,17 @@ links/
 | 添加/修改后端命令 | `src-tauri/src/commands.rs` | 所有 `#[tauri::command]` 集中于此 |
 | 数据库操作 | `src-tauri/src/db.rs` | 模型、CRUD、搜索、导出逻辑 |
 | URL 抓取逻辑 | `src-tauri/src/fetcher.rs` | 元数据解析、Windows 代理 |
+| 浏览器扩展 HTTP 服务 | `src-tauri/src/http_server.rs` | 本地 HTTP 服务（端口 + 令牌鉴权） |
 | 配置读写 | `src-tauri/src/config.rs` | config.json 的 HashMap 封装 |
 | 应用启动流程 | `src-tauri/src/lib.rs` | 插件注册、DB 初始化、托盘、快捷键 |
 | 前端 API 层 | `src/lib/api.js` | 所有 invoke 调用的 JS 绑定 |
 | 状态管理 | `src/lib/stores/index.js` | links / categories / tags 三个 store |
-| UI 组件 | `src/lib/components/` | 10 个 Svelte 组件 |
-| 窗口配置 | `src-tauri/tauri.conf.json` | 主窗口 + quick-add 窗口 |
-| 构建配置 | `vite.config.js` | 双入口 rollup（main + quick-add） |
-| CI 流程 | `.github/workflows/release.yml` | Windows 自动构建 |
+| UI 组件 | `src/lib/components/` | 仍是 10 个组件但列表更新 |
+| 窗口配置 | `src-tauri/tauri.conf.json` | 主窗口 + quick-add + spotlight 窗口 |
+| 构建配置 | `vite.config.js` | 三入口 rollup（main + quick-add + spotlight） |
+| CI 流程 | `.github/workflows/release.yml` | macOS + Windows 双平台自动构建 |
 | 自动化 Skill | `.sisyphus/skills/` | version-bump 等自定义工作流 |
+| spotlight.html / spotlight.js / Spotlight.svelte | 全局搜索浮层 | 入口及组件资源，见 Spotlight 页 | 
 
 ## 代码地图
 
@@ -48,6 +52,11 @@ links/
 | `linksStore` | store | `src/lib/stores/index.js` | 链接状态（分页、加载、搜索） |
 | `categoriesStore` | store | `src/lib/stores/index.js` | 分组状态（树形） |
 | `tagsStore` | store | `src/lib/stores/index.js` | 标签状态（排序） |
+| `UpdateDialog` | component | `src/lib/components/UpdateDialog.svelte` | 更新检查与安装弹窗 |
+| `CategoryInput` | component | `src/lib/components/CategoryInput.svelte` | 分组选择输入 |
+| `Spotlight` | page | `src/pages/Spotlight.svelte` | 全局搜索浮层页面 |
+| `http_server` | module | `src-tauri/src/http_server.rs` | 浏览器扩展本地 HTTP 服务 |
+| `LocalServerInfoDto` | struct | `src-tauri/src/commands.rs` | 本地服务器信息（端口+令牌） |
 
 ## 约定
 
@@ -55,7 +64,9 @@ links/
 - **前端 API**：每个后端命令在 `api.js` 中有对应 async 函数，参数名与 Rust 保持 snake_case 一致
 - **数据库迁移**：当前使用 `CREATE TABLE IF NOT EXISTS` + `ALTER TABLE ADD COLUMN`（无版本管理），见 TODO.md 中的技术债务
 - **CSS 变量**：主题色定义在 `app.css`，组件应使用 CSS 变量而非硬编码颜色
-- **双窗口架构**：主窗口（index.html）和快速添加窗口（quick-add.html）是两个独立入口
+- **三窗口架构**：主窗口（index.html）、快速添加窗口（quick-add.html）和全局搜索窗口（spotlight.html）是三个独立入口
+- **浏览器扩展**：通过 deep-link 协议（links://）和本地 HTTP 服务与主应用通信
+- **自动更新**：使用 tauri-plugin-updater，支持启动检查和手动检查
 
 ## 反模式（本项目）
 
@@ -94,14 +105,21 @@ cd src-tauri && cargo test   # Rust 单元测试（db.rs, fetcher.rs, normalize.
 - Vite 开发服务器端口固定 1420，被占用会报错（不会自动换端口）
 - `src/lib/utils/` 目录为空，预留未使用
 - `normalize.rs` 标记为 `#[allow(dead_code)]`，URL 标准化功能未接入去重流程
-- Windows 构建 CI 仅构建 Windows 包，macOS/Linux 需本地或添加 CI Runner
-- Release 为 Draft 模式，需手动确认发布
-- `db.rs` 约 1547 行（含测试），是最大文件；含 30+ 个 Rust 单元测试（`cargo test` 可运行），前端暂无测试
-- `commands.rs` 约 867 行，`fetcher.rs` 约 544 行（含 Windows 代理逻辑）
+- macOS + Windows 双平台 CI 自动构建，Release 为 Draft 模式，需手动确认发布
+- `db.rs` 约 1613 行（含测试），含 30+ 个 Rust 单元测试
+- `commands.rs` 约 1133 行
+- `fetcher.rs` 约 544 行（含 Windows 代理逻辑）
+- `lib.rs` 约 506 行
+- `normalize.rs` 约 127 行
+ - `http_server.rs` 提供浏览器扩展本地 HTTP 服务（端口+令牌鉴权）
+
+- 新增关键依赖：tauri-plugin-updater / tauri-plugin-deep-link / tauri-plugin-single-instance — 自动更新、深度链接、单实例
+- tiny_http — 浏览器扩展本地 HTTP 服务基础
+- marked — Release Notes Markdown 渲染
 
 ## 变更与提交约束（新增）
 - 改动提交约束：所有改动不得直接提交到远程仓库。应在本地创建独立分支，完成测试后再合并提交；提交应通过测试并获得人工测试确认后再进行，确保不破坏主线功能。
 - 代码注释与提交信息规范：代码注释使用中文，提交信息统一使用中文，格式示例：feat: 添加新功能 或 fix: 修复问题；描述部分应包含改动原因（why）及影响范围，避免空描述。
 - TODO 工作区开发日志归档：若任务来自 TODO 工作区，完成后将相关条目写入 TODO.md 的开发日志（在工作区 TODO.md 内的 ## 开发日志 小节），按时间戳追加归档，格式为 YYYY-MM-DD HH:MM:SS。
 - Release 文档刷新：每当发布新版本（打 tag vX.Y.Z），必须同步刷新 AGENTS.md、README.md、USER_GUIDE.md 三个文档。更新内容包括版本号引用、新功能描述、工作流变更、弃用/迁移说明、资源链接等，确保文档与代码保持一致。
-  - 版本号分别在 tauri.conf.json 里的 "version"、Cargo.toml和Cargo.lock 里的 package.version、
+- 版本号分别在 tauri.conf.json 里的 "version"、Cargo.toml和Cargo.lock 里的 package.version、以及 package.json 里的 "version"（仅前端构建版本，非应用版本，当前未同步）。
