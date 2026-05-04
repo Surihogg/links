@@ -1,6 +1,6 @@
 [package]
 name = "Links"
-version = "1.1.9"
+version = "1.2.0"
 description = "A cross-platform local link manager"
 authors = ["hyatt zhao"]
 edition = "2021"
