@@ -124,6 +124,7 @@ pub fn links_list(
 pub fn links_create(
     db: State<'_, Db>,
     app: AppHandle,
+    config: State<'_, Config>,
     payload: CreateLinkPayload,
 ) -> Result<crate::db::Link, AppError> {
     let link = db.create_link(&payload)?;
@@ -140,15 +141,17 @@ pub fn links_create(
     let url_for_check = link.url.clone();
     let link_id_check = link.id;
     let app_clone_check = app.clone();
+    let check_enabled = config.get("check-link-reachability").unwrap_or("true".to_string()) != "false";
     tauri::async_runtime::spawn(async move {
-        // Check reachability in background and mark is_broken if needed
-        let reachable = do_check_link(&url_for_check).await.unwrap_or(false);
-        if !reachable {
-            if let Ok(db_guard) = app_clone_check.state::<Db>().0.lock() {
-                let _ = db_guard.execute(
-                    "UPDATE links SET is_broken = 1 WHERE id = ?",
-                    rusqlite::params![link_id_check],
-                );
+        if check_enabled {
+            let reachable = do_check_link(&url_for_check).await.unwrap_or(false);
+            if !reachable {
+                if let Ok(db_guard) = app_clone_check.state::<Db>().0.lock() {
+                    let _ = db_guard.execute(
+                        "UPDATE links SET is_broken = 1 WHERE id = ?",
+                        rusqlite::params![link_id_check],
+                    );
+                }
             }
         }
         if !needs_meta_fetch { return; }

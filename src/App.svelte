@@ -1,7 +1,7 @@
 <script>
   import { onMount, tick } from "svelte";
   import { marked } from "marked";
-  import { linksStore, categoriesStore, tagsStore } from "./lib/stores/index.js";
+  import { linksStore, categoriesStore, tagsStore, settingsStore } from "./lib/stores/index.js";
   import * as api from "./lib/api.js";
   import { waitForBackendReady } from "./lib/ready.js";
   import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -76,6 +76,11 @@
       else savedTheme = "system";
     }
     theme_mode = savedTheme || "system";
+    // Initialize settings store
+    try {
+      const v = (await api.getSetting("check-link-reachability")) !== "false";
+      settingsStore.update(s => ({ ...s, check_link_reachability: v }));
+    } catch {}
     // Initialize dark_mode based on current theme_mode
     apply_theme();
     // Listen for OS theme changes if in system mode
@@ -786,7 +791,7 @@ async function on_toggle_favorite(link) {
   {/if}
 
   {#if show_settings}
-    <SettingsDialog onclose={() => show_settings = false} onthemechange={on_theme_change} oncheckupdate={async (info) => { update_available = true; update_info = info; await fetch_github_notes(info.version); show_update_dialog = true; }} />
+    <SettingsDialog onclose={async () => { show_settings = false; const v = (await api.getSetting("check-link-reachability")) !== "false"; settingsStore.update(s => ({ ...s, check_link_reachability: v })); linksStore.load({ page: 1 }); }} onthemechange={on_theme_change} oncheckupdate={async (info) => { update_available = true; update_info = info; await fetch_github_notes(info.version); show_update_dialog = true; }} />
   {/if}
 
   {#if show_close_dialog}

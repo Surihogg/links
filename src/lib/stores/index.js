@@ -160,3 +160,4 @@ function createTagsStore() {
 export const linksStore = createLinksStore();
 export const categoriesStore = createCategoriesStore();
 export const tagsStore = createTagsStore();
+export const settingsStore = writable({ check_link_reachability: true });

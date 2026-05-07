@@ -1,6 +1,7 @@
 <script>
   import { openUrl, getSetting } from "../api.js";
   import { copyToClipboard } from "../api.js";
+  import { settingsStore } from "../stores/index.js";
 
   let { link, highlight = "", category_name = null, selected = false, onedit, ondelete, ontoggle_favorite, onremovecategory, onremovetag, onremovenotes } = $props();
   let show_confirm = $state(false);
@@ -10,6 +11,9 @@
   let show_full_url = $state(false);
   let title_truncated = $state(false);
   let desc_truncated = $state(false);
+  let check_reachability = $state(true);
+
+  settingsStore.subscribe(v => { check_reachability = v.check_link_reachability; });
 
   let domain = $derived.by(() => {
     try { return new URL(link.url).hostname.replace('www.', ''); } catch { return ''; }
@@ -114,7 +118,7 @@
   <div class="card-main">
     <div class="card-content" onclick={card_click}>
       <div class="card-top">
-          {#if link.is_broken}
+          {#if link.is_broken && check_reachability}
             <span class="broken-badge" data-tooltip="链接可能已失效">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>

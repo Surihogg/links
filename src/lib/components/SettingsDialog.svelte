@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import * as api from "../api.js";
+  import { settingsStore } from "../stores/index.js";
   let { onclose, onthemechange, oncheckupdate } = $props();
   let close_behavior = $state(null);
   let loaded = $state(false);
@@ -35,6 +36,7 @@
   let auto_minimize = $state(false);
   // 启动时自动检查更新
   let auto_check_update = $state(true);
+  let check_link_reachability = $state(true);
   let bookmarklet_copied = $state(false);
   let bookmarklet_code = $state("");
   let ext_step = $state(0);
@@ -224,6 +226,13 @@
     } catch {
       auto_check_update = true;
     }
+    // 链接可达性检查
+    try {
+      check_link_reachability = (await api.getSetting("check-link-reachability")) !== "false";
+      settingsStore.update(s => ({ ...s, check_link_reachability: check_link_reachability }));
+    } catch {
+      check_link_reachability = true;
+    }
     loaded = true;
     try {
       const t = await api.getSetting("theme-mode");
@@ -333,6 +342,12 @@
   async function toggleAutoCheckUpdate() {
     auto_check_update = !auto_check_update;
     await api.setSetting("auto-check-update", String(auto_check_update));
+  }
+
+  async function toggleCheckLinkReachability() {
+    check_link_reachability = !check_link_reachability;
+    await api.setSetting("check-link-reachability", String(check_link_reachability));
+    settingsStore.update(s => ({ ...s, check_link_reachability: check_link_reachability }));
   }
 
   async function copy_bookmarklet() {
@@ -596,27 +611,28 @@
               <span class="format-name">开机自启动</span>
               <span class="format-desc">系统启动时自动运行 Links</span>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick={toggleAutostart}>
-              {autostart_enabled ? '禁用' : '启用'}
-            </button>
+            <button class="toggle" class:active={autostart_enabled} onclick={toggleAutostart}></button>
           </div>
           <div class="format-option autostart-row" style="justify-content: space-between; align-items: center; margin-top: 6px;">
             <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
               <span class="format-name">打开链接后最小化</span>
               <span class="format-desc">点击链接跳转时自动最小化到托盘</span>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick={toggleAutoMinimize}>
-              {auto_minimize ? '禁用' : '启用'}
-            </button>
+            <button class="toggle" class:active={auto_minimize} onclick={toggleAutoMinimize}></button>
           </div>
           <div class="format-option autostart-row" style="justify-content: space-between; align-items: center; margin-top: 6px;">
             <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
               <span class="format-name">启动时自动检查更新</span>
               <span class="format-desc">每次打开应用时自动检测是否有新版本</span>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick={toggleAutoCheckUpdate}>
-              {auto_check_update ? '禁用' : '启用'}
-            </button>
+            <button class="toggle" class:active={auto_check_update} onclick={toggleAutoCheckUpdate}></button>
+          </div>
+          <div class="format-option autostart-row" style="justify-content: space-between; align-items: center; margin-top: 6px;">
+            <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+              <span class="format-name">链接可达性检查</span>
+              <span class="format-desc">添加链接时检测网址是否可正常访问</span>
+            </div>
+            <button class="toggle" class:active={check_link_reachability} onclick={toggleCheckLinkReachability}></button>
           </div>
           <div class="format-option autostart-row" style="justify-content: space-between; align-items: center; margin-top: 6px;">
             <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
