@@ -134,6 +134,7 @@ pub fn run() {
                         }
                     } else if *shortcut == hide_sc {
                         if let Some(w) = app.get_webview_window("main") {
+                            let _ = app.emit("main-hidden", ());
                             let _ = w.hide();
                         }
                     } else if *shortcut == spotlight_sc {

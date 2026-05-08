@@ -132,12 +132,8 @@ pub fn links_create(
     let url_for_fetch = link.url.clone();
     let link_id = link.id;
     let app_clone = app.clone();
-    // Only re-fetch metadata if frontend didn't already provide it.
-    // Frontend fetches title/description/favicon via fetchMeta before submit;
-    // if title is already populated, skip the redundant backend fetch.
     let needs_meta_fetch = link.title.is_empty() && link.description.is_empty() && link.favicon_url.is_empty();
 
-    // Spawn link status check after metadata fetch is attempted
     let url_for_check = link.url.clone();
     let link_id_check = link.id;
     let app_clone_check = app.clone();
@@ -292,6 +288,15 @@ struct BookmarkEntry {
     add_date: Option<i64>,
 }
 
+fn unescape_html(s: &str) -> String {
+    s.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+}
+
 fn parse_bookmark_html(html: &str) -> Vec<BookmarkEntry> {
     let mut entries = Vec::new();
     let mut folder_stack: Vec<String> = Vec::new();
@@ -337,7 +342,7 @@ fn extract_folder_name(text: &str) -> Option<String> {
     let after_h3 = &lower[h3_start..];
     let start = after_h3.find('>')? + h3_start + 1;
     let end = lower.rfind("</h3>")?;
-    let name = text[start..end].trim();
+    let name = unescape_html(text[start..end].trim());
     if name.is_empty() {
         return None;
     }
@@ -349,7 +354,7 @@ fn extract_href(text: &str) -> Option<String> {
     let start = lower.find("href=\"")? + 6;
     let rest = &text[start..];
     let end = rest.find('"')?;
-    let href = rest[..end].to_string();
+    let href = unescape_html(rest[..end].trim());
     if href.is_empty() {
         return None;
     }
@@ -365,7 +370,7 @@ fn extract_icon(text: &str) -> String {
     let Some(end) = rest.find('"') else {
         return String::new();
     };
-    rest[..end].to_string()
+    unescape_html(&rest[..end])
 }
 
 fn extract_add_date(text: &str) -> Option<i64> {
@@ -398,7 +403,7 @@ fn extract_link_title(text: &str) -> String {
     let Some(end) = lower.rfind("</a>") else {
         return String::new();
     };
-    text[start..end].trim().to_string()
+    unescape_html(text[start..end].trim())
 }
 
 fn get_or_create_category(

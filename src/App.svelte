@@ -41,6 +41,13 @@
   let selected_tag = $state(null);
   let search_query = $state("");
   let show_add_form = $state(false);
+
+  function reset_filters() {
+    search_query = "";
+    selected_category = null;
+    selected_tag = null;
+    selected_link_index = -1;
+  }
   let edit_link = $state(null);
   let show_export = $state(false);
   let show_settings = $state(false);
@@ -76,7 +83,6 @@
       else savedTheme = "system";
     }
     theme_mode = savedTheme || "system";
-    // Initialize settings store
     try {
       const v = (await api.getSetting("check-link-reachability")) !== "false";
       settingsStore.update(s => ({ ...s, check_link_reachability: v }));
@@ -140,6 +146,9 @@
     const { LogicalSize, PhysicalPosition } = await import("@tauri-apps/api/window");
     const unlisten = await listen("main-shown", () => {
       search_bar?.focus();
+    });
+    const unlistenHidden = await listen("main-hidden", () => {
+      reset_filters();
     });
 
     const savedSize = await api.getSetting("window-size");
@@ -209,6 +218,7 @@
       if (behavior === "exit") {
         await api.exitApp();
       } else if (behavior === "tray") {
+        reset_filters();
         await mainWindow.hide();
       } else {
         show_close_dialog = true;
@@ -257,6 +267,7 @@
       clearTimeout(resize_timer);
       window.removeEventListener("resize", on_resize);
       if (unlisten) unlisten();
+      if (unlistenHidden) unlistenHidden();
       if (unlistenLinksChanged) unlistenLinksChanged();
       if (unlistenSpotlightLocate) unlistenSpotlightLocate();
       if (unlistenMoved) unlistenMoved();
@@ -495,6 +506,7 @@ async function on_toggle_favorite(link) {
 
   async function close_to_tray() {
     show_close_dialog = false;
+    reset_filters();
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     await getCurrentWindow().hide();
   }
@@ -667,6 +679,7 @@ async function on_toggle_favorite(link) {
             api.openUrl(link.url);
             selected_link_index = -1;
             if ((await api.getSetting("auto-minimize-on-open")) === "true") {
+              reset_filters();
               const { getCurrentWindow } = await import("@tauri-apps/api/window");
               await getCurrentWindow().hide();
             }

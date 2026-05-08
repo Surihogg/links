@@ -2,6 +2,7 @@
   import { openUrl, getSetting } from "../api.js";
   import { copyToClipboard } from "../api.js";
   import { settingsStore } from "../stores/index.js";
+  import { emit } from "@tauri-apps/api/event";
 
   let { link, highlight = "", category_name = null, selected = false, onedit, ondelete, ontoggle_favorite, onremovecategory, onremovetag, onremovenotes } = $props();
   let show_confirm = $state(false);
@@ -40,6 +41,7 @@
   async function card_click() {
     openUrl(link.url);
     if ((await getSetting("auto-minimize-on-open")) === "true") {
+      await emit("main-hidden");
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       await getCurrentWindow().hide();
     }
