@@ -6,7 +6,7 @@
   import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
 
   const WIN_WIDTH = 560;
-  const WIN_MIN_HEIGHT = 66;
+  const WIN_MIN_HEIGHT = 52;
   const WIN_MAX_HEIGHT = 420;
 
   let query = $state("");
@@ -33,11 +33,11 @@
   async function resize_window() {
     await new Promise(r => requestAnimationFrame(r));
     await new Promise(r => requestAnimationFrame(r));
-    const resultsEl = document.querySelector(".results-container");
     const searchEl = document.querySelector(".search-area");
-    if (!resultsEl || !searchEl) return;
+    if (!searchEl) return;
     const search_h = searchEl.getBoundingClientRect().height;
-    const content_h = resultsEl.scrollHeight;
+    const resultsEl = document.querySelector(".results-container");
+    const content_h = resultsEl ? resultsEl.scrollHeight : 0;
     const total_h = search_h + content_h;
     const h = Math.max(WIN_MIN_HEIGHT, Math.min(total_h, WIN_MAX_HEIGHT));
     getCurrentWindow().setSize(new LogicalSize(WIN_WIDTH, Math.ceil(h)));
@@ -363,8 +363,10 @@
   }
 
   .search-area {
-    padding: 10px 12px;
+    padding: 6px 10px;
     flex-shrink: 0;
+    margin-top: auto;
+    margin-bottom: auto;
   }
 
   .input-wrap {
@@ -377,7 +379,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 9px 8px;
+    padding: 6px 8px;
     border: 1px solid var(--border-1);
     border-radius: var(--radius-md);
     background: var(--bg-1);
@@ -423,8 +425,8 @@
     background: var(--bg-1);
     color: var(--text-0);
     font-size: 14px;
-    padding: 8px 36px 8px 36px;
-    border-radius: 12px;
+    padding: 6px 36px 6px 36px;
+    border-radius: 10px;
   }
 
   .search-input::placeholder {
