@@ -14,6 +14,18 @@
   let desc_truncated = $state(false);
   let check_reachability = $state(true);
 
+  function format_last_opened(ts) {
+    if (!ts) return '';
+    const now = Math.floor(Date.now() / 1000);
+    const diff = now - ts;
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)} 天前`;
+    const d = new Date(ts * 1000);
+    return `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+  }
+
   settingsStore.subscribe(v => { check_reachability = v.check_link_reachability; });
 
   let domain = $derived.by(() => {
@@ -143,6 +155,18 @@
           <span class="card-url-full" onmouseout={() => { if (!url_matches_search) show_full_url = false; }}>{@html hl(link.url)}</span>
         {:else}
           <span class="card-domain" onmouseover={() => show_full_url = true}>{domain}</span>
+        {/if}
+        {#if link.click_count > 0}
+          <span class="click-badge" data-tooltip={`访问过 ${link.click_count} 次`}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            {link.click_count}
+          </span>
+        {/if}
+        {#if link.last_opened_at}
+          <span class="last-opened-badge" data-tooltip={format_last_opened(link.last_opened_at)}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            {format_last_opened(link.last_opened_at)}
+          </span>
         {/if}
       </div>
 
@@ -395,6 +419,49 @@
   }
 
   .card-domain { font-size: 11px; color: var(--text-3); cursor: default; }
+
+  .click-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    color: var(--text-3);
+    position: relative;
+    padding: 0 3px;
+    border-radius: 3px;
+    cursor: default;
+  }
+
+  .last-opened-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    color: var(--text-3);
+    position: relative;
+    padding: 0 3px;
+    border-radius: 3px;
+    cursor: default;
+  }
+
+  .click-badge[data-tooltip]:hover::after,
+  .last-opened-badge[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 0;
+    top: calc(100% + 2px);
+    z-index: 50;
+    white-space: nowrap;
+    padding: 3px 7px;
+    background: var(--bg-0);
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-2);
+    pointer-events: none;
+  }
 
   .card-url-full {
     font-size: 11px;

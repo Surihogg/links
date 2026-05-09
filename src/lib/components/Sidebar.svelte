@@ -423,6 +423,17 @@
       </svg>
       <span>特别关注</span>
     </button>
+
+    <button
+      class="nav-item"
+      class:active={selected_id === 'stats'}
+      onclick={() => onselect?.('stats')}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+      </svg>
+      <span>统计</span>
+    </button>
   </nav>
 
   <div class="sidebar-section">
@@ -1157,6 +1168,13 @@
   .tag-action-btn:hover {
     color: var(--text-1);
     background: var(--bg-hover);
+  }
+
+  .sidebar-footer {
+    padding: 8px 12px;
+    background: var(--bg-2);
+    display: flex;
+    gap: 4px;
   }
 
   .sidebar-footer {

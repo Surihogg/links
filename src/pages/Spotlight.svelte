@@ -22,6 +22,7 @@
   let mouse_moved = $state(false);
   let spotlight_ready = $state(false);
   let hiding = false;
+  let current_sort = $state("");
 
   function category_name(cid) {
     if (cid == null) return null;
@@ -60,6 +61,18 @@
     catch { return url; }
   }
 
+  function format_last_opened(ts) {
+    if (!ts) return '';
+    const now = Math.floor(Date.now() / 1000);
+    const diff = now - ts;
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}天前`;
+    const d = new Date(ts * 1000);
+    return `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+  }
+
   async function do_search(q) {
     if (!q.trim()) {
       results = [];
@@ -69,7 +82,7 @@
     }
     searching = true;
     try {
-      const res = await searchLinks({ query: q.trim() });
+      const res = await searchLinks({ query: q.trim(), sort_by: current_sort || undefined });
       results = res.items || [];
       has_searched = true;
     } catch {
@@ -219,21 +232,28 @@
 <div class="spotlight" class:hidden={!spotlight_ready}>
   <div class="search-area">
     <div class="input-wrap">
-      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      <input
-        bind:this={input_el}
-        bind:value={query}
-        oninput={on_input}
-        placeholder="搜搜看~"
-        class="search-input"
-        autocomplete="off"
-        spellcheck="false"
-      />
-      {#if searching}
-        <span class="spinner"></span>
-      {/if}
+      <select class="sort-select" onchange={(e) => { current_sort = e.target.value; if (query.trim()) do_search(query); }}>
+        <option value="">最近更新</option>
+        <option value="click_count" selected={current_sort === "click_count"}>最多打开</option>
+        <option value="last_opened_at" selected={current_sort === "last_opened_at"}>最近打开</option>
+      </select>
+      <div class="search-field">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          bind:this={input_el}
+          bind:value={query}
+          oninput={on_input}
+          placeholder="搜搜看~"
+          class="search-input"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        {#if searching}
+          <span class="spinner"></span>
+        {/if}
+      </div>
     </div>
   </div>
 
@@ -258,19 +278,33 @@
             <span class="result-title">{link.title || link.url}</span>
             <span class="result-domain">{extract_domain(link.url)}</span>
           </div>
-          {#if category_name(link.category_id) || (link.tags && link.tags.length > 0)}
-            <div class="result-tags">
-              {#if category_name(link.category_id)}
-                <span class="result-cat">{category_name(link.category_id)}</span>
-              {/if}
-              {#each link.tags?.slice(0, 3) || [] as tag}
-                <span class="tag-chip">{tag}</span>
-              {/each}
-              {#if link.tags && link.tags.length > 3}
-                <span class="tag-more">+{link.tags.length - 3}</span>
-              {/if}
+          <div class="result-bottom">
+              <div class="result-tags">
+                {#if category_name(link.category_id)}
+                  <span class="result-cat">{category_name(link.category_id)}</span>
+                {/if}
+                {#each link.tags?.slice(0, 3) || [] as tag}
+                  <span class="tag-chip">{tag}</span>
+                {/each}
+                {#if link.tags && link.tags.length > 3}
+                  <span class="tag-more">+{link.tags.length - 3}</span>
+                {/if}
+              </div>
+              <div class="result-stats">
+                {#if link.click_count > 0}
+                  <span class="result-stat">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    {link.click_count}
+                  </span>
+                {/if}
+                {#if link.last_opened_at}
+                  <span class="result-stat">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    {format_last_opened(link.last_opened_at)}
+                  </span>
+                {/if}
+              </div>
             </div>
-          {/if}
         </div>
       {/each}
     {:else if !has_searched}
@@ -308,7 +342,37 @@
   }
 
   .input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sort-select {
+    padding: 6px 22px 6px 8px;
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    background: var(--bg-1);
+    color: var(--text-2);
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+    transition: all var(--transition);
+    appearance: none;
+    -webkit-appearance: none;
+    flex-shrink: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 7px center;
+  }
+
+  .sort-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+
+  .search-field {
     position: relative;
+    flex: 1;
     display: flex;
     align-items: center;
   }
@@ -406,10 +470,40 @@
     white-space: nowrap;
   }
 
+  .result-bottom {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+
   .result-tags {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .result-stats {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .result-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    color: var(--text-3);
+    white-space: nowrap;
+  }
+
+  .result-tags .result-stat:first-of-type {
+    margin-left: auto;
   }
 
   .tag-chip {
@@ -426,6 +520,15 @@
     border-radius: 4px;
     background: var(--bg-2);
     color: var(--text-3);
+  }
+
+  .result-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    color: var(--text-3);
+    margin-left: auto;
   }
 
   .empty-state {

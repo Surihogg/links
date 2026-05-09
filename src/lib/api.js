@@ -200,3 +200,7 @@ export async function getHideShortcut() {
 export async function setHideShortcut(shortcut) {
   return invoke("set_hide_shortcut", { shortcut });
 }
+
+export async function linksStats() {
+  return invoke("links_stats");
+}

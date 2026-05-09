@@ -8,6 +8,11 @@
 
 ### 工作区
 
+触碰最后打开时间应该显示具体时间
+
+搜索框（包括主页面和spotlight），支持用tab键循环切换选项
+
+按照统计信息查询的习惯，持久化到配置里
 
 ### 缺陷修复
 
@@ -37,21 +42,32 @@
 
 **Phase 1 — 数据采集（schema 变更 + 写入逻辑）**
 
-- [ ] `links` 表新增 `click_count INTEGER DEFAULT 0`（点击次数）
-- [ ] `links` 表新增 `last_opened_at INTEGER DEFAULT NULL`（最后打开时间，Unix 时间戳）
-- [ ] `open_url` 命令中原子更新 `click_count += 1`、`last_opened_at = now()`
-- [ ] 数据库迁移（`ALTER TABLE ADD COLUMN`，兼容现有 `migrate()` 流程）
+- [x] `links` 表新增 `click_count INTEGER DEFAULT 0`（点击次数）
+- [x] `links` 表新增 `last_opened_at INTEGER DEFAULT NULL`（最后打开时间，Unix 时间戳）
+- [x] `open_url` 命令中原子更新 `click_count += 1`、`last_opened_at = now()`
+- [x] 数据库迁移（`ALTER TABLE ADD COLUMN`，兼容现有 `migrate()` 流程）
 
 **Phase 2 — 排序与展示**
 
-- [ ] 链接列表新增「最多访问」排序（`click_count DESC`）
-- [ ] 链接列表新增「最近打开」排序（`last_opened_at DESC`）
-- [ ] LinkCard 展示访问次数（角落小数字或 hover 显示）
-- [ ] 侧边栏底部或设置页添加统计摘要（总链接数、本周新增、最常访问 Top 3）
+- [x] 链接列表新增「最多访问」排序（`click_count DESC`）
+- [x] 链接列表新增「最近打开」排序（`last_opened_at DESC`）
+- [x] LinkCard 展示访问次数（角落小数字或 hover 显示）
+- [x] 侧边栏底部或设置页添加统计摘要（总链接数、本周新增、最常访问 Top 3）
 
 **不在本版本范围**：趋势图表、停留时长统计、搜索热词记录（留待后续版本评估）
 
 ## 开发日志
+
+## 2026-05-09
+
+- [x] v1.3.x — 统计与行为追踪
+  - Phase 1: `links` 表新增 `click_count` / `last_opened_at` 字段，`ALTER TABLE` 迁移兼容现有数据库
+  - Phase 1: `open_url` 命令原子更新点击计数和最后打开时间
+  - Phase 2: 链接列表新增「最多访问」和「最近打开」排序（header 排序下拉框）
+  - Phase 2: LinkCard 卡片域名旁展示访问次数小徽章（hover 显示完整文案）
+  - Phase 2: 侧边栏底部统计摘要（总链接数、本周新增、最常访问 Top 3）
+  - 新增 `links_stats` 后端命令 + `linksStats` 前端 API
+  - 所有 90 个 Rust 单元测试通过
 
 ## 2026-05-08
 

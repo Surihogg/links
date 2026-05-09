@@ -40,6 +40,7 @@
   let selected_category = $state(null);
   let selected_tag = $state(null);
   let search_query = $state("");
+  let sort_by = $state(null);
   let show_add_form = $state(false);
 
   function reset_filters() {
@@ -281,6 +282,7 @@
         categoriesStore.load(),
         tagsStore.load(),
         load_links(),
+        load_stats(),
       ]);
       console.log("[startup] load_data done");
     } catch (e) {
@@ -289,6 +291,7 @@
   }
 
   async function load_links() {
+    if (selected_category === 'stats') return;
     const params = {};
     if (selected_tag === "__untagged__") {
       params.untagged_only = true;
@@ -300,6 +303,9 @@
       params.uncategorized_only = true;
     } else if (selected_category != null) {
       params.category_id = selected_category;
+    }
+    if (sort_by) {
+      params.sort_by = sort_by;
     }
     await linksStore.load(params);
   }
@@ -385,6 +391,7 @@ async function with_scroll_preserve(fn) {
       }
       await categoriesStore.load();
     });
+    load_stats();
   }
 
   function on_category_select(id) {
@@ -392,7 +399,11 @@ async function with_scroll_preserve(fn) {
     selected_tag = null;
     search_query = "";
     selected_link_index = -1;
-    load_links();
+    if (id === 'stats') {
+      load_stats();
+    } else {
+      load_links();
+    }
   }
 
   function on_tag_select(tag) {
@@ -428,6 +439,7 @@ async function with_scroll_preserve(fn) {
     }
     await categoriesStore.load();
     await tagsStore.load();
+    load_stats();
   }
 
 async function on_toggle_favorite(link) {
@@ -439,6 +451,7 @@ async function on_toggle_favorite(link) {
     selected_link_index = -1;
     await linksStore.remove(link.id);
     await categoriesStore.load();
+    load_stats();
   }
 
   async function on_remove_category(link) {
@@ -491,6 +504,15 @@ async function on_toggle_favorite(link) {
   }
 
   let importing = $state(false);
+  let sidebar_stats = $state(null);
+
+  async function load_stats() {
+    try {
+      sidebar_stats = await api.linksStats();
+    } catch (e) {
+      console.warn("[stats] failed:", e);
+    }
+  }
 
   async function on_import_bookmarks() {
     importing = true;
@@ -546,7 +568,9 @@ async function on_toggle_favorite(link) {
   let has_more = $derived(links.has_more);
   let current_page = $derived(links.page);
   let total_count = $derived(links.total);
+  let show_stats_view = $derived(selected_category === 'stats');
   let current_title = $derived(
+    selected_category === 'stats' ? '统计' :
     search_query.trim() ? `搜索: ${search_query}` :
     selected_tag === "__untagged__" ? "无标签" :
     selected_tag ? `标签: ${selected_tag}` :
@@ -568,6 +592,9 @@ async function on_toggle_favorite(link) {
       params.uncategorized_only = true;
     } else if (selected_category != null) {
       params.category_id = selected_category;
+    }
+    if (sort_by) {
+      params.sort_by = sort_by;
     }
     return params;
   }
@@ -595,6 +622,16 @@ async function on_toggle_favorite(link) {
     selected_link_index = -1;
     if (search_query.trim()) {
       linksStore.search({ query: search_query, per_page: 30 });
+    } else {
+      load_links();
+    }
+  }
+
+  function on_sort_change(value) {
+    sort_by = value || null;
+    selected_link_index = -1;
+    if (search_query.trim()) {
+      linksStore.search({ query: search_query, per_page: 30, ...build_filter_params() });
     } else {
       load_links();
     }
@@ -758,36 +795,86 @@ async function on_toggle_favorite(link) {
         {:else}
           <div class="header-left">
             <h2 class="header-title">{current_title}</h2>
-            <span class="header-count">{total_count} 条</span>
+            {#if !show_stats_view}
+              <span class="header-count">{total_count} 条</span>
+            {/if}
           </div>
         {/if}
         <div class="header-right">
+          {#if !show_stats_view}
+            <select class="sort-select" onchange={(e) => on_sort_change(e.target.value)}>
+              <option value="">最近更新</option>
+              <option value="click_count" selected={sort_by === "click_count"}>最多访问</option>
+              <option value="last_opened_at" selected={sort_by === "last_opened_at"}>最近打开</option>
+            </select>
+          {/if}
           <SearchBar bind:this={search_bar} bind:query={search_query} {filter_chip} onremovefilter={on_remove_filter} onsearch={on_search} />
         </div>
       </header>
 
-      <LinkList
-        links={filtered_links}
-        {categories}
-        loading={links.loading}
-        highlight={search_query}
-        has_more={has_more}
-        selected_index={selected_link_index}
-        onloadmore={load_more}
-        onedit={(link) => edit_link = link}
-        ondelete={on_delete_link}
-        ontoggle_favorite={on_toggle_favorite}
-        onremovecategory={on_remove_category}
-        onremovetag={on_remove_tag}
-        onremovenotes={on_remove_notes}
-      />
+      {#if show_stats_view}
+        <div class="stats-panel">
+          {#if sidebar_stats}
+            <div class="stats-overview">
+              <div class="stat-card">
+                <span class="stat-value">{sidebar_stats.total}</span>
+                <span class="stat-label">收藏总数</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-value">+{sidebar_stats.this_week}</span>
+                <span class="stat-label">本周新增</span>
+              </div>
+            </div>
+            {#if sidebar_stats.top.length > 0}
+              <div class="stats-top-section">
+                <h3 class="stats-section-title">最常访问</h3>
+                <div class="stats-top-list">
+                  {#each sidebar_stats.top as link, i}
+                    <div class="stats-top-row">
+                      <span class="stats-rank">{i + 1}</span>
+                      <div class="stats-top-info">
+                        <span class="stats-top-title">{link.title}</span>
+                        <span class="stats-top-url">{link.url}</span>
+                      </div>
+                      <span class="stats-top-count">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        {link.click_count} 次
+                      </span>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+          {:else}
+            <div class="stats-loading">加载中...</div>
+          {/if}
+        </div>
+      {:else}
+        <LinkList
+          links={filtered_links}
+          {categories}
+          loading={links.loading}
+          highlight={search_query}
+          has_more={has_more}
+          selected_index={selected_link_index}
+          onloadmore={load_more}
+          onedit={(link) => edit_link = link}
+          ondelete={on_delete_link}
+          ontoggle_favorite={on_toggle_favorite}
+          onremovecategory={on_remove_category}
+          onremovetag={on_remove_tag}
+          onremovenotes={on_remove_notes}
+        />
+      {/if}
 
-      <button class="fab" onclick={() => show_add_form = true} title="添加链接">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="10" y1="4" x2="10" y2="16"/>
-          <line x1="4" y1="10" x2="16" y2="10"/>
-        </svg>
-      </button>
+      {#if !show_stats_view}
+        <button class="fab" onclick={() => show_add_form = true} title="添加链接">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="10" y1="4" x2="10" y2="16"/>
+            <line x1="4" y1="10" x2="16" y2="10"/>
+          </svg>
+        </button>
+      {/if}
     </main>
   </div>
 
@@ -908,6 +995,36 @@ async function on_toggle_favorite(link) {
 
   .header-right {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sort-select {
+    padding: 5px 8px;
+    border: 1px solid var(--border-1);
+    border-radius: var(--radius-md);
+    background: var(--bg-1);
+    color: var(--text-2);
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+    transition: all var(--transition);
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 22px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 7px center;
+  }
+
+  .sort-select:hover {
+    border-color: var(--border-2);
+  }
+
+  .sort-select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
   }
 
   .fab {
@@ -1045,5 +1162,124 @@ async function on_toggle_favorite(link) {
     gap: 8px;
     padding: 12px 20px 20px;
     flex-shrink: 0;
+  }
+
+  .stats-panel {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+  }
+
+  .stats-overview {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card {
+    flex: 1;
+    background: var(--bg-1);
+    border: 1px solid var(--border-0);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-0);
+    letter-spacing: -0.5px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-3);
+  }
+
+  .stats-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-1);
+    margin-bottom: 12px;
+  }
+
+  .stats-top-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stats-top-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-1);
+    border: 1px solid var(--border-0);
+    border-radius: var(--radius-md);
+    transition: background var(--transition);
+  }
+
+  .stats-top-row:hover {
+    background: var(--bg-hover);
+  }
+
+  .stats-rank {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .stats-top-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stats-top-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stats-top-url {
+    font-size: 11px;
+    color: var(--text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .stats-top-count {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-2);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .stats-loading {
+    color: var(--text-3);
+    font-size: 13px;
+    padding: 40px 0;
+    text-align: center;
   }
 </style>
