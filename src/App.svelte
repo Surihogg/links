@@ -13,6 +13,7 @@
   import ExportDialog from "./lib/components/ExportDialog.svelte";
   import SettingsDialog from "./lib/components/SettingsDialog.svelte";
   import UpdateDialog from "./lib/components/UpdateDialog.svelte";
+import SortSelect from "./lib/components/SortSelect.svelte";
 
   let is_macos = $state(false);
 
@@ -813,11 +814,15 @@ async function on_toggle_favorite(link) {
         {/if}
         <div class="header-right">
           {#if !show_stats_view}
-            <select class="sort-select" onchange={(e) => on_sort_change(e.target.value)}>
-              <option value="">最近更新</option>
-              <option value="click_count" selected={sort_by === "click_count"}>最多访问</option>
-              <option value="last_opened_at" selected={sort_by === "last_opened_at"}>最近打开</option>
-            </select>
+            <SortSelect
+              bind:value={sort_by}
+              options={[
+                { value: "", label: "最近更新" },
+                { value: "click_count", label: "最多访问" },
+                { value: "last_opened_at", label: "最近打开" },
+              ]}
+              onchange={(v) => on_sort_change(v)}
+            />
           {/if}
           <SearchBar bind:this={search_bar} bind:query={search_query} {filter_chip} onremovefilter={on_remove_filter} onsearch={on_search} ontab={on_tab_sort} />
         </div>
@@ -1009,33 +1014,6 @@ async function on_toggle_favorite(link) {
     display: flex;
     align-items: center;
     gap: 8px;
-  }
-
-  .sort-select {
-    padding: 5px 8px;
-    border: 1px solid var(--border-1);
-    border-radius: var(--radius-md);
-    background: var(--bg-1);
-    color: var(--text-2);
-    font-size: 12px;
-    outline: none;
-    cursor: pointer;
-    transition: all var(--transition);
-    appearance: none;
-    -webkit-appearance: none;
-    padding-right: 22px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 7px center;
-  }
-
-  .sort-select:hover {
-    border-color: var(--border-2);
-  }
-
-  .sort-select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent-soft);
   }
 
   .fab {

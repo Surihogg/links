@@ -33,10 +33,11 @@
   async function resize_window() {
     await new Promise(r => requestAnimationFrame(r));
     await new Promise(r => requestAnimationFrame(r));
-    const el = document.querySelector(".results-container");
-    if (!el) return;
-    const search_h = 78;
-    const content_h = el.scrollHeight;
+    const resultsEl = document.querySelector(".results-container");
+    const searchEl = document.querySelector(".search-area");
+    if (!resultsEl || !searchEl) return;
+    const search_h = searchEl.getBoundingClientRect().height;
+    const content_h = resultsEl.scrollHeight;
     const total_h = search_h + content_h;
     const h = Math.max(WIN_MIN_HEIGHT, Math.min(total_h, WIN_MAX_HEIGHT));
     getCurrentWindow().setSize(new LogicalSize(WIN_WIDTH, Math.ceil(h)));
@@ -141,6 +142,7 @@
   }
 
   const SORT_CYCLE = ["", "click_count", "last_opened_at"];
+  const SORT_LABELS = { "": "最近更新", "click_count": "最多访问", "last_opened_at": "最近打开" };
 
   function handle_keydown(e) {
     if (e.key === "Escape") {
@@ -255,11 +257,6 @@
 <div class="spotlight" class:hidden={!spotlight_ready}>
   <div class="search-area">
     <div class="input-wrap">
-      <select class="sort-select" onchange={(e) => { current_sort = e.target.value; setSetting("spotlight-sort-by", current_sort); if (query.trim()) do_search(query); }}>
-        <option value="">最近更新</option>
-        <option value="click_count" selected={current_sort === "click_count"}>最多访问</option>
-        <option value="last_opened_at" selected={current_sort === "last_opened_at"}>最近打开</option>
-      </select>
       <div class="search-field">
         <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -277,9 +274,14 @@
           <span class="spinner"></span>
         {/if}
       </div>
+      <div class="sort-hint">
+        <span class="sort-hint-label">{SORT_LABELS[current_sort]}</span>
+        <span class="sort-hint-key">Tab ↹</span>
+      </div>
     </div>
   </div>
 
+  {#if has_searched || results.length > 0}
   <div class="results-container" class:scrollable={results.length > 0} onmousemove={() => mouse_moved = true}>
     {#if has_searched && results.length === 0}
       <div class="empty-state">
@@ -334,6 +336,7 @@
       <div class="hint">输入关键词搜索已保存的链接</div>
     {/if}
   </div>
+  {/if}
 </div>
 
 <style>
@@ -360,37 +363,42 @@
   }
 
   .search-area {
-    padding: 14px 16px 20px;
+    padding: 10px 12px;
     flex-shrink: 0;
   }
 
   .input-wrap {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
 
-  .sort-select {
-    padding: 6px 22px 6px 8px;
+  .sort-hint {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 9px 8px;
     border: 1px solid var(--border-1);
     border-radius: var(--radius-md);
     background: var(--bg-1);
     color: var(--text-2);
     font-size: 12px;
-    outline: none;
-    cursor: pointer;
-    transition: all var(--transition);
-    appearance: none;
-    -webkit-appearance: none;
     flex-shrink: 0;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 7px center;
+    user-select: none;
+    transition: all var(--transition);
   }
 
-  .sort-select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px var(--accent-soft);
+  .sort-hint-label {
+    font-weight: 500;
+  }
+
+  .sort-hint-key {
+    font-size: 10px;
+    color: var(--text-3);
+    background: var(--bg-2);
+    padding: 2px 4px;
+    border-radius: 3px;
+    border: 1px solid var(--border-0);
   }
 
   .search-field {
@@ -402,7 +410,7 @@
 
   .search-icon {
     position: absolute;
-    left: 12px;
+    left: 10px;
     flex-shrink: 0;
     color: var(--text-3);
     pointer-events: none;
@@ -437,7 +445,7 @@
   .results-container {
     flex: 1;
     min-height: 0;
-    padding: 0 8px 8px;
+    padding: 0 16px 16px;
   }
 
   .results-container.scrollable {
