@@ -9,27 +9,47 @@ pub struct PageMeta {
     pub keywords: Vec<String>,
 }
 
-pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
+/// 构建带超时与系统代理的 reqwest 客户端（Windows 走注册表读到的代理；其它平台走默认）。
+/// 同时供 fetch_metadata、check_link_status 等命令共用，避免代理逻辑重复实现。
+pub fn build_http_client(
+    url: &str,
+    timeout_secs: u64,
+    user_agent: Option<&str>,
+) -> Result<reqwest::Client, reqwest::Error> {
     let mut builder = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(8))
-        .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+        .timeout(std::time::Duration::from_secs(timeout_secs));
 
-    // Try to use system proxy on Windows (read from registry)
+    if let Some(ua) = user_agent {
+        builder = builder.user_agent(ua);
+    }
+
+    // 在 Windows 下从注册表读系统代理，并按 ProxyOverride 规则决定是否绕过
     #[cfg(target_os = "windows")]
     {
-        // Check if URL should bypass proxy based on ProxyOverride rules
         if !should_bypass_proxy(url) {
             if let Some(proxy_url) = get_windows_system_proxy() {
-                log::info!("[fetcher] using system proxy: {}", proxy_url);
+                log::info!("[http] using system proxy: {}", proxy_url);
                 let proxy = reqwest::Proxy::all(&proxy_url)?;
                 builder = builder.proxy(proxy);
             }
         } else {
-            log::info!("[fetcher] bypassing proxy for internal URL: {}", url);
+            log::info!("[http] bypassing proxy for internal URL: {}", url);
         }
     }
 
-    let client = builder.build()?;
+    // 非 Windows 平台不读取系统代理；保留参数以统一签名
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = url;
+    }
+
+    builder.build()
+}
+
+const FETCHER_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+pub async fn fetch_metadata(url: &str) -> Result<PageMeta, reqwest::Error> {
+    let client = build_http_client(url, 8, Some(FETCHER_USER_AGENT))?;
 
     let resp = match client.get(url).send().await {
         Ok(r) => r,
@@ -209,8 +229,10 @@ pub fn get_windows_system_proxy() -> Option<String> {
                     let parts: Vec<&str> = line.split_whitespace().collect();
                     // The proxy address is typically the last part or after REG_SZ
                     for part in parts.iter().rev() {
-                        // Skip registry metadata keywords
-                        if !["ProxyServer", "REG_SZ", "REG_DWORD", ""].contains(part) && part.contains(".") || part.contains(":") {
+                        // 跳过注册表元数据关键字；地址特征：包含 "." 或 ":"
+                        if !["ProxyServer", "REG_SZ", "REG_DWORD", ""].contains(part)
+                            && (part.contains('.') || part.contains(':'))
+                        {
                             log::info!("[fetcher] found proxy address: {}", part);
                             return Some(format!("http://{}", part));
                         }

@@ -23,8 +23,10 @@ fn static_data_dir() -> PathBuf {
         .join("com.links.desktop")
 }
 
+/// 启动期解析应用数据目录；失败即 panic（应用无法继续）。
+/// 运行期请用 `commands::app_data_dir` 以传播 AppError。
 fn data_dir(app: &tauri::AppHandle) -> PathBuf {
-    app.path().app_data_dir().expect("failed to resolve app data dir")
+    commands::app_data_dir(app).expect("failed to resolve app data dir")
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -76,16 +76,21 @@ fn log_fetch_failure(app: &AppHandle, url: &str, error: &str) {
     }
 }
 
-fn get_db_path(app: &AppHandle) -> PathBuf {
-    let dir = app
-        .path()
+/// 解析应用数据目录。
+///
+/// 失败时返回 AppError 而非 panic，便于上层选择降级策略。
+pub(crate) fn app_data_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
+    app.path()
         .app_data_dir()
-        .expect("failed to resolve app data dir");
-    dir.join("links.db")
+        .map_err(|e| AppError::General(format!("failed to resolve app data dir: {}", e)))
+}
+
+fn get_db_path(app: &AppHandle) -> Result<PathBuf, AppError> {
+    Ok(app_data_dir(app)?.join("links.db"))
 }
 
 pub fn init_db(app: &AppHandle) -> Result<(), AppError> {
-    let path = get_db_path(app);
+    let path = get_db_path(app)?;
     log::info!("[init_db] opening database at {:?}", path);
     match Db::open(&path) {
         Ok(db) => {
@@ -413,28 +418,29 @@ fn extract_link_title(text: &str) -> String {
     unescape_html(text[start..end].trim())
 }
 
+/// 在指定 parent_id 下查找或创建分组。
+///
+/// 返回 (category_id, created)。统一用 `IFNULL(...) = IFNULL(...)` 处理 NULL 比较，
+/// 同时供 HTML 书签导入与 JSON 导入共用，避免双份实现。
 fn get_or_create_category(
+    conn: &rusqlite::Connection,
     name: &str,
     parent_id: Option<i64>,
-    conn: &rusqlite::Connection,
 ) -> Result<(i64, bool), AppError> {
     let existing: Option<i64> = conn
         .query_row(
-            "SELECT id FROM categories WHERE name = ? AND (parent_id IS ? OR (parent_id IS NULL AND ? IS NULL))",
-            rusqlite::params![name, parent_id, parent_id],
+            "SELECT id FROM categories WHERE name = ? AND IFNULL(parent_id, -1) = IFNULL(?, -1)",
+            rusqlite::params![name, parent_id],
             |r| r.get(0),
         )
         .ok();
-
     if let Some(id) = existing {
         return Ok((id, false));
     }
-
     conn.execute(
         "INSERT INTO categories (name, parent_id) VALUES (?, ?)",
         rusqlite::params![name, parent_id],
     )?;
-
     Ok((conn.last_insert_rowid(), true))
 }
 
@@ -456,7 +462,7 @@ fn import_bookmark_entries(
             let category_id = if let Some(&id) = category_cache.get(&cache_key) {
                 id
             } else {
-                let (id, created) = get_or_create_category(folder_name, parent_id, &tx)?;
+                let (id, created) = get_or_create_category(&tx, folder_name, parent_id)?;
                 if created {
                     stats.categories_created += 1;
                 }
@@ -498,28 +504,6 @@ fn import_bookmark_entries(
     Ok(stats)
 }
 
-fn get_or_create_category_by_name(
-    conn: &rusqlite::Connection,
-    name: &str,
-    parent_id: Option<i64>,
-) -> Result<(i64, bool), AppError> {
-    let existing: Option<i64> = conn
-        .query_row(
-            "SELECT id FROM categories WHERE name = ? AND IFNULL(parent_id, -1) = IFNULL(?, -1)",
-            rusqlite::params![name, parent_id],
-            |r| r.get(0),
-        )
-        .ok();
-    if let Some(id) = existing {
-        return Ok((id, false));
-    }
-    conn.execute(
-        "INSERT INTO categories (name, parent_id) VALUES (?, ?)",
-        rusqlite::params![name, parent_id],
-    )?;
-    Ok((conn.last_insert_rowid(), true))
-}
-
 fn import_json_entries(
     links: &[crate::db::Link],
     categories: &[crate::db::FlatCategory],
@@ -540,7 +524,7 @@ fn import_json_entries(
     let mut cat_id_map: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
     for cat in &sorted_cats {
         let parent_id = cat.parent_id.and_then(|pid| cat_id_map.get(&pid).copied());
-        let (new_id, created) = get_or_create_category_by_name(&tx, &cat.name, parent_id)?;
+        let (new_id, created) = get_or_create_category(&tx, &cat.name, parent_id)?;
         cat_id_map.insert(cat.id, new_id);
         if created {
             stats.categories_created += 1;
@@ -601,7 +585,8 @@ fn import_json_entries(
         .ok();
 
         if !link.tags.is_empty() {
-            let tag_ids = ensure_tags(&tx, &link.tags);
+            // 复用 db.rs 中唯一的 ensure_tags 实现，避免双份维护
+            let tag_ids = crate::db::ensure_tags(&tx, &link.tags);
             for tid in tag_ids {
                 tx.execute(
                     "INSERT OR IGNORE INTO link_tags (link_id, tag_id) VALUES (?, ?)",
@@ -617,42 +602,18 @@ fn import_json_entries(
     Ok(stats)
 }
 
-fn ensure_tags(
-    conn: &rusqlite::Connection,
-    tag_names: &[String],
-) -> Vec<i64> {
-    let mut ids = Vec::new();
-    for name in tag_names {
-        if name.trim().is_empty() {
-            continue;
-        }
-        let existing: Option<i64> = conn
-            .query_row(
-                "SELECT id FROM tags WHERE name = ?",
-                rusqlite::params![name],
-                |r| r.get(0),
-            )
-            .ok();
-        if let Some(id) = existing {
-            conn.execute(
-                "UPDATE tags SET updated_at = datetime('now','localtime') WHERE id = ?",
-                rusqlite::params![id],
-            ).ok();
-            ids.push(id);
-        } else {
-            conn.execute(
-                "INSERT INTO tags (name) VALUES (?)",
-                rusqlite::params![name],
-            )
-            .ok();
-            ids.push(conn.last_insert_rowid());
-        }
-    }
-    ids
+/// 已经解析好的导入负载。区分 HTML 书签 / JSON 两种来源，
+/// 让锁外完成文件读取与解析、锁内只跑事务，避免阻塞其它 DB 命令。
+enum ImportPayload {
+    Bookmark(Vec<BookmarkEntry>),
+    Json {
+        links: Vec<crate::db::Link>,
+        categories: Vec<crate::db::FlatCategory>,
+    },
 }
 
 #[tauri::command]
-pub fn import_bookmarks(db: State<'_, Db>) -> Result<(u32, u32), AppError> {
+pub fn import_bookmarks(_app: AppHandle, db: State<'_, Db>) -> Result<(u32, u32), AppError> {
     let Some(path) = rfd::FileDialog::new()
         .add_filter("书签文件", &["html", "htm", "json"])
         .set_title("导入")
@@ -667,22 +628,32 @@ pub fn import_bookmarks(db: State<'_, Db>) -> Result<(u32, u32), AppError> {
         .unwrap_or("")
         .to_lowercase();
 
-    let conn = db.0.lock().unwrap();
-
-    let stats = if ext == "json" {
+    // —— 锁外完成所有文件 I/O 与解析 ——
+    let payload = if ext == "json" {
         let content = std::fs::read_to_string(&path)?;
         // 新格式：{ links: [...], categories: [...] }
         if let Ok(export) = serde_json::from_str::<crate::db::JsonExport>(&content) {
-            import_json_entries(&export.links, &export.categories, &conn)?
+            ImportPayload::Json {
+                links: export.links,
+                categories: export.categories,
+            }
         } else {
             // 旧格式：裸数组 [...]
             let links: Vec<crate::db::Link> = serde_json::from_str(&content)?;
-            import_json_entries(&links, &[], &conn)?
+            ImportPayload::Json { links, categories: Vec::new() }
         }
     } else {
         let html = std::fs::read_to_string(&path)?;
-        let entries = parse_bookmark_html(&html);
-        import_bookmark_entries(&entries, &conn)?
+        ImportPayload::Bookmark(parse_bookmark_html(&html))
+    };
+
+    // —— 仅在事务期持锁 ——
+    let conn = db.0.lock().unwrap();
+    let stats = match payload {
+        ImportPayload::Bookmark(entries) => import_bookmark_entries(&entries, &conn)?,
+        ImportPayload::Json { links, categories } => {
+            import_json_entries(&links, &categories, &conn)?
+        }
     };
 
     Ok((stats.links_imported, stats.categories_created))
@@ -696,8 +667,7 @@ pub fn get_setting(config: State<'_, Config>, key: String) -> Result<Option<Stri
 #[tauri::command]
 pub fn set_setting(app: AppHandle, config: State<'_, Config>, key: String, value: String) -> Result<(), AppError> {
     config.set(&key, &value)?;
-    let dir = app.path().app_data_dir().expect("failed to resolve app data dir");
-    config.save(&dir)?;
+    config.save(&app_data_dir(&app)?)?;
     Ok(())
 }
 
@@ -725,49 +695,66 @@ pub const DEFAULT_MAIN_SHORTCUT: &str = "CmdOrCtrl+Shift+J";
 pub const DEFAULT_SPOTLIGHT_SHORTCUT: &str = "CmdOrCtrl+Shift+K";
 pub const DEFAULT_HIDE_SHORTCUT: &str = "CmdOrCtrl+Shift+M";
 
+/// 一类全局快捷键的元信息（配置 key 与默认值），供四套 getter/setter 共用。
+struct ShortcutKind {
+    config_key: &'static str,
+    default: &'static str,
+}
+
+const KIND_QUICK_ADD: ShortcutKind = ShortcutKind { config_key: "global-shortcut", default: DEFAULT_SHORTCUT };
+const KIND_MAIN: ShortcutKind = ShortcutKind { config_key: "main-shortcut", default: DEFAULT_MAIN_SHORTCUT };
+const KIND_SPOTLIGHT: ShortcutKind = ShortcutKind { config_key: "spotlight-shortcut", default: DEFAULT_SPOTLIGHT_SHORTCUT };
+const KIND_HIDE: ShortcutKind = ShortcutKind { config_key: "hide-shortcut", default: DEFAULT_HIDE_SHORTCUT };
+
+/// 解析并切换全局快捷键：注销旧值、注册新值、保存配置。
+///
+/// 内部统一处理解析错误、unregister 容错（旧值可能已失效）、AppError 转换，
+/// 替代 4 套高度重复的 setter 模板。
+fn update_shortcut(
+    app: &AppHandle,
+    config: &Config,
+    kind: &ShortcutKind,
+    new_shortcut: &str,
+) -> Result<String, AppError> {
+    let parsed: tauri_plugin_global_shortcut::Shortcut = new_shortcut
+        .parse()
+        .map_err(|e: <tauri_plugin_global_shortcut::Shortcut as std::str::FromStr>::Err| {
+            AppError::General(format!("invalid shortcut '{}': {}", new_shortcut, e))
+        })?;
+
+    // 旧值 unregister 失败不影响新值 register，因此忽略其错误
+    let old = config.get(kind.config_key).unwrap_or_else(|| kind.default.to_string());
+    let _ = app.global_shortcut().unregister(old.as_str());
+
+    app.global_shortcut()
+        .register(parsed)
+        .map_err(|e| AppError::General(e.to_string()))?;
+
+    config.set(kind.config_key, new_shortcut)?;
+    config.save(&app_data_dir(app)?)?;
+    Ok(parsed.to_string())
+}
+
 #[tauri::command]
 pub fn get_shortcut(config: State<'_, Config>) -> Result<String, AppError> {
-    Ok(config.get("global-shortcut").unwrap_or_else(|| DEFAULT_SHORTCUT.to_string()))
+    Ok(config.get(KIND_QUICK_ADD.config_key).unwrap_or_else(|| KIND_QUICK_ADD.default.to_string()))
 }
 
 #[tauri::command]
 pub fn get_main_shortcut(config: State<'_, Config>) -> Result<String, AppError> {
-    Ok(config.get("main-shortcut").unwrap_or_else(|| DEFAULT_MAIN_SHORTCUT.to_string()))
+    Ok(config.get(KIND_MAIN.config_key).unwrap_or_else(|| KIND_MAIN.default.to_string()))
 }
 
 #[tauri::command]
 pub fn set_main_shortcut(app: AppHandle, config: State<'_, Config>, shortcut: String) -> Result<String, AppError> {
-    let parsed: tauri_plugin_global_shortcut::Shortcut = shortcut
-        .parse()
-        .map_err(|e: <tauri_plugin_global_shortcut::Shortcut as std::str::FromStr>::Err| AppError::General(e.to_string()))?;
-    let old = config.get("main-shortcut").unwrap_or_else(|| DEFAULT_MAIN_SHORTCUT.to_string());
-    let _ = app.global_shortcut().unregister(old.as_str());
-    app.global_shortcut()
-        .register(parsed)
-        .map_err(|e| AppError::General(e.to_string()))?;
-    config.set("main-shortcut", &shortcut)?;
-    let dir = app.path().app_data_dir().expect("failed to resolve app data dir");
-    config.save(&dir)?;
-    Ok(parsed.to_string())
+    update_shortcut(&app, &config, &KIND_MAIN, &shortcut)
 }
 
 #[tauri::command]
 pub fn set_shortcut(app: AppHandle, config: State<'_, Config>, shortcut: String) -> Result<String, AppError> {
-    let parsed: tauri_plugin_global_shortcut::Shortcut = shortcut.parse()
-        .map_err(|e: <tauri_plugin_global_shortcut::Shortcut as std::str::FromStr>::Err| AppError::General(e.to_string()))?;
-
-    let old = config.get("global-shortcut").unwrap_or_else(|| DEFAULT_SHORTCUT.to_string());
-    let _ = app.global_shortcut().unregister(old.as_str());
-
-    app.global_shortcut().register(parsed)
-        .map_err(|e| AppError::General(e.to_string()))?;
-
-    config.set("global-shortcut", &shortcut)?;
-    let dir = app.path().app_data_dir().expect("failed to resolve app data dir");
-    config.save(&dir)?;
-
-    Ok(parsed.to_string())
+    update_shortcut(&app, &config, &KIND_QUICK_ADD, &shortcut)
 }
+
 use arboard::Clipboard;
 #[tauri::command]
 pub fn copy_to_clipboard(content: String) -> Result<(), AppError> {
@@ -780,44 +767,22 @@ pub fn copy_to_clipboard(content: String) -> Result<(), AppError> {
 
 #[tauri::command]
 pub fn get_spotlight_shortcut(config: State<'_, Config>) -> Result<String, AppError> {
-    Ok(config.get("spotlight-shortcut").unwrap_or_else(|| DEFAULT_SPOTLIGHT_SHORTCUT.to_string()))
+    Ok(config.get(KIND_SPOTLIGHT.config_key).unwrap_or_else(|| KIND_SPOTLIGHT.default.to_string()))
 }
 
 #[tauri::command]
 pub fn set_spotlight_shortcut(app: AppHandle, config: State<'_, Config>, shortcut: String) -> Result<String, AppError> {
-    let parsed: tauri_plugin_global_shortcut::Shortcut = shortcut
-        .parse()
-        .map_err(|e: <tauri_plugin_global_shortcut::Shortcut as std::str::FromStr>::Err| AppError::General(e.to_string()))?;
-    let old = config.get("spotlight-shortcut").unwrap_or_else(|| DEFAULT_SPOTLIGHT_SHORTCUT.to_string());
-    let _ = app.global_shortcut().unregister(old.as_str());
-    app.global_shortcut()
-        .register(parsed)
-        .map_err(|e| AppError::General(e.to_string()))?;
-    config.set("spotlight-shortcut", &shortcut)?;
-    let dir = app.path().app_data_dir().expect("failed to resolve app data dir");
-    config.save(&dir)?;
-    Ok(parsed.to_string())
+    update_shortcut(&app, &config, &KIND_SPOTLIGHT, &shortcut)
 }
 
 #[tauri::command]
 pub fn get_hide_shortcut(config: State<'_, Config>) -> Result<String, AppError> {
-    Ok(config.get("hide-shortcut").unwrap_or_else(|| DEFAULT_HIDE_SHORTCUT.to_string()))
+    Ok(config.get(KIND_HIDE.config_key).unwrap_or_else(|| KIND_HIDE.default.to_string()))
 }
 
 #[tauri::command]
 pub fn set_hide_shortcut(app: AppHandle, config: State<'_, Config>, shortcut: String) -> Result<String, AppError> {
-    let parsed: tauri_plugin_global_shortcut::Shortcut = shortcut
-        .parse()
-        .map_err(|e: <tauri_plugin_global_shortcut::Shortcut as std::str::FromStr>::Err| AppError::General(e.to_string()))?;
-    let old = config.get("hide-shortcut").unwrap_or_else(|| DEFAULT_HIDE_SHORTCUT.to_string());
-    let _ = app.global_shortcut().unregister(old.as_str());
-    app.global_shortcut()
-        .register(parsed)
-        .map_err(|e| AppError::General(e.to_string()))?;
-    config.set("hide-shortcut", &shortcut)?;
-    let dir = app.path().app_data_dir().expect("failed to resolve app data dir");
-    config.save(&dir)?;
-    Ok(parsed.to_string())
+    update_shortcut(&app, &config, &KIND_HIDE, &shortcut)
 }
 
 #[tauri::command]
@@ -826,27 +791,8 @@ pub fn check_duplicate(db: State<'_, Db>, url: String, exclude_id: Option<i64>) 
 }
 
 async fn do_check_link(url: &str) -> Result<bool, AppError> {
-    let mut builder = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(8));
-
-    // Use system proxy on Windows (same logic as fetcher)
-    #[cfg(target_os = "windows")]
-    {
-        // Check if URL should bypass proxy based on ProxyOverride rules
-        if !crate::fetcher::should_bypass_proxy(url) {
-            if let Some(proxy_url) = crate::fetcher::get_windows_system_proxy() {
-                log::info!("[check_link] using system proxy: {}", proxy_url);
-                let proxy = reqwest::Proxy::all(&proxy_url)
-                    .map_err(|e| AppError::General(e.to_string()))?;
-                builder = builder.proxy(proxy);
-            }
-        } else {
-            log::info!("[check_link] bypassing proxy for internal URL: {}", url);
-        }
-    }
-
-    let client = builder
-        .build()
+    // 复用 fetcher 的 client builder：保持代理/超时策略一致
+    let client = crate::fetcher::build_http_client(url, 8, None)
         .map_err(|e| AppError::General(e.to_string()))?;
 
     if let Ok(resp) = client.head(url).send().await {
