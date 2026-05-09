@@ -152,7 +152,7 @@
       e.preventDefault();
       const idx = SORT_CYCLE.indexOf(current_sort);
       current_sort = SORT_CYCLE[(idx + 1) % SORT_CYCLE.length];
-      setSetting("sort-by", current_sort);
+      setSetting("spotlight-sort-by", current_sort);
       if (query.trim()) do_search(query);
       return;
     }
@@ -197,7 +197,7 @@
     apply_theme(saved || "system");
     document.documentElement.classList.add("theme-ready");
 
-    const savedSort = await getSetting("sort-by");
+    const savedSort = await getSetting("spotlight-sort-by");
     if (savedSort) current_sort = savedSort;
 
     listCategories().then(c => categories = c);
@@ -255,7 +255,7 @@
 <div class="spotlight" class:hidden={!spotlight_ready}>
   <div class="search-area">
     <div class="input-wrap">
-      <select class="sort-select" onchange={(e) => { current_sort = e.target.value; setSetting("sort-by", current_sort); if (query.trim()) do_search(query); }}>
+      <select class="sort-select" onchange={(e) => { current_sort = e.target.value; setSetting("spotlight-sort-by", current_sort); if (query.trim()) do_search(query); }}>
         <option value="">最近更新</option>
         <option value="click_count" selected={current_sort === "click_count"}>最多打开</option>
         <option value="last_opened_at" selected={current_sort === "last_opened_at"}>最近打开</option>
