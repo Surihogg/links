@@ -10,7 +10,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2",
+    "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-autostart": "^2.5.1",
     "@tauri-apps/plugin-process": "^2",
     "@tauri-apps/plugin-updater": "^2",
@@ -19,7 +19,7 @@
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5",
     "@tailwindcss/vite": "^4",
-    "@tauri-apps/cli": "^2",
+    "@tauri-apps/cli": "^2.11.1",
     "oxlint": "^1.62.0",
     "svelte": "^5",
     "tailwindcss": "^4",
