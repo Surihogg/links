@@ -101,6 +101,9 @@ impl Db {
         conn.execute_batch("ALTER TABLE links ADD COLUMN is_broken INTEGER NOT NULL DEFAULT 0").ok();
         conn.execute_batch("ALTER TABLE tags ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''").ok();
         conn.execute_batch("UPDATE tags SET updated_at = datetime('now','localtime') WHERE updated_at = ''").ok();
+        // 统计与行为追踪字段
+        conn.execute_batch("ALTER TABLE links ADD COLUMN click_count INTEGER NOT NULL DEFAULT 0").ok();
+        conn.execute_batch("ALTER TABLE links ADD COLUMN last_opened_at INTEGER DEFAULT NULL").ok();
         Ok(())
     }
 }
@@ -117,6 +120,8 @@ pub struct Link {
     pub category_id: Option<i64>,
     pub is_favorite: bool,
     pub is_broken: bool,
+    pub click_count: i64,
+    pub last_opened_at: Option<i64>,
     pub tags: Vec<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -183,10 +188,26 @@ pub struct Tag {
     pub updated_at: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateTagPayload {
     pub id: i64,
     pub name: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TopLink {
+    pub id: i64,
+    pub title: String,
+    pub url: String,
+    pub click_count: i64,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LinksStats {
+    pub total: i64,
+    pub this_week: i64,
+    pub top: Vec<TopLink>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -199,6 +220,7 @@ pub struct ListLinksParams {
     pub favorite_only: Option<bool>,
     pub untagged_only: Option<bool>,
     pub uncategorized_only: Option<bool>,
+    pub sort_by: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -210,6 +232,7 @@ pub struct SearchParams {
     pub tag: Option<String>,
     pub favorite_only: Option<bool>,
     pub untagged_only: Option<bool>,
+    pub sort_by: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -273,9 +296,11 @@ pub(crate) fn row_to_link(row: &rusqlite::Row) -> rusqlite::Result<Link> {
         category_id: row.get(7)?,
         is_favorite: row.get::<_, i32>(8)? != 0,
         is_broken: row.get::<_, i32>(9)? != 0,
+        click_count: row.get(10)?,
+        last_opened_at: row.get(11)?,
         tags: vec![],
-        created_at: row.get(10)?,
-        updated_at: row.get(11)?,
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
     })
 }
 
@@ -313,7 +338,7 @@ pub(crate) fn ensure_tags(conn: &Connection, tags: &[String]) -> Vec<i64> {
     ids
 }
 
-const LINK_COLUMNS: &str = "l.id, l.url, l.title, l.description, l.notes, l.favicon_url, l.og_image_url, l.category_id, l.is_favorite, l.is_broken, l.created_at, l.updated_at";
+const LINK_COLUMNS: &str = "l.id, l.url, l.title, l.description, l.notes, l.favicon_url, l.og_image_url, l.category_id, l.is_favorite, l.is_broken, l.click_count, l.last_opened_at, l.created_at, l.updated_at";
 
 impl Db {
     pub fn create_link(&self, payload: &CreateLinkPayload) -> Result<Link, AppError> {
@@ -495,9 +520,14 @@ impl Db {
             |r| r.get(0),
         )?;
 
+        let order_by = match params.sort_by.as_deref() {
+            Some("click_count") => "l.click_count DESC, l.updated_at DESC",
+            Some("last_opened_at") => "l.last_opened_at DESC, l.updated_at DESC",
+            _ => "l.updated_at DESC",
+        };
         let query_sql = format!(
-            "SELECT {} FROM links l {} ORDER BY l.updated_at DESC LIMIT ? OFFSET ?",
-            LINK_COLUMNS, where_sql
+            "SELECT {} FROM links l {} ORDER BY {} LIMIT ? OFFSET ?",
+            LINK_COLUMNS, where_sql, order_by
         );
 
         p.push(Box::new(per_page));
@@ -517,6 +547,44 @@ impl Db {
         }
 
         Ok(PaginatedResult { items, total, page, per_page })
+    }
+
+    pub fn track_click(&self, url: &str) -> Result<(), AppError> {
+        let conn = self.0.lock().unwrap();
+        conn.execute(
+            "UPDATE links SET click_count = click_count + 1, last_opened_at = CAST(strftime('%s','now') AS INTEGER) WHERE url = ?1",
+            rusqlite::params![url],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_stats(&self) -> Result<LinksStats, AppError> {
+        let conn = self.0.lock().unwrap();
+        let total: i64 = conn.query_row("SELECT COUNT(*) FROM links", [], |r| r.get(0))?;
+        let this_week: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM links WHERE created_at >= datetime('now','localtime','-7 days')",
+            [],
+            |r| r.get(0),
+        )?;
+        let raw_links: Vec<Link> = {
+            let mut stmt = conn.prepare(
+                &format!("SELECT {} FROM links l WHERE l.click_count > 0 ORDER BY l.click_count DESC LIMIT 3", LINK_COLUMNS),
+            )?;
+            let rows = stmt.query_map([], row_to_link)?;
+            rows.collect::<Result<Vec<_>, _>>()?
+        };
+        let mut top: Vec<TopLink> = Vec::new();
+        for link in raw_links {
+            let tags = load_tags_for_link(&conn, link.id);
+            top.push(TopLink {
+                id: link.id,
+                title: if link.title.is_empty() { link.url.clone() } else { link.title.clone() },
+                url: link.url,
+                click_count: link.click_count,
+                tags,
+            });
+        }
+        Ok(LinksStats { total, this_week, top })
     }
 
     pub fn search_links(&self, params: &SearchParams) -> Result<PaginatedResult<Link>, AppError> {
@@ -553,11 +621,16 @@ impl Db {
             filter_parts.push("is_favorite = 1".into());
         }
 
+        let order_by = match params.sort_by.as_deref() {
+            Some("click_count") => "click_count DESC, updated_at DESC",
+            Some("last_opened_at") => "last_opened_at DESC, updated_at DESC",
+            _ => "updated_at DESC",
+        };
         let (union_sql, count_sql) = if filter_parts.is_empty() {
-            (format!("{} ORDER BY updated_at DESC", base_union), format!("SELECT COUNT(*) FROM ({})", base_union))
+            (format!("{} ORDER BY {}", base_union, order_by), format!("SELECT COUNT(*) FROM ({})", base_union))
         } else {
             let w = filter_parts.join(" AND ");
-            (format!("SELECT * FROM ({}) AS sub WHERE {} ORDER BY updated_at DESC", base_union, w),
+            (format!("SELECT * FROM ({}) AS sub WHERE {} ORDER BY {}", base_union, w, order_by),
              format!("SELECT COUNT(*) FROM ({}) AS sub WHERE {}", base_union, w))
         };
 
@@ -621,12 +694,12 @@ impl Db {
                 Ok(PaginatedResult { items, total, page, per_page })
             }
             Err(_) => {
-                let fallback_union = format!("{} UNION {} UNION {} ORDER BY updated_at DESC", tag_sql, cat_sql, like_sql);
+                let fallback_union = format!("{} UNION {} UNION {} ORDER BY {}", tag_sql, cat_sql, like_sql, order_by);
                 let (fb_query, fb_count) = if filter_parts.is_empty() {
                     (format!("{} LIMIT ? OFFSET ?", fallback_union), format!("SELECT COUNT(*) FROM ({})", fallback_union))
                 } else {
                     let w = filter_parts.join(" AND ");
-                    (format!("SELECT * FROM ({}) AS sub WHERE {} ORDER BY updated_at DESC LIMIT ? OFFSET ?", fallback_union, w),
+                    (format!("SELECT * FROM ({}) AS sub WHERE {} ORDER BY {} LIMIT ? OFFSET ?", fallback_union, w, order_by),
                      format!("SELECT COUNT(*) FROM ({}) AS sub WHERE {}", fallback_union, w))
                 };
 
@@ -1263,7 +1336,7 @@ mod tests {
         }
         let result = db.list_links(&ListLinksParams {
             page: Some(1), per_page: Some(3), category_id: None, tag: None, query: None, favorite_only: None,
-            untagged_only: None, uncategorized_only: None,
+            untagged_only: None, uncategorized_only: None, sort_by: None,
         }).unwrap();
         assert_eq!(result.items.len(), 3);
         assert_eq!(result.total, 5);
@@ -1279,7 +1352,7 @@ mod tests {
 
         let result = db.list_links(&ListLinksParams {
             category_id: Some(Some(cat.id)), page: None, per_page: None, tag: None, query: None, favorite_only: None,
-            untagged_only: None, uncategorized_only: None,
+            untagged_only: None, uncategorized_only: None, sort_by: None,
         }).unwrap();
         assert_eq!(result.items.len(), 1);
         assert_eq!(result.items[0].url, "https://news.com");
@@ -1293,7 +1366,7 @@ mod tests {
 
         let result = db.list_links(&ListLinksParams {
             tag: Some("rust".into()), page: None, per_page: None, category_id: None, query: None, favorite_only: None,
-            untagged_only: None, uncategorized_only: None,
+            untagged_only: None, uncategorized_only: None, sort_by: None,
         }).unwrap();
         assert_eq!(result.items.len(), 1);
     }
@@ -1307,7 +1380,7 @@ mod tests {
 
         let result = db.list_links(&ListLinksParams {
             favorite_only: Some(true), page: None, per_page: None, category_id: None, tag: None, query: None,
-            untagged_only: None, uncategorized_only: None,
+            untagged_only: None, uncategorized_only: None, sort_by: None,
         }).unwrap();
         assert_eq!(result.items.len(), 1);
         assert!(result.items[0].is_favorite);
@@ -1419,7 +1492,7 @@ mod tests {
 
         let link_after = db.list_links(&ListLinksParams {
             page: None, per_page: None, category_id: None, tag: None, query: None, favorite_only: None,
-            untagged_only: None, uncategorized_only: None,
+            untagged_only: None, uncategorized_only: None, sort_by: None,
         }).unwrap();
         assert!(link_after.items[0].category_id.is_none());
 

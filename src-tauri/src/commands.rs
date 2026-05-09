@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::db::{
     AppError, CreateCategoryPayload, CreateLinkPayload, Db, ExportParams, ListLinksParams,
-    PaginatedResult, SearchParams, UpdateCategoryPayload, UpdateLinkPayload, UpdateTagPayload,
+    LinksStats, PaginatedResult, SearchParams, UpdateCategoryPayload, UpdateLinkPayload, UpdateTagPayload,
 };
 use rusqlite::params;
 use serde_json::Value;
@@ -186,6 +186,11 @@ pub fn links_search(db: State<'_, Db>, params: SearchParams) -> Result<Paginated
 }
 
 #[tauri::command]
+pub fn links_stats(db: State<'_, Db>) -> Result<LinksStats, AppError> {
+    db.get_stats()
+}
+
+#[tauri::command]
 pub fn categories_list(db: State<'_, Db>) -> Result<Vec<crate::db::Category>, AppError> {
     log::info!("[cmd] categories_list called");
     db.list_categories()
@@ -245,8 +250,10 @@ pub async fn fetch_metadata(app: AppHandle, url: String) -> Result<crate::fetche
 }
 
 #[tauri::command]
-pub fn open_url(url: String) -> Result<(), AppError> {
-    open::that(&url).map_err(|e| AppError::General(e.to_string()))
+pub fn open_url(url: String, db: State<'_, Db>) -> Result<(), AppError> {
+    open::that(&url).map_err(|e| AppError::General(e.to_string()))?;
+    let _ = db.track_click(&url);
+    Ok(())
 }
 
 #[tauri::command]

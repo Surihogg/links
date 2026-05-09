@@ -357,6 +357,7 @@ pub fn run() {
             commands::links_update,
             commands::links_delete,
             commands::links_search,
+            commands::links_stats,
             commands::copy_to_clipboard,
             commands::check_duplicate,
             commands::check_link_status,
