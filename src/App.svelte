@@ -511,7 +511,7 @@ async function on_toggle_favorite(link) {
 
   async function load_stats() {
     try {
-      sidebar_stats = await api.linksStats();
+      sidebar_stats = await api.getLinksStats();
     } catch (e) {
       console.warn("[stats] failed:", e);
     }

@@ -1,63 +1,83 @@
 import { invoke } from "@tauri-apps/api/core";
 
+// —— 链接 CRUD ——
+
 export async function listLinks(params = {}) {
-  return invoke("links_list", { params });
+  return invoke("list_links", { params });
 }
 
 export async function createLink(payload) {
-  return invoke("links_create", { payload });
+  return invoke("create_link", { payload });
 }
 
 export async function updateLink(payload) {
-  return invoke("links_update", { payload });
+  return invoke("update_link", { payload });
 }
 
 export async function deleteLink(id) {
-  return invoke("links_delete", { id });
+  return invoke("delete_link", { id });
 }
 
 export async function searchLinks(params = {}) {
-  return invoke("links_search", { params });
+  return invoke("search_links", { params });
 }
 
+export async function getLinksStats() {
+  return invoke("get_links_stats");
+}
+
+export async function checkDuplicate(url, excludeId = null) {
+  return invoke("check_duplicate", { url, exclude_id: excludeId });
+}
+
+export async function checkLinkStatus(url) {
+  return invoke("check_link_status", { url });
+}
+
+// —— 分组 CRUD ——
+
 export async function listCategories() {
-  return invoke("categories_list");
+  return invoke("list_categories");
 }
 
 export async function createCategory(payload) {
-  return invoke("categories_create", { payload });
+  return invoke("create_category", { payload });
 }
 
 export async function updateCategory(payload) {
-  return invoke("categories_update", { payload });
+  return invoke("update_category", { payload });
 }
 
 export async function deleteCategory(id) {
-  return invoke("categories_delete", { id });
+  return invoke("delete_category", { id });
 }
 
+// —— 标签 CRUD ——
+
 export async function listTags() {
-  return invoke("tags_list");
+  return invoke("list_tags");
 }
 
 export async function deleteTag(id) {
-  return invoke("tags_delete", { id });
+  return invoke("delete_tag", { id });
 }
 
 export async function createTag(name) {
-  return invoke("tags_create", { name });
+  return invoke("create_tag", { name });
 }
 
 export async function updateTag(payload) {
-  return invoke("tags_update", { payload });
+  return invoke("update_tag", { payload });
 }
 
 export async function autocompleteTags(prefix) {
-  return invoke("tags_autocomplete", { prefix });
+  return invoke("autocomplete_tags", { prefix });
 }
 
-export async function exportLinks(params) {
-  return invoke("export_links", { params });
+// —— 抓取与系统 ——
+
+export async function fetchMeta(url) {
+  return invoke("fetch_metadata", { url });
 }
 
 export async function openUrl(url) {
@@ -72,15 +92,27 @@ export async function saveFile(content, filename) {
   return invoke("save_file", { content, filename });
 }
 
-export async function fetchMeta(url) {
-  return invoke("fetch_metadata", { url });
+export async function copyToClipboard(content) {
+  return invoke("copy_to_clipboard", { content });
+}
+
+export async function exitApp() {
+  return invoke("exit_app");
+}
+
+// —— 导入导出 ——
+
+export async function exportLinks(params) {
+  return invoke("export_links", { params });
 }
 
 export async function importBookmarks() {
   return invoke("import_bookmarks");
 }
 
-// Settings: migrate from localStorage to SQLite-backed settings table
+// —— 配置 ——
+// 配置统一持久化到 config.json，禁止使用 localStorage
+
 export async function getSetting(key) {
   return invoke("get_setting", { key });
 }
@@ -88,6 +120,8 @@ export async function getSetting(key) {
 export async function setSetting(key, value) {
   return invoke("set_setting", { key, value });
 }
+
+// —— 快捷键 ——
 
 export async function getShortcut() {
   return invoke("get_shortcut");
@@ -97,7 +131,6 @@ export async function setShortcut(shortcut) {
   return invoke("set_shortcut", { shortcut });
 }
 
-// Main window shortcut management
 export async function getMainShortcut() {
   return invoke("get_main_shortcut");
 }
@@ -106,24 +139,24 @@ export async function setMainShortcut(shortcut) {
   return invoke("set_main_shortcut", { shortcut });
 }
 
-// Frontend helpers for link sharing and status checks
-export async function copyToClipboard(content) {
-  return invoke("copy_to_clipboard", { content });
+export async function getSpotlightShortcut() {
+  return invoke("get_spotlight_shortcut");
 }
 
-export async function checkDuplicate(url, excludeId = null) {
-  return invoke("check_duplicate", { url, exclude_id: excludeId });
+export async function setSpotlightShortcut(shortcut) {
+  return invoke("set_spotlight_shortcut", { shortcut });
 }
 
-export async function checkLinkStatus(url) {
-  return invoke("check_link_status", { url });
+export async function getHideShortcut() {
+  return invoke("get_hide_shortcut");
 }
 
-export async function exitApp() {
-  return invoke("exit_app");
+export async function setHideShortcut(shortcut) {
+  return invoke("set_hide_shortcut", { shortcut });
 }
 
-// Autostart
+// —— 自动启动（Tauri 插件，懒加载减小 quick-add 启动开销） ——
+
 export async function enableAutostart() {
   const { enable } = await import("@tauri-apps/plugin-autostart");
   return enable();
@@ -139,7 +172,8 @@ export async function isAutostartEnabled() {
   return isEnabled();
 }
 
-// Updater
+// —— 自动更新 ——
+
 export async function getSystemProxy() {
   return invoke("get_system_proxy");
 }
@@ -173,6 +207,8 @@ export async function fetchReleaseNotes(tag) {
   return data.body || "";
 }
 
+// —— Deep link / 浏览器扩展 ——
+
 export async function popPendingDeepLink() {
   return invoke("pop_pending_deep_link");
 }
@@ -185,22 +221,3 @@ export async function getLocalServerInfo() {
   return invoke("get_local_server_info");
 }
 
-export async function getSpotlightShortcut() {
-  return invoke("get_spotlight_shortcut");
-}
-
-export async function setSpotlightShortcut(shortcut) {
-  return invoke("set_spotlight_shortcut", { shortcut });
-}
-
-export async function getHideShortcut() {
-  return invoke("get_hide_shortcut");
-}
-
-export async function setHideShortcut(shortcut) {
-  return invoke("set_hide_shortcut", { shortcut });
-}
-
-export async function linksStats() {
-  return invoke("links_stats");
-}

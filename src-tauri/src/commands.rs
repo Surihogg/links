@@ -116,17 +116,17 @@ pub fn init_db(app: &AppHandle) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-pub fn links_list(
+pub fn list_links(
     _app: AppHandle,
     db: State<'_, Db>,
     params: ListLinksParams,
 ) -> Result<PaginatedResult<crate::db::Link>, AppError> {
-    log::info!("[cmd] links_list called");
+    log::info!("[cmd] list_links called");
     db.list_links(&params)
 }
 
 #[tauri::command]
-pub fn links_create(
+pub fn create_link(
     db: State<'_, Db>,
     app: AppHandle,
     config: State<'_, Config>,
@@ -176,69 +176,69 @@ pub fn links_create(
 }
 
 #[tauri::command]
-pub fn links_update(db: State<'_, Db>, payload: UpdateLinkPayload) -> Result<crate::db::Link, AppError> {
+pub fn update_link(db: State<'_, Db>, payload: UpdateLinkPayload) -> Result<crate::db::Link, AppError> {
     db.update_link(&payload)
 }
 
 #[tauri::command]
-pub fn links_delete(db: State<'_, Db>, id: i64) -> Result<(), AppError> {
+pub fn delete_link(db: State<'_, Db>, id: i64) -> Result<(), AppError> {
     db.delete_link(id)
 }
 
 #[tauri::command]
-pub fn links_search(db: State<'_, Db>, params: SearchParams) -> Result<PaginatedResult<crate::db::Link>, AppError> {
+pub fn search_links(db: State<'_, Db>, params: SearchParams) -> Result<PaginatedResult<crate::db::Link>, AppError> {
     db.search_links(&params)
 }
 
 #[tauri::command]
-pub fn links_stats(db: State<'_, Db>) -> Result<LinksStats, AppError> {
+pub fn get_links_stats(db: State<'_, Db>) -> Result<LinksStats, AppError> {
     db.get_stats()
 }
 
 #[tauri::command]
-pub fn categories_list(db: State<'_, Db>) -> Result<Vec<crate::db::Category>, AppError> {
-    log::info!("[cmd] categories_list called");
+pub fn list_categories(db: State<'_, Db>) -> Result<Vec<crate::db::Category>, AppError> {
+    log::info!("[cmd] list_categories called");
     db.list_categories()
 }
 
 #[tauri::command]
-pub fn categories_create(db: State<'_, Db>, payload: CreateCategoryPayload) -> Result<crate::db::Category, AppError> {
+pub fn create_category(db: State<'_, Db>, payload: CreateCategoryPayload) -> Result<crate::db::Category, AppError> {
     db.create_category(&payload)
 }
 
 #[tauri::command]
-pub fn categories_update(db: State<'_, Db>, payload: UpdateCategoryPayload) -> Result<crate::db::Category, AppError> {
+pub fn update_category(db: State<'_, Db>, payload: UpdateCategoryPayload) -> Result<crate::db::Category, AppError> {
     db.update_category(&payload)
 }
 
 #[tauri::command]
-pub fn categories_delete(db: State<'_, Db>, id: i64) -> Result<(), AppError> {
+pub fn delete_category(db: State<'_, Db>, id: i64) -> Result<(), AppError> {
     db.delete_category(id)
 }
 
 #[tauri::command]
-pub fn tags_list(db: State<'_, Db>) -> Result<Vec<crate::db::Tag>, AppError> {
-    log::info!("[cmd] tags_list called");
+pub fn list_tags(db: State<'_, Db>) -> Result<Vec<crate::db::Tag>, AppError> {
+    log::info!("[cmd] list_tags called");
     db.list_tags()
 }
 
 #[tauri::command]
-pub fn tags_delete(db: State<'_, Db>, id: i64) -> Result<(), AppError> {
+pub fn delete_tag(db: State<'_, Db>, id: i64) -> Result<(), AppError> {
     db.delete_tag(id)
 }
 
 #[tauri::command]
-pub fn tags_create(db: State<'_, Db>, name: String) -> Result<crate::db::Tag, AppError> {
+pub fn create_tag(db: State<'_, Db>, name: String) -> Result<crate::db::Tag, AppError> {
     db.create_tag(&name)
 }
 
 #[tauri::command]
-pub fn tags_update(db: State<'_, Db>, payload: UpdateTagPayload) -> Result<crate::db::Tag, AppError> {
+pub fn update_tag(db: State<'_, Db>, payload: UpdateTagPayload) -> Result<crate::db::Tag, AppError> {
     db.update_tag(&payload)
 }
 
 #[tauri::command]
-pub fn tags_autocomplete(db: State<'_, Db>, prefix: String) -> Result<Vec<crate::db::Tag>, AppError> {
+pub fn autocomplete_tags(db: State<'_, Db>, prefix: String) -> Result<Vec<crate::db::Tag>, AppError> {
     db.autocomplete_tags(&prefix)
 }
 

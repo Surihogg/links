@@ -354,45 +354,53 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::links_list,
-            commands::links_create,
-            commands::links_update,
-            commands::links_delete,
-            commands::links_search,
-            commands::links_stats,
-            commands::copy_to_clipboard,
+            // 链接 CRUD
+            commands::list_links,
+            commands::create_link,
+            commands::update_link,
+            commands::delete_link,
+            commands::search_links,
+            commands::get_links_stats,
             commands::check_duplicate,
             commands::check_link_status,
-            commands::categories_list,
-            commands::categories_create,
-            commands::categories_update,
-            commands::categories_delete,
-            commands::tags_list,
-            commands::tags_create,
-            commands::tags_update,
-            commands::tags_delete,
-            commands::tags_autocomplete,
-            commands::export_links,
+            // 分组 CRUD
+            commands::list_categories,
+            commands::create_category,
+            commands::update_category,
+            commands::delete_category,
+            // 标签 CRUD
+            commands::list_tags,
+            commands::create_tag,
+            commands::update_tag,
+            commands::delete_tag,
+            commands::autocomplete_tags,
+            // 抓取与系统
+            commands::fetch_metadata,
             commands::open_url,
             commands::open_data_dir,
             commands::save_file,
-            commands::fetch_metadata,
+            commands::copy_to_clipboard,
+            commands::get_system_proxy,
+            commands::exit_app,
+            // 导入导出
+            commands::export_links,
             commands::import_bookmarks,
+            // 配置
             commands::get_setting,
             commands::set_setting,
+            // 快捷键
             commands::get_shortcut,
             commands::set_shortcut,
             commands::get_main_shortcut,
             commands::set_main_shortcut,
-            commands::exit_app,
-            commands::get_system_proxy,
-            commands::pop_pending_deep_link,
-            commands::check_startup_deep_link,
-            commands::get_local_server_info,
             commands::get_spotlight_shortcut,
             commands::set_spotlight_shortcut,
             commands::get_hide_shortcut,
             commands::set_hide_shortcut,
+            // Deep link / 浏览器扩展
+            commands::pop_pending_deep_link,
+            commands::check_startup_deep_link,
+            commands::get_local_server_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
