@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import { searchLinks, openUrl, getSetting, listCategories } from "../lib/api.js";
+  import { searchLinks, openUrl, getSetting, setSetting, listCategories } from "../lib/api.js";
   import { waitForBackendReady } from "../lib/ready.js";
   import { emit, listen } from "@tauri-apps/api/event";
   import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
@@ -69,8 +69,18 @@
     if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
     if (diff < 604800) return `${Math.floor(diff / 86400)}天前`;
+    return format_absolute_time(ts);
+  }
+
+  function format_absolute_time(ts) {
+    if (!ts) return '';
     const d = new Date(ts * 1000);
-    return `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    const h = d.getHours().toString().padStart(2, '0');
+    const min = d.getMinutes().toString().padStart(2, '0');
+    return `${y}-${m}-${day} ${h}:${min}`;
   }
 
   async function do_search(q) {
@@ -130,10 +140,20 @@
     });
   }
 
+  const SORT_CYCLE = ["", "click_count", "last_opened_at"];
+
   function handle_keydown(e) {
     if (e.key === "Escape") {
       e.preventDefault();
       hide_window();
+      return;
+    }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const idx = SORT_CYCLE.indexOf(current_sort);
+      current_sort = SORT_CYCLE[(idx + 1) % SORT_CYCLE.length];
+      setSetting("sort-by", current_sort);
+      if (query.trim()) do_search(query);
       return;
     }
     if (results.length === 0) return;
@@ -176,6 +196,9 @@
     }
     apply_theme(saved || "system");
     document.documentElement.classList.add("theme-ready");
+
+    const savedSort = await getSetting("sort-by");
+    if (savedSort) current_sort = savedSort;
 
     listCategories().then(c => categories = c);
 
@@ -232,7 +255,7 @@
 <div class="spotlight" class:hidden={!spotlight_ready}>
   <div class="search-area">
     <div class="input-wrap">
-      <select class="sort-select" onchange={(e) => { current_sort = e.target.value; if (query.trim()) do_search(query); }}>
+      <select class="sort-select" onchange={(e) => { current_sort = e.target.value; setSetting("sort-by", current_sort); if (query.trim()) do_search(query); }}>
         <option value="">最近更新</option>
         <option value="click_count" selected={current_sort === "click_count"}>最多打开</option>
         <option value="last_opened_at" selected={current_sort === "last_opened_at"}>最近打开</option>
@@ -298,7 +321,7 @@
                   </span>
                 {/if}
                 {#if link.last_opened_at}
-                  <span class="result-stat">
+                  <span class="result-stat" title={`上次打开：${format_absolute_time(link.last_opened_at)}`}>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     {format_last_opened(link.last_opened_at)}
                   </span>

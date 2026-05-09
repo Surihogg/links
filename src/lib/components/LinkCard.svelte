@@ -26,6 +26,17 @@
     return `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   }
 
+  function format_absolute_time(ts) {
+    if (!ts) return '';
+    const d = new Date(ts * 1000);
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    const h = d.getHours().toString().padStart(2, '0');
+    const min = d.getMinutes().toString().padStart(2, '0');
+    return `${y}-${m}-${day} ${h}:${min}`;
+  }
+
   settingsStore.subscribe(v => { check_reachability = v.check_link_reachability; });
 
   let domain = $derived.by(() => {
@@ -163,7 +174,7 @@
           </span>
         {/if}
         {#if link.last_opened_at}
-          <span class="last-opened-badge" data-tooltip={format_last_opened(link.last_opened_at)}>
+          <span class="last-opened-badge" data-tooltip={`上次打开：${format_absolute_time(link.last_opened_at)}`}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             {format_last_opened(link.last_opened_at)}
           </span>
