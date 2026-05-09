@@ -257,7 +257,7 @@
     <div class="input-wrap">
       <select class="sort-select" onchange={(e) => { current_sort = e.target.value; setSetting("spotlight-sort-by", current_sort); if (query.trim()) do_search(query); }}>
         <option value="">最近更新</option>
-        <option value="click_count" selected={current_sort === "click_count"}>最多打开</option>
+        <option value="click_count" selected={current_sort === "click_count"}>最多访问</option>
         <option value="last_opened_at" selected={current_sort === "last_opened_at"}>最近打开</option>
       </select>
       <div class="search-field">
