@@ -1542,7 +1542,7 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Rust Programming Language", "A systems language", vec![])).unwrap();
 
-        let results = db.search_links(&SearchParams { query: "Rust".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None }).unwrap();
+        let results = db.search_links(&SearchParams { query: "Rust".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None, sort_by: None }).unwrap();
         assert!(!results.items.is_empty());
         assert!(results.items[0].title.contains("Rust"));
     }
@@ -1552,7 +1552,7 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Rust 编程语言指南", "学习 Rust", vec![])).unwrap();
 
-        let results = db.search_links(&SearchParams { query: "编程".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None }).unwrap();
+        let results = db.search_links(&SearchParams { query: "编程".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None, sort_by: None }).unwrap();
         assert!(!results.items.is_empty());
     }
 
@@ -1561,7 +1561,7 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Some Title", "desc", vec!["webassembly"])).unwrap();
 
-        let results = db.search_links(&SearchParams { query: "webassembly".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None }).unwrap();
+        let results = db.search_links(&SearchParams { query: "webassembly".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None, sort_by: None }).unwrap();
         assert!(!results.items.is_empty());
     }
 
@@ -1570,7 +1570,7 @@ mod tests {
         let db = test_db();
         db.create_link(&make_link_full("https://example.com", "Hello World", "desc", vec![])).unwrap();
 
-        let results = db.search_links(&SearchParams { query: "ello".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None }).unwrap();
+        let results = db.search_links(&SearchParams { query: "ello".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None, sort_by: None }).unwrap();
         assert!(!results.items.is_empty());
     }
 
@@ -1580,7 +1580,7 @@ mod tests {
         let cat = db.create_category(&CreateCategoryPayload { name: "开发工具".into(), parent_id: None }).unwrap();
         db.create_link(&make_link_full_cat("https://tauri.app", "Tauri App", Some(cat.id))).unwrap();
 
-        let results = db.search_links(&SearchParams { query: "开发工具".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None }).unwrap();
+        let results = db.search_links(&SearchParams { query: "开发工具".into(), page: None, per_page: None, category_id: None, tag: None, favorite_only: None, untagged_only: None, sort_by: None }).unwrap();
         assert_eq!(results.items.len(), 1, "应通过分组名搜到该分组下的链接");
         assert_eq!(results.items[0].url, "https://tauri.app");
     }
