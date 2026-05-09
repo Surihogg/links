@@ -1,5 +1,5 @@
 <script>
-  let { query = $bindable(""), onsearch, filter_chip = null, onremovefilter } = $props();
+  let { query = $bindable(""), onsearch, ontab, filter_chip = null, onremovefilter } = $props();
   let timer = $state(null);
   let input_el;
 
@@ -22,6 +22,10 @@
     if (e.key === "Backspace" && query === "" && filter_chip) {
       e.preventDefault();
       onremovefilter?.();
+    }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      ontab?.();
     }
   }
 </script>

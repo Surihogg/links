@@ -84,6 +84,8 @@
       else savedTheme = "system";
     }
     theme_mode = savedTheme || "system";
+    const savedSort = await api.getSetting("sort-by");
+    if (savedSort) sort_by = savedSort;
     try {
       const v = (await api.getSetting("check-link-reachability")) !== "false";
       settingsStore.update(s => ({ ...s, check_link_reachability: v }));
@@ -629,12 +631,21 @@ async function on_toggle_favorite(link) {
 
   function on_sort_change(value) {
     sort_by = value || null;
+    api.setSetting("sort-by", sort_by || "");
     selected_link_index = -1;
     if (search_query.trim()) {
       linksStore.search({ query: search_query, per_page: 30, ...build_filter_params() });
     } else {
       load_links();
     }
+  }
+
+  const SORT_CYCLE = [null, "click_count", "last_opened_at"];
+
+  function on_tab_sort() {
+    const idx = SORT_CYCLE.indexOf(sort_by);
+    const next = SORT_CYCLE[(idx + 1) % SORT_CYCLE.length];
+    on_sort_change(next || "");
   }
 
   async function fetch_github_notes(version) {
@@ -808,7 +819,7 @@ async function on_toggle_favorite(link) {
               <option value="last_opened_at" selected={sort_by === "last_opened_at"}>最近打开</option>
             </select>
           {/if}
-          <SearchBar bind:this={search_bar} bind:query={search_query} {filter_chip} onremovefilter={on_remove_filter} onsearch={on_search} />
+          <SearchBar bind:this={search_bar} bind:query={search_query} {filter_chip} onremovefilter={on_remove_filter} onsearch={on_search} ontab={on_tab_sort} />
         </div>
       </header>
 
