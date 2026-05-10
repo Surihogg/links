@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use rusqlite::Connection;
 
 use super::models::*;
-use super::row_mapping::ensure_tags;
+use super::row_mapping::{ensure_tags, load_tags_for_links};
 use super::Db;
 
 fn test_db() -> Db {
@@ -783,4 +783,40 @@ fn test_export_unsupported_format() {
         favorite_only: None,
     });
     assert!(result.is_err());
+}
+
+// ===== 批量加载标签（消除 N+1）=====
+
+#[test]
+fn load_tags_for_links_batch_fills_tags_in_place() {
+    let db = test_db();
+    let l1 = db.create_link(&make_link_full("https://a.com", "A", "", vec!["rust", "wasm"])).unwrap();
+    let l2 = db.create_link(&make_link_full("https://b.com", "B", "", vec!["js"])).unwrap();
+    let l3 = db.create_link(&make_link("https://c.com")).unwrap();
+
+    // 模拟 list_links 拿到的"标签未填充"链接列表
+    let mut bare = vec![
+        Link { tags: vec![], ..l1.clone() },
+        Link { tags: vec![], ..l2.clone() },
+        Link { tags: vec![], ..l3.clone() },
+    ];
+
+    let conn = db.0.lock().unwrap();
+    load_tags_for_links(&conn, &mut bare);
+
+    let mut t1 = bare[0].tags.clone();
+    t1.sort();
+    assert_eq!(t1, vec!["rust", "wasm"]);
+    assert_eq!(bare[1].tags, vec!["js"]);
+    assert!(bare[2].tags.is_empty());
+}
+
+#[test]
+fn load_tags_for_links_batch_handles_empty_input() {
+    let db = test_db();
+    let conn = db.0.lock().unwrap();
+    let mut empty: Vec<Link> = vec![];
+    // 不应崩溃，不应发起查询
+    load_tags_for_links(&conn, &mut empty);
+    assert!(empty.is_empty());
 }

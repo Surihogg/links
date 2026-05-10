@@ -56,6 +56,8 @@ pub(crate) fn row_to_tag(row: &rusqlite::Row) -> rusqlite::Result<Tag> {
 }
 
 /// 加载某条链接的全部标签名。
+///
+/// 单条查询版本；批量场景请用 [`load_tags_for_links`] 避免 N+1。
 pub(crate) fn load_tags_for_link(conn: &Connection, link_id: i64) -> Vec<String> {
     let Ok(mut stmt) = conn.prepare(
         "SELECT t.name FROM tags t JOIN link_tags lt ON lt.tag_id = t.id WHERE lt.link_id = ?",
@@ -69,6 +71,57 @@ pub(crate) fn load_tags_for_link(conn: &Connection, link_id: i64) -> Vec<String>
         };
     drop(stmt);
     tags
+}
+
+/// 批量为多条链接加载标签，把每条 link 的 tags 字段就地填充。
+///
+/// 一次 SQL 拉回所有 (link_id, tag_name) 对，按 link_id 分组后填回。
+/// 替代 list/search/export 路径里 `for link in items { link.tags = load_tags_for_link(...) }`
+/// 的 N+1 模式：30 条/页 时从 31 次查询降为 1 次。
+///
+/// 空 links 时直接返回，不发起查询。
+pub(crate) fn load_tags_for_links(conn: &Connection, links: &mut [super::models::Link]) {
+    if links.is_empty() {
+        return;
+    }
+
+    // SQLite 单条 IN (?, ?, ?, ...) 用占位符上限 999；本应用单页最多 100 条，
+    // 远低于上限，直接拼一次 IN 即可。如未来分页变大可分批。
+    let placeholders: String = std::iter::repeat("?")
+        .take(links.len())
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "SELECT lt.link_id, t.name \
+         FROM link_tags lt JOIN tags t ON t.id = lt.tag_id \
+         WHERE lt.link_id IN ({}) \
+         ORDER BY lt.link_id, t.name",
+        placeholders
+    );
+
+    let params: Vec<rusqlite::types::Value> =
+        links.iter().map(|l| rusqlite::types::Value::from(l.id)).collect();
+
+    let Ok(mut stmt) = conn.prepare(&sql) else { return };
+    let rows = match stmt.query_map(rusqlite::params_from_iter(params.iter()), |row| {
+        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+    }) {
+        Ok(r) => r,
+        Err(_) => return,
+    };
+
+    let mut by_link: std::collections::HashMap<i64, Vec<String>> =
+        std::collections::HashMap::with_capacity(links.len());
+    for row in rows.flatten() {
+        by_link.entry(row.0).or_default().push(row.1);
+    }
+    drop(stmt);
+
+    for link in links {
+        if let Some(tags) = by_link.remove(&link.id) {
+            link.tags = tags;
+        }
+    }
 }
 
 /// 确保给定标签名都存在于 `tags` 表，返回它们对应的 ID。

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use super::error::AppError;
 use super::models::{Category, ExportParams, FlatCategory, JsonExport, Link};
 use super::row_mapping::{
-    build_category_tree, load_tags_for_link, row_to_category, row_to_link, LINK_COLUMNS,
+    build_category_tree, load_tags_for_links, row_to_category, row_to_link, LINK_COLUMNS,
 };
 use super::Db;
 
@@ -59,9 +59,8 @@ impl Db {
             .collect::<Result<Vec<_>, _>>()?;
         drop(stmt);
 
-        for link in &mut links {
-            link.tags = load_tags_for_link(&conn, link.id);
-        }
+        // 批量加载所有过滤后链接的标签
+        load_tags_for_links(&conn, &mut links);
 
         match params.format.as_str() {
             "json" => {

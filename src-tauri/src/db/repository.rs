@@ -9,8 +9,8 @@ use super::models::{
     Tag, UpdateCategoryPayload, UpdateLinkPayload, UpdateTagPayload,
 };
 use super::row_mapping::{
-    build_category_tree, ensure_tags, load_tags_for_link, row_to_category, row_to_link, row_to_tag,
-    LINK_COLUMNS,
+    build_category_tree, ensure_tags, load_tags_for_link, load_tags_for_links, row_to_category,
+    row_to_link, row_to_tag, LINK_COLUMNS,
 };
 use super::Db;
 
@@ -253,9 +253,8 @@ impl Db {
             .collect::<Result<Vec<_>, _>>()?;
         drop(stmt);
 
-        for link in &mut items {
-            link.tags = load_tags_for_link(&conn, link.id);
-        }
+        // 批量加载标签：单条 IN 查询代替原 N 次独立 SELECT
+        load_tags_for_links(&conn, &mut items);
 
         Ok(PaginatedResult {
             items,

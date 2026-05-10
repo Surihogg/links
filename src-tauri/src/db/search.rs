@@ -6,7 +6,7 @@
 
 use super::error::AppError;
 use super::models::{Link, LinksStats, PaginatedResult, SearchParams, TopLink};
-use super::row_mapping::{load_tags_for_link, row_to_link, LINK_COLUMNS};
+use super::row_mapping::{load_tags_for_links, row_to_link, LINK_COLUMNS};
 use super::Db;
 
 impl Db {
@@ -18,7 +18,7 @@ impl Db {
             [],
             |r| r.get(0),
         )?;
-        let raw_links: Vec<Link> = {
+        let mut raw_links: Vec<Link> = {
             let mut stmt = conn.prepare(&format!(
                 "SELECT {} FROM links l WHERE l.click_count > 0 ORDER BY l.click_count DESC LIMIT 3",
                 LINK_COLUMNS
@@ -26,10 +26,11 @@ impl Db {
             let rows = stmt.query_map([], row_to_link)?;
             rows.collect::<Result<Vec<_>, _>>()?
         };
-        let mut top: Vec<TopLink> = Vec::new();
-        for link in raw_links {
-            let tags = load_tags_for_link(&conn, link.id);
-            top.push(TopLink {
+        // 一次性批量加载 Top 3 的标签
+        load_tags_for_links(&conn, &mut raw_links);
+        let top: Vec<TopLink> = raw_links
+            .into_iter()
+            .map(|link| TopLink {
                 id: link.id,
                 title: if link.title.is_empty() {
                     link.url.clone()
@@ -38,9 +39,9 @@ impl Db {
                 },
                 url: link.url,
                 click_count: link.click_count,
-                tags,
-            });
-        }
+                tags: link.tags,
+            })
+            .collect();
         Ok(LinksStats {
             total,
             this_week,
@@ -187,9 +188,7 @@ impl Db {
                     .unwrap_or(items.len() as u32);
 
                 let mut items = items;
-                for link in &mut items {
-                    link.tags = load_tags_for_link(&conn, link.id);
-                }
+                load_tags_for_links(&conn, &mut items);
                 Ok(PaginatedResult {
                     items,
                     total,
@@ -245,9 +244,7 @@ impl Db {
                     .unwrap_or(items.len() as u32);
 
                 let mut items = items;
-                for link in &mut items {
-                    link.tags = load_tags_for_link(&conn, link.id);
-                }
+                load_tags_for_links(&conn, &mut items);
                 Ok(PaginatedResult {
                     items,
                     total,
