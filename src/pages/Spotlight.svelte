@@ -21,7 +21,6 @@
   let input_el;
   let categories = $state([]);
   let mouse_moved = $state(false);
-  let spotlight_ready = $state(false);
   let hiding = false;
   let current_sort = $state("");
 
@@ -39,9 +38,10 @@
     const search_h = searchEl.getBoundingClientRect().height;
     const resultsEl = document.querySelector(".results-container");
     const content_h = resultsEl ? resultsEl.scrollHeight : 0;
-    const total_h = search_h + content_h;
-    const h = Math.max(WIN_MIN_HEIGHT, Math.min(total_h, WIN_MAX_HEIGHT));
-    getCurrentWindow().setSize(new LogicalSize(WIN_WIDTH, Math.ceil(h)));
+    // +2 补偿 .spotlight 的 1px border 上下（border-box 下内容区 = 窗口高度 - 2px）
+    const total_h = search_h + content_h + 2;
+    const h = Math.min(total_h, WIN_MAX_HEIGHT);
+    await getCurrentWindow().setSize(new LogicalSize(WIN_WIDTH, Math.ceil(h)));
   }
 
   // Spotlight 风格：保留 "www."，解析失败回退原 url
@@ -93,10 +93,21 @@
   async function hide_window() {
     if (hiding) return;
     hiding = true;
-    spotlight_ready = false;
+    // 先重置状态（和 QuickAdd 的 close_window 同理：hide 前清空，
+    // 下次 show 时内容已是干净的，无需 opacity 闪烁过渡）
+    query = "";
+    results = [];
+    has_searched = false;
+    selected_index = -1;
+    searching = false;
+    mouse_moved = false;
+    clearTimeout(search_timer);
+    // 等一帧让 DOM 更新（清空搜索结果），再缩小窗口
     await new Promise(r => requestAnimationFrame(r));
     if (!hiding) return;
-    await getCurrentWindow().setSize(new LogicalSize(WIN_WIDTH, WIN_MIN_HEIGHT));
+    const searchEl = document.querySelector(".search-area");
+    const h = searchEl ? Math.ceil(searchEl.getBoundingClientRect().height + 2) : WIN_MIN_HEIGHT;
+    await getCurrentWindow().setSize(new LogicalSize(WIN_WIDTH, h));
     if (!hiding) return;
     await getCurrentWindow().hide();
     hiding = false;
@@ -169,24 +180,12 @@
 
     const unlistenShown = await listen("spotlight-shown", () => {
       hiding = false;
-      spotlight_ready = false;
       const { availWidth, availHeight } = window.screen;
       getCurrentWindow().setPosition(new LogicalPosition(
         Math.round((availWidth - WIN_WIDTH) / 2),
         Math.round(availHeight * 0.25)
       ));
-      getCurrentWindow().setSize(new LogicalSize(WIN_WIDTH, WIN_MIN_HEIGHT));
-      query = "";
-      results = [];
-      has_searched = false;
-      selected_index = -1;
-      searching = false;
-      mouse_moved = false;
-      clearTimeout(search_timer);
       setTimeout(() => input_el?.focus(), 50);
-      requestAnimationFrame(() => {
-        spotlight_ready = true;
-      });
     });
 
     const unlistenFocus = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
@@ -194,8 +193,6 @@
     });
 
     window.addEventListener("keydown", handle_keydown);
-
-    spotlight_ready = true;
 
     return () => {
       window.removeEventListener("keydown", handle_keydown);
@@ -206,7 +203,7 @@
   });
 </script>
 
-<div class="spotlight" class:hidden={!spotlight_ready}>
+<div class="spotlight">
   <div class="search-area">
     <div class="input-wrap">
       <div class="search-field">
@@ -310,15 +307,9 @@
     overflow: hidden;
   }
 
-  .spotlight.hidden {
-    opacity: 0;
-  }
-
   .search-area {
     padding: 6px 10px;
     flex-shrink: 0;
-    margin-top: auto;
-    margin-bottom: auto;
   }
 
   .input-wrap {

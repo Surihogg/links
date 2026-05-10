@@ -141,7 +141,6 @@ pub fn run() {
                         }
                     } else if *shortcut == spotlight_sc {
                         if let Some(window) = app.get_webview_window("spotlight") {
-                            let _ = window.set_size(tauri::LogicalSize::new(560.0, 66.0));
                             if let Ok(Some(monitor)) = window.current_monitor() {
                                 let size = monitor.size();
                                 let scale = monitor.scale_factor();
