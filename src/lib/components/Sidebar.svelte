@@ -97,25 +97,9 @@
     if (!cat) return;
 
     ghost_el = document.createElement('div');
+    // 全部样式由 :global(.drag-ghost) 定义，避免内联 + global 双份维护
     ghost_el.className = 'drag-ghost';
     ghost_el.textContent = cat.name;
-    ghost_el.style.cssText = `
-      position: fixed;
-      pointer-events: none;
-      z-index: 9999;
-      background: var(--bg-2);
-      border: 1px solid var(--border-1);
-      border-radius: var(--radius-sm);
-      padding: 6px 12px;
-      font-size: 13px;
-      color: var(--text-0);
-      opacity: 0.8;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      white-space: nowrap;
-      max-width: 200px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    `;
     document.body.appendChild(ghost_el);
   }
 
@@ -1177,13 +1161,6 @@
     gap: 4px;
   }
 
-  .sidebar-footer {
-    padding: 8px 12px;
-    background: var(--bg-2);
-    display: flex;
-    gap: 4px;
-  }
-
   .footer-btn {
     width: 32px;
     height: 32px;
@@ -1227,7 +1204,7 @@
     font-size: 13px;
     color: var(--text-0);
     opacity: 0.8;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: var(--shadow-drag);
     white-space: nowrap;
     max-width: 200px;
     overflow: hidden;

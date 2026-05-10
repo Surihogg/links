@@ -2,6 +2,9 @@
   import { onMount } from "svelte";
   import { searchLinks, openUrl, getSetting, setSetting, listCategories } from "../lib/api.js";
   import { waitForBackendReady } from "../lib/ready.js";
+  import { formatAbsoluteTime, formatRelativeTime } from "../lib/utils/time.js";
+  import { getDomain } from "../lib/utils/url.js";
+  import { themeStore } from "../lib/stores/themeStore.svelte.js";
   import { emit, listen } from "@tauri-apps/api/event";
   import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
 
@@ -16,8 +19,6 @@
   let has_searched = $state(false);
   let search_timer = null;
   let input_el;
-  let dark_mode = $state(false);
-  let theme_mode = $state("system");
   let categories = $state([]);
   let mouse_moved = $state(false);
   let spotlight_ready = $state(false);
@@ -43,46 +44,13 @@
     getCurrentWindow().setSize(new LogicalSize(WIN_WIDTH, Math.ceil(h)));
   }
 
-  function apply_theme(mode) {
-    if (mode !== undefined) theme_mode = mode;
-    if (theme_mode === "system") {
-      dark_mode = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    } else {
-      dark_mode = theme_mode === "dark";
-    }
-    const root = document.documentElement;
-    root.classList.add("no-transition");
-    root.classList.toggle("dark", dark_mode);
-    root.offsetHeight;
-    requestAnimationFrame(() => root.classList.remove("no-transition"));
-  }
+  // Spotlight 风格：保留 "www."，解析失败回退原 url
+  const extract_domain = (url) => getDomain(url, { stripWww: false, fallback: "original" });
 
-  function extract_domain(url) {
-    try { return new URL(url).hostname; }
-    catch { return url; }
-  }
-
-  function format_last_opened(ts) {
-    if (!ts) return '';
-    const now = Math.floor(Date.now() / 1000);
-    const diff = now - ts;
-    if (diff < 60) return '刚刚';
-    if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}天前`;
-    return format_absolute_time(ts);
-  }
-
-  function format_absolute_time(ts) {
-    if (!ts) return '';
-    const d = new Date(ts * 1000);
-    const y = d.getFullYear();
-    const m = (d.getMonth() + 1).toString().padStart(2, '0');
-    const day = d.getDate().toString().padStart(2, '0');
-    const h = d.getHours().toString().padStart(2, '0');
-    const min = d.getMinutes().toString().padStart(2, '0');
-    return `${y}-${m}-${day} ${h}:${min}`;
-  }
+  // Spotlight 风格："3分钟前"（无空格），超 7 天回退到 "YYYY-MM-DD HH:mm"
+  const format_last_opened = (ts) =>
+    formatRelativeTime(ts, { spaceBeforeUnit: false, fallback: "absolute" });
+  const format_absolute_time = formatAbsoluteTime;
 
   async function do_search(q) {
     if (!q.trim()) {
@@ -191,28 +159,13 @@
   onMount(async () => {
     await waitForBackendReady();
 
-    let saved = await getSetting("theme-mode");
-    if (!saved) {
-      const legacyDark = await getSetting("dark-mode");
-      saved = legacyDark === "true" ? "dark" : (legacyDark === "false" ? "light" : "system");
-    }
-    apply_theme(saved || "system");
-    document.documentElement.classList.add("theme-ready");
+    // 主题加载、系统主题监听、跨窗口同步全部由 themeStore 接管
+    await themeStore.init();
 
     const savedSort = await getSetting("spotlight-sort-by");
     if (savedSort) current_sort = savedSort;
 
     listCategories().then(c => categories = c);
-
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    function on_system_theme() {
-      if (theme_mode === "system") apply_theme();
-    }
-    if (mq) mq.addEventListener("change", on_system_theme);
-
-    const unlistenTheme = await listen("theme-changed", (e) => {
-      apply_theme(e.payload);
-    });
 
     const unlistenShown = await listen("spotlight-shown", () => {
       hiding = false;
@@ -246,7 +199,6 @@
 
     return () => {
       window.removeEventListener("keydown", handle_keydown);
-      unlistenTheme();
       unlistenShown();
       unlistenFocus();
       clearTimeout(search_timer);

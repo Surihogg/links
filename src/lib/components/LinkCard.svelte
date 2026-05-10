@@ -3,6 +3,9 @@
   import { copyToClipboard } from "../api.js";
   import { settingsStore } from "../stores/index.js";
   import { emit } from "@tauri-apps/api/event";
+  import { formatAbsoluteTime, formatRelativeTime } from "../utils/time.js";
+  import { getDomain } from "../utils/url.js";
+  import { formatLinkAs } from "../utils/linkShare.js";
 
   let { link, highlight = "", category_name = null, selected = false, onedit, ondelete, ontoggle_favorite, onremovecategory, onremovetag, onremovenotes } = $props();
   let show_confirm = $state(false);
@@ -14,34 +17,14 @@
   let desc_truncated = $state(false);
   let check_reachability = $state(true);
 
-  function format_last_opened(ts) {
-    if (!ts) return '';
-    const now = Math.floor(Date.now() / 1000);
-    const diff = now - ts;
-    if (diff < 60) return '刚刚';
-    if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)} 天前`;
-    const d = new Date(ts * 1000);
-    return `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-  }
-
-  function format_absolute_time(ts) {
-    if (!ts) return '';
-    const d = new Date(ts * 1000);
-    const y = d.getFullYear();
-    const m = (d.getMonth() + 1).toString().padStart(2, '0');
-    const day = d.getDate().toString().padStart(2, '0');
-    const h = d.getHours().toString().padStart(2, '0');
-    const min = d.getMinutes().toString().padStart(2, '0');
-    return `${y}-${m}-${day} ${h}:${min}`;
-  }
+  // 主窗口风格："3 分钟前"（带空格）；超 7 天回退 "MM-DD HH:mm"
+  const format_last_opened = (ts) =>
+    formatRelativeTime(ts, { spaceBeforeUnit: true, fallback: "short" });
+  const format_absolute_time = formatAbsoluteTime;
 
   settingsStore.subscribe(v => { check_reachability = v.check_link_reachability; });
 
-  let domain = $derived.by(() => {
-    try { return new URL(link.url).hostname.replace('www.', ''); } catch { return ''; }
-  });
+  let domain = $derived(getDomain(link.url, { stripWww: true }));
 
   let url_matches_search = $derived.by(() => {
     if (!highlight) return false;
@@ -100,22 +83,7 @@
   }
 
   async function copy_as(format) {
-    const title = link.title || link.url;
-    let content = "";
-    function escMarkdown(text) {
-      return text.replace(/[\[\]]/g, '\\$&').replace(/[*_`~]/g, '\\$&');
-    }
-    function escHtml(text) {
-      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-    if (format === 'url') {
-      content = link.url;
-    } else if (format === 'markdown') {
-      content = `[${escMarkdown(title)}](${link.url})`;
-    } else {
-      content = `<a href="${escHtml(link.url)}">${escHtml(title)}</a>`;
-    }
-    await copyToClipboard(content);
+    await copyToClipboard(formatLinkAs(link, format));
     show_share_menu = false;
     copy_success = true;
     setTimeout(() => copy_success = false, 1500);
@@ -638,7 +606,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--scrim-bg);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
   }

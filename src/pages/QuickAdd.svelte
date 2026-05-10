@@ -1,128 +1,85 @@
 <script>
+  // 快速添加窗口（独立 Tauri 窗口，全局快捷键唤起）。
+  // 表单本体复用 LinkForm 的 standalone 模式，QuickAdd 只负责窗口生命周期：
+  // 1. 主题加载（themeStore.init）
+  // 2. quick-add-shown 事件后 reset 表单 + 拉取 deep link
+  // 3. 创建链接后 emit("links-changed") 并 hide 窗口
+  // 4. Esc 关窗、IME 守卫由 LinkForm 内部处理
+
   import { onMount } from "svelte";
-  import TagInput from "../lib/components/TagInput.svelte";
-  import CategoryInput from "../lib/components/CategoryInput.svelte";
-  import { fetchMeta, checkDuplicate, createLink, listCategories, getSetting, popPendingDeepLink } from "../lib/api.js";
+  import LinkForm from "../lib/components/LinkForm.svelte";
+  import {
+    createLink,
+    listCategories,
+    getSetting,
+    popPendingDeepLink,
+  } from "../lib/api.js";
   import { waitForBackendReady } from "../lib/ready.js";
+  import { themeStore } from "../lib/stores/themeStore.svelte.js";
   import { emit, listen } from "@tauri-apps/api/event";
 
-  let url = $state("");
-  let title = $state("");
-  let description = $state("");
-  let notes = $state("");
-  let category_id = $state(null);
-  let tags = $state([]);
-  let saving = $state(false);
-  let fetching = $state(false);
-  let fetch_error = $state("");
-  let fetch_timer = null;
-  let duplicate_warning = $state("");
-  let user_edited = $state({ title: false, description: false });
-  let fetched_meta = $state({ favicon_url: "", og_image_url: "" });
   let categories = $state([]);
   let message = $state("");
-  let pending_fetch = null;
-  let dark_mode = $state(false);
-  let theme_mode = $state("system");
-  let url_input;
-  let ime_guard = $state(false);
-  let ime_timer = null;
+  /** @type {LinkForm | undefined} */
+  let form;
 
-  function apply_theme(mode) {
-    if (mode !== undefined) theme_mode = mode;
-    if (theme_mode === "system") {
-      dark_mode = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    } else {
-      dark_mode = theme_mode === "dark";
+  /** 用 deep-link 数据预填表单 */
+  async function fill_from_pending() {
+    try {
+      const pending = await popPendingDeepLink();
+      if (pending?.url) {
+        form?.reset({ url: pending.url, title: pending.title || "" });
+        // 主动触发去重检测 + 元数据抓取（reset 不会派发 input 事件）
+        form?.triggerFetch();
+      }
+    } catch {
+      // 无 pending 则忽略
     }
-    const root = document.documentElement;
-    root.classList.add("no-transition");
-    root.classList.toggle("dark", dark_mode);
-    root.offsetHeight;
-    requestAnimationFrame(() => root.classList.remove("no-transition"));
   }
 
-  function reset_form() {
-    url = "";
-    title = "";
-    description = "";
-    notes = "";
-    category_id = null;
-    tags = [];
-    saving = false;
-    fetching = false;
-    fetch_error = "";
-    duplicate_warning = "";
-    user_edited = { title: false, description: false };
-    fetched_meta = { favicon_url: "", og_image_url: "" };
+  async function close_window() {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    await emit("links-changed");
+    await getCurrentWindow().hide();
+  }
+
+  async function on_save(payload) {
     message = "";
-    clearTimeout(fetch_timer);
-    pending_fetch = null;
+    try {
+      await createLink({
+        url: payload.url,
+        title: payload.title,
+        description: payload.description,
+        notes: payload.notes,
+        category_id: payload.category_id,
+        tags: payload.tags,
+        favicon_url: payload.favicon_url,
+        og_image_url: payload.og_image_url,
+      });
+      // 保存成功，通知主程序刷新，关闭窗口
+      await emit("links-changed");
+      await close_window();
+    } catch {
+      message = "保存失败 ✗";
+      form?.setSaving(false);
+    }
   }
 
   onMount(async () => {
     await waitForBackendReady();
+    await themeStore.init();
 
-    let saved = await getSetting("theme-mode");
-    if (!saved) {
-      const legacyDark = await getSetting("dark-mode");
-      saved = legacyDark === "true" ? "dark" : (legacyDark === "false" ? "light" : "system");
-    }
-    apply_theme(saved || "system");
-    document.documentElement.classList.add("theme-ready");
+    listCategories().then((c) => (categories = c));
 
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    function on_system_theme(e) {
-      if (theme_mode === "system") {
-        apply_theme();
-      }
-    }
-    if (mq) mq.addEventListener("change", on_system_theme);
-
-    const unlistenTheme = await listen("theme-changed", (e) => {
-      apply_theme(e.payload);
-    });
     const unlistenShown = await listen("quick-add-shown", async () => {
-      // 每次显示都清空表单
-      reset_form();
-      // 拉取 Rust 端缓存的 deep link 数据（Bookmarklet 收藏场景）
-      try {
-        const pending = await popPendingDeepLink();
-        if (pending?.url) {
-          url = pending.url;
-          if (pending.title) {
-            title = pending.title;
-            user_edited.title = true;
-          }
-          on_url_input();
-        }
-      } catch { /* 无 pending 则忽略 */ }
-      setTimeout(() => url_input?.focus(), 50);
+      message = "";
+      form?.reset();
+      await fill_from_pending();
+      form?.focusUrl();
     });
 
-    listCategories().then(c => categories = c);
-
-    // 冷启动兜底：前端就绪后主动拉取 Rust 端缓存的 deep link
-    try {
-      const pending = await popPendingDeepLink();
-      if (pending?.url) {
-        url = pending.url;
-        if (pending.title) {
-          title = pending.title;
-          user_edited.title = true;
-        }
-        on_url_input();
-      }
-    } catch { /* 无 pending 则忽略 */ }
-
-    const handle_composition_start = () => { ime_guard = true; clearTimeout(ime_timer); };
-    const handle_composition_end = () => {
-      ime_guard = true;
-      clearTimeout(ime_timer);
-      ime_timer = setTimeout(() => ime_guard = false, 200);
-    };
-    document.addEventListener("compositionstart", handle_composition_start, true);
-    document.addEventListener("compositionend", handle_composition_end, true);
+    // 冷启动兜底：前端就绪后主动拉一次 deep link
+    await fill_from_pending();
 
     const handle_keydown = (e) => {
       if (e.key === "Escape") {
@@ -132,177 +89,34 @@
     };
     window.addEventListener("keydown", handle_keydown);
     return () => {
-      clearTimeout(ime_timer);
-      document.removeEventListener("compositionstart", handle_composition_start, true);
-      document.removeEventListener("compositionend", handle_composition_end, true);
       window.removeEventListener("keydown", handle_keydown);
-      unlistenTheme();
       unlistenShown();
     };
   });
-
-  function mark_edited(field) {
-    return (e) => { user_edited[field] = true; };
-  }
-
-  async function do_fetch(u) {
-    fetching = true;
-    fetch_error = "";
-    try {
-      const meta = await fetchMeta(u);
-      if (meta.title || meta.description) {
-        if (!user_edited.title && meta.title) title = meta.title;
-        if (!user_edited.description && meta.description) description = meta.description;
-      } else {
-        fetch_error = "这个小站很神秘呢，手动补充一下缺失的信息吧";
-      }
-      fetched_meta = { favicon_url: meta.favicon_url || "", og_image_url: meta.og_image_url || "" };
-      if (tags.length === 0 && meta.keywords && meta.keywords.length > 0) {
-        tags = meta.keywords.slice(0, 5);
-      }
-    } catch {
-      fetch_error = "人家不让抓，只能麻烦您动动小手了";
-    }
-    fetching = false;
-    pending_fetch = null;
-  }
-
-  async function check_dup(u) {
-    const existing = await checkDuplicate(u, null);
-    if (existing) {
-      duplicate_warning = existing.title ? `已有相同链接：${existing.title}` : "已有相同链接";
-    } else {
-      duplicate_warning = "";
-    }
-  }
-
-  function on_url_input() {
-    clearTimeout(fetch_timer);
-    fetch_error = "";
-    const u = url.trim();
-    if (!u || !/^https?:\/\//.test(u)) return;
-    setTimeout(() => check_dup(u), 300);
-    fetch_timer = setTimeout(() => {
-      pending_fetch = do_fetch(u);
-    }, 500);
-  }
-
-  async function submit() {
-    if (!url.trim()) return;
-    saving = true;
-    message = "";
-    try {
-      await createLink({
-        url: url.trim(),
-        title: title.trim() || undefined,
-        description: description.trim() || undefined,
-        notes: notes.trim(),
-        category_id: category_id || -1,
-        tags,
-        favicon_url: fetched_meta.favicon_url || undefined,
-        og_image_url: fetched_meta.og_image_url || undefined,
-      });
-      // 保存成功，通知主程序刷新，然后关闭窗口
-      await emit("links-changed");
-      await close_window();
-    } catch {
-      message = "保存失败 ✗";
-    } finally {
-      saving = false;
-    }
-  }
-
-  async function refresh_meta() {
-    const u = url.trim();
-    if (!u) return;
-    user_edited = { title: false, description: false };
-    await do_fetch(u);
-  }
-
-  async function close_window() {
-    const { getCurrentWindow } = await import("@tauri-apps/api/window");
-    await emit("links-changed");
-    await getCurrentWindow().hide();
-  }
-
-  let btn_text = $derived(saving ? "保存中..." : "保存");
-  let btn_disabled = $derived(saving);
 </script>
 
-<div class="quick-add {dark_mode ? 'dark' : ''}">
+<div class="quick-add">
   <div class="modal-header" data-tauri-drag-region>
     <h2 class="modal-title">添加链接</h2>
-    <button class="modal-close" onclick={close_window}>
+    <button class="modal-close" onclick={close_window} aria-label="关闭">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
         <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
       </svg>
     </button>
   </div>
 
-  <form class="modal-body" onsubmit={(e) => { e.preventDefault(); if (ime_guard) return; submit(); }}>
-    <div class="field url-field">
-      <div class="field-label-row">
-        <label class="field-label">URL <span class="required">*</span></label>
-        {#if duplicate_warning}
-          <span class="dup-warning">{duplicate_warning}</span>
-        {/if}
-      </div>
-      <div class="url-input-wrap">
-        <input bind:this={url_input} type="url" bind:value={url} oninput={on_url_input} required placeholder="https://..." class="field-input" />
-        <button type="button" class="refresh-btn" onclick={refresh_meta} disabled={fetching || !url.trim()} title="重新抓取元数据">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class={fetching ? 'spin-anim' : ''}>
-            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <div class="field">
-      <label class="field-label">标题</label>
-      <input type="text" bind:value={title} oninput={mark_edited("title")} placeholder="会自动帮你抓取哦" class="field-input" />
-    </div>
-
-    <div class="field">
-      <label class="field-label">分组</label>
-      <CategoryInput bind:selectedId={category_id} {categories} />
-    </div>
-
-    <div class="field tag-field">
-      <label class="field-label">标签</label>
-      <TagInput bind:tags />
-    </div>
-
-    <div class="field desc-field">
-      <label class="field-label">描述</label>
-      <textarea bind:value={description} oninput={mark_edited("description")} rows="2" placeholder="会自动帮你抓取哦" class="field-input field-textarea"></textarea>
-    </div>
-
-    <div class="field notes-field">
-      <label class="field-label">备注</label>
-      <textarea bind:value={notes} rows="2" placeholder="说说你的想法吧" class="field-input field-textarea"></textarea>
-    </div>
-
-    <div class="modal-footer">
-      <div class="footer-left">
-        {#if fetching}
-          <span class="fetch-indicator">
-            <span class="spinner-sm"></span>
-            抓取中...
-          </span>
-        {:else if fetch_error}
-          <span class="fetch-error">{fetch_error}</span>
-        {:else if message}
-          <span class="message">{message}</span>
-        {/if}
-      </div>
-      <div class="footer-right">
-        <button type="button" onclick={close_window} class="btn btn-secondary">取消</button>
-        <button type="submit" disabled={btn_disabled} class="btn btn-primary">
-          {btn_text}
-        </button>
-      </div>
-    </div>
-  </form>
+  <div class="quick-add-body">
+    <LinkForm
+      bind:this={form}
+      mode="standalone"
+      {categories}
+      onsave={on_save}
+      oncancel={close_window}
+    />
+    {#if message}
+      <div class="message-bar">{message}</div>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -355,164 +169,18 @@
     color: var(--text-1);
   }
 
-  .modal-body {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px 16px;
-    padding: 0 20px 16px;
-    overflow-y: auto;
+  .quick-add-body {
     flex: 1;
-  }
-
-  .field {
+    overflow-y: auto;
+    padding: 0 20px 16px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-  }
-
-  .field-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-2);
-  }
-
-  .required {
-    color: var(--danger);
-  }
-
-  .field-input {
-    width: 100%;
-    padding: 7px 10px;
-    border: 1px solid var(--border-1);
-    border-radius: var(--radius-md);
-    background: var(--bg-0);
-    color: var(--text-0);
-    font-size: 13px;
-    outline: none;
-    transition: all var(--transition);
-  }
-
-  .field-input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
-  }
-
-  .field-input::placeholder {
-    color: var(--text-3);
-  }
-
-  .url-input-wrap {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-
-  .url-input-wrap .field-input {
-    flex: 1;
-    padding-right: 42px;
-  }
-
-  .fetch-error {
-    font-size: 12px;
-    color: var(--text-3);
-  }
-
-  .message {
-    font-size: 12px;
-    color: var(--success);
-  }
-
-  .refresh-btn {
-    position: absolute;
-    right: 10px;
-    width: 26px;
-    height: 26px;
-    border: none;
-    background: var(--bg-2);
-    color: var(--text-2);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all var(--transition);
-  }
-
-  .refresh-btn:hover:not(:disabled) {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-
-  .refresh-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  .spin-anim {
-    animation: spin 0.6s linear infinite;
-  }
-
-  .url-field {
-    position: relative;
-  }
-
-  .field-label-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .dup-warning {
-    font-size: 11px;
-    color: var(--warning);
-  }
-
-  .field-textarea {
-    resize: none;
-    line-height: 1.5;
-  }
-
-  .url-field,
-  .tag-field,
-  .desc-field,
-  .notes-field,
-  .modal-footer {
-    grid-column: span 2;
-  }
-
-  .modal-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 4px;
-  }
-
-  .footer-left {
-    display: flex;
-    align-items: center;
-  }
-
-  .footer-right {
-    display: flex;
     gap: 8px;
   }
 
-  .fetch-indicator {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  .message-bar {
     font-size: 12px;
-    color: var(--text-3);
+    color: var(--danger);
+    padding: 6px 0;
   }
-
-  .spinner-sm {
-    width: 12px;
-    height: 12px;
-    border: 1.5px solid var(--border-1);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
 </style>

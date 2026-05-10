@@ -2,6 +2,7 @@
   import { onMount, tick } from "svelte";
   import { marked } from "marked";
   import { linksStore, categoriesStore, tagsStore, settingsStore } from "./lib/stores/index.js";
+  import { themeStore } from "./lib/stores/themeStore.svelte.js";
   import * as api from "./lib/api.js";
   import { waitForBackendReady } from "./lib/ready.js";
   import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -17,11 +18,10 @@ import SortSelect from "./lib/components/SortSelect.svelte";
 
   let is_macos = $state(false);
 
-  // Theme mode state: "light" | "dark" | "system". Default to "system".
-  let theme_mode = $state("system");
-  // Actual applied dark mode state derived from theme_mode (system or explicit)
-  let dark_mode = $state(false);
-  let system_unlisten; // cleanup for system theme listener
+  // 主题模式与暗色判定全部委托给 themeStore（跨窗口同步、系统跟随、持久化）
+  // 模板里仍以 dark_mode / theme_mode 名字读取，保持原有 UI 代码改动最小
+  let theme_mode = $derived(themeStore.mode);
+  let dark_mode = $derived(themeStore.isDark);
 
   let links = $derived($linksStore);
   let categories = $derived($categoriesStore);
@@ -75,42 +75,15 @@ import SortSelect from "./lib/components/SortSelect.svelte";
     if (!isDeepLinkStartup) {
       try { await mainWindow.show(); } catch (e) {}
     }
-    // Load theme setting with backward-compatibility
-    let savedTheme = await api.getSetting("theme-mode");
-    if (!savedTheme) {
-      // Backwards compatibility: migrate legacy dark-mode if present
-      const legacyDark = await api.getSetting("dark-mode");
-      if (legacyDark === "true") savedTheme = "dark";
-      else if (legacyDark === "false") savedTheme = "light";
-      else savedTheme = "system";
-    }
-    theme_mode = savedTheme || "system";
+    // 主题加载、系统主题监听、跨窗口同步全部由 themeStore 接管
+    await themeStore.init();
+
     const savedSort = await api.getSetting("sort-by");
     if (savedSort) sort_by = savedSort;
     try {
       const v = (await api.getSetting("check-link-reachability")) !== "false";
       settingsStore.update(s => ({ ...s, check_link_reachability: v }));
     } catch {}
-    // Initialize dark_mode based on current theme_mode
-    apply_theme();
-    // Listen for OS theme changes if in system mode
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    function on_system_theme_change(e) {
-      if (theme_mode === "system") {
-        apply_theme();
-      }
-    }
-    if (mq && typeof mq.addEventListener === "function") {
-      mq.addEventListener("change", on_system_theme_change);
-    } else if (mq && typeof mq.addListener === "function") {
-      mq.addListener(on_system_theme_change);
-    }
-    system_unlisten = () => {
-      if (mq) {
-        if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", on_system_theme_change);
-        else if (typeof mq.removeListener === "function") mq.removeListener(on_system_theme_change);
-      }
-    };
     is_macos = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
     console.log("[startup] loading data...");
     await load_data();
@@ -275,7 +248,6 @@ import SortSelect from "./lib/components/SortSelect.svelte";
       if (unlistenLinksChanged) unlistenLinksChanged();
       if (unlistenSpotlightLocate) unlistenSpotlightLocate();
       if (unlistenMoved) unlistenMoved();
-      if (system_unlisten) system_unlisten();
     };
   });
 
@@ -542,29 +514,12 @@ async function on_toggle_favorite(link) {
   }
 
   async function toggle_dark() {
-    theme_mode = dark_mode ? "light" : "dark";
-    apply_theme();
-    await api.setSetting("theme-mode", theme_mode);
-    emit("theme-changed", theme_mode);
-  }
-
-  function apply_theme() {
-    if (theme_mode === "system") {
-      dark_mode = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    } else {
-      dark_mode = (theme_mode === "dark");
-    }
-    const root = document.documentElement;
-    root.classList.add("no-transition");
-    root.classList.toggle("dark", dark_mode);
-    root.offsetHeight;
-    requestAnimationFrame(() => root.classList.remove("no-transition"));
+    // 当前是暗色就切到亮色，反之到暗色（跳过 system 状态）
+    await themeStore.setMode(themeStore.isDark ? "light" : "dark");
   }
 
   async function on_theme_change(mode) {
-    theme_mode = mode;
-    apply_theme();
-    emit("theme-changed", mode);
+    await themeStore.setMode(mode);
   }
 
   let filtered_links = $derived(links.items);
@@ -1051,13 +1006,10 @@ async function on_toggle_favorite(link) {
     left: 0;
     right: 0;
     height: 36px;
+    /* var(--bg-0) 在亮/暗模式下分别为白/深底，无需再写 .dark 覆盖 */
     background: var(--bg-0);
     z-index: 100;
     pointer-events: auto;
-  }
-
-  .dark .titlebar-drag {
-    background: #0a0a0b;
   }
 
   .close-overlay {
@@ -1067,7 +1019,7 @@ async function on_toggle_favorite(link) {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--scrim-bg);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
   }

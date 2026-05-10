@@ -56,6 +56,11 @@
   --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
   --shadow-xl: 0 16px 40px rgba(0,0,0,0.16);
+  /* 拖拽幽灵浮层阴影：比 shadow-md 略重，用于 sidebar 拖拽 */
+  --shadow-drag: 0 4px 12px rgba(0,0,0,0.15);
+
+  /* Scrim：模态/确认遮罩背景 */
+  --scrim-bg: rgba(0, 0, 0, 0.4);
 
   /* Radius */
   --radius-sm: 5px;
@@ -115,6 +120,9 @@
   --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
   --shadow-xl: 0 16px 40px rgba(0,0,0,0.5);
+  --shadow-drag: 0 4px 12px rgba(0,0,0,0.4);
+
+  --scrim-bg: rgba(0, 0, 0, 0.6);
 }
 
 * {
@@ -226,7 +234,7 @@ input, textarea, select, button {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--scrim-bg);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
@@ -447,4 +455,55 @@ input, textarea, select, button {
 
 .toggle.active::after {
   transform: translateX(18px);
+}
+
+/* ===== 加载圈（替换 LinkList / Spotlight / LinkForm / QuickAdd / App 五处副本） ===== */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 大号加载圈：列表/搜索结果加载态 */
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-1);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* 小号加载圈：嵌在按钮/输入框右侧 */
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-1);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* ===== 通用图标按钮（卡片操作、关闭、刷新等）=====
+   各组件历史上各写一份；新增组件优先用此 class，不再单写 .action-btn / .footer-btn */
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+
+.icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

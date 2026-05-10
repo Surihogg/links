@@ -13,15 +13,8 @@
         width: 100%;
         background: transparent;
       }
-      #app {
-        height: 100%;
-        background: transparent;
-        overflow: hidden;
-        opacity: 0;
-      }
-      html.theme-ready #app {
-        opacity: 1;
-      }
+      /* opacity:0 配合 themeStore.init 后给 <html> 加 theme-ready 类，
+         避免主题首屏闪白 */
       #app {
         height: 100%;
         background: transparent;

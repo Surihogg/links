@@ -177,7 +177,7 @@
   .error-title {
     font-size: 13px;
     font-weight: 600;
-    color: var(--danger, #e53e3e);
+    color: var(--danger);
     margin-bottom: 6px;
   }
 

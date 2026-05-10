@@ -2,35 +2,33 @@
   import { onMount } from "svelte";
   import * as api from "../api.js";
   import { settingsStore } from "../stores/index.js";
+  import ShortcutEditor from "./ShortcutEditor.svelte";
+
   let { onclose, onthemechange, oncheckupdate } = $props();
   let close_behavior = $state(null);
   let loaded = $state(false);
-  // Appearance (theme) state for the dialog
+  // 外观（亮/暗/跟随系统）
   let appearance = $state("system");
 
-  let shortcut_raw = $state(null);
   // 检查更新状态
   let checking_update = $state(false);
   let check_status = $state("检查是否有新版本可用");
-  let shortcut_loaded = $state(false);
-  let recording = $state(false);
-  let recorded_shortcut = $state(null);
-  let shortcut_error = $state(false);
-  let main_shortcut = $state(null);
-  let main_shortcut_loaded = $state(false);
-  let main_recording = $state(false);
-  let main_recorded_shortcut = $state(null);
-  let main_shortcut_error = $state(false);
-  let spotlight_shortcut = $state(null);
-  let spotlight_shortcut_loaded = $state(false);
-  let spotlight_recording = $state(false);
-  let spotlight_recorded_shortcut = $state(null);
-  let spotlight_shortcut_error = $state(false);
-  let hide_shortcut = $state(null);
-  let hide_shortcut_loaded = $state(false);
-  let hide_recording = $state(false);
-  let hide_recorded_shortcut = $state(null);
-  let hide_shortcut_error = $state(false);
+
+  // 4 套快捷键：用通用 ShortcutEditor 组件，元数据驱动
+  /** @type {Array<{key: string, name: string, desc: string, getter: () => Promise<string|null>, setter: (v: string) => Promise<string>}>} */
+  const shortcuts = [
+    { key: "quick", name: "快速添加", desc: "唤起快速添加窗口",
+      getter: api.getShortcut, setter: api.setShortcut },
+    { key: "main", name: "主窗口", desc: "唤起主窗口",
+      getter: api.getMainShortcut, setter: api.setMainShortcut },
+    { key: "spotlight", name: "全局搜索", desc: "唤起 Spotlight 搜索窗口",
+      getter: api.getSpotlightShortcut, setter: api.setSpotlightShortcut },
+    { key: "hide", name: "隐藏窗口", desc: "隐藏主程序窗口",
+      getter: api.getHideShortcut, setter: api.setHideShortcut },
+  ];
+  /** ShortcutEditor 组件实例引用，用于把 window keydown 转发给正在录制的那个 */
+  const shortcutRefs = $state({});
+
   let autostart_enabled = $state(false);
   let autostart_loaded = $state(false);
   let auto_minimize = $state(false);
@@ -41,172 +39,10 @@
   let bookmarklet_code = $state("");
   let ext_step = $state(0);
 
-  const isMac = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
-
-  function formatShortcut(raw) {
-    if (!raw) return "";
-    const parts = raw.split("+");
-    const map = isMac
-      ? { super: "\u2318", cmdorctrl: "\u2318", control: "\u2325", alt: "\u2325", shift: "\u21E7" }
-      : { super: "Win", cmdorctrl: "Ctrl", control: "Ctrl", alt: "Alt", shift: "Shift" };
-    const separator = isMac ? " " : "+";
-    return parts.map((p) => {
-      const lower = p.toLowerCase();
-      return map[lower] ?? p.toUpperCase();
-    }).join(separator);
-  }
-
-  function buildShortcutFromEvent(e) {
-    const modifiers = [];
-    if (e.metaKey || e.ctrlKey) modifiers.push("CmdOrCtrl");
-    if (e.shiftKey) modifiers.push("Shift");
-    if (e.altKey) modifiers.push("Alt");
-    const ignore = ["Meta", "Control", "Shift", "Alt"];
-    if (ignore.includes(e.key)) return null;
-    if (modifiers.length === 0) return null;
-    const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
-    return [...modifiers, key].join("+");
-  }
-
-  function on_record_keydown(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    const result = buildShortcutFromEvent(e);
-    if (result) recorded_shortcut = result;
-  }
-
-  function start_recording() {
-    recorded_shortcut = null;
-    shortcut_error = false;
-    recording = true;
-  }
-
-  function start_main_recording() {
-    main_recorded_shortcut = null;
-    main_shortcut_error = false;
-    main_recording = true;
-  }
-
-  function cancel_recording() {
-    recorded_shortcut = null;
-    recording = false;
-    shortcut_error = false;
-  }
-
-  function cancel_main_recording() {
-    main_recorded_shortcut = null;
-    main_recording = false;
-    main_shortcut_error = false;
-  }
-
-  function start_spotlight_recording() {
-    spotlight_recorded_shortcut = null;
-    spotlight_shortcut_error = false;
-    spotlight_recording = true;
-  }
-
-  function cancel_spotlight_recording() {
-    spotlight_recorded_shortcut = null;
-    spotlight_recording = false;
-    spotlight_shortcut_error = false;
-  }
-
-  async function save_shortcut() {
-    if (!recorded_shortcut) return;
-    shortcut_error = false;
-    try {
-      const result = await api.setShortcut(recorded_shortcut);
-      shortcut_raw = result;
-      recording = false;
-      recorded_shortcut = null;
-    } catch {
-      shortcut_error = true;
-      recorded_shortcut = null;
-    }
-  }
-
-  async function save_main_shortcut() {
-    if (!main_recorded_shortcut) return;
-    main_shortcut_error = false;
-    try {
-      const result = await api.setMainShortcut(main_recorded_shortcut);
-      main_shortcut = result;
-      main_recording = false;
-      main_recorded_shortcut = null;
-    } catch {
-      main_shortcut_error = true;
-      main_recorded_shortcut = null;
-    }
-  }
-
-  async function save_spotlight_shortcut() {
-    if (!spotlight_recorded_shortcut) return;
-    spotlight_shortcut_error = false;
-    try {
-      const result = await api.setSpotlightShortcut(spotlight_recorded_shortcut);
-      spotlight_shortcut = result;
-      spotlight_recording = false;
-      spotlight_recorded_shortcut = null;
-    } catch {
-      spotlight_shortcut_error = true;
-      spotlight_recorded_shortcut = null;
-    }
-  }
-
-  function start_hide_recording() {
-    hide_recorded_shortcut = null;
-    hide_shortcut_error = false;
-    hide_recording = true;
-  }
-
-  function cancel_hide_recording() {
-    hide_recorded_shortcut = null;
-    hide_recording = false;
-    hide_shortcut_error = false;
-  }
-
-  async function save_hide_shortcut() {
-    if (!hide_recorded_shortcut) return;
-    hide_shortcut_error = false;
-    try {
-      const result = await api.setHideShortcut(hide_recorded_shortcut);
-      hide_shortcut = result;
-      hide_recording = false;
-      hide_recorded_shortcut = null;
-    } catch {
-      hide_shortcut_error = true;
-      hide_recorded_shortcut = null;
-    }
-  }
-
   onMount(async () => {
     const val = await api.getSetting("close-behavior");
     close_behavior = val || "ask";
 
-    try {
-      shortcut_raw = await api.getShortcut();
-    } catch {
-      shortcut_raw = null;
-    }
-    shortcut_loaded = true;
-    try {
-      main_shortcut = await api.getMainShortcut();
-    } catch {
-      main_shortcut = null;
-    }
-    main_shortcut_loaded = true;
-    try {
-      spotlight_shortcut = await api.getSpotlightShortcut();
-    } catch {
-      spotlight_shortcut = null;
-    }
-    spotlight_shortcut_loaded = true;
-    try {
-      hide_shortcut = await api.getHideShortcut();
-    } catch {
-      hide_shortcut = null;
-    }
-    hide_shortcut_loaded = true;
     // Load autostart state
     try {
       autostart_enabled = await api.isAutostartEnabled();
@@ -401,24 +237,9 @@
       onclose?.();
       return;
     }
-    if (recording) on_record_keydown(e);
-    if (main_recording) {
-      e.preventDefault();
-      e.stopPropagation();
-      const res = buildShortcutFromEvent(e);
-      if (res) main_recorded_shortcut = res;
-    }
-    if (spotlight_recording) {
-      e.preventDefault();
-      e.stopPropagation();
-      const res = buildShortcutFromEvent(e);
-      if (res) spotlight_recorded_shortcut = res;
-    }
-    if (hide_recording) {
-      e.preventDefault();
-      e.stopPropagation();
-      const res = buildShortcutFromEvent(e);
-      if (res) hide_recorded_shortcut = res;
+    // 转发给所有 ShortcutEditor，组件内部按 recording 状态自行决定是否消费
+    for (const s of shortcuts) {
+      if (shortcutRefs[s.key]?.handleKeydown(e)) break;
     }
   }
 </script>
@@ -467,112 +288,17 @@
         {/if}
 
         <div class="section-label" style="margin-top: 16px;">快捷键</div>
-        {#if shortcut_loaded && main_shortcut_loaded && spotlight_shortcut_loaded && hide_shortcut_loaded}
-          <div class="shortcut-section">
-            <div class="shortcut-row">
-              <div class="shortcut-info">
-                <span class="format-name">快速添加</span>
-                <span class="format-desc">唤起快速添加窗口</span>
-              </div>
-              {#if !recording}
-                <div class="shortcut-display">{formatShortcut(shortcut_raw) || "未设置"}</div>
-                <button class="btn btn-secondary btn-sm" onclick={start_recording}>修改</button>
-              {:else}
-                <div class="shortcut-display recording-area">
-                  {#if recorded_shortcut}
-                    {formatShortcut(recorded_shortcut)}
-                  {:else}
-                    请按下新的快捷键...
-                  {/if}
-                </div>
-                {#if shortcut_error}
-                  <span class="shortcut-error">快捷键设置失败，请重试</span>
-                {/if}
-                <div class="shortcut-actions">
-                  <button class="btn btn-secondary btn-sm" onclick={cancel_recording}>取消</button>
-                  <button class="btn btn-primary btn-sm" disabled={!recorded_shortcut} onclick={save_shortcut}>保存</button>
-                </div>
-              {/if}
-            </div>
-            <div class="shortcut-row" style="margin-top: 10px;">
-              <div class="shortcut-info">
-                <span class="format-name">主窗口</span>
-                <span class="format-desc">唤起主窗口</span>
-              </div>
-              {#if !main_recording}
-                <div class="shortcut-display">{formatShortcut(main_shortcut) || "未设置"}</div>
-                <button class="btn btn-secondary btn-sm" onclick={start_main_recording}>修改</button>
-              {:else}
-                <div class="shortcut-display recording-area">
-                  {#if main_recorded_shortcut}
-                    {formatShortcut(main_recorded_shortcut)}
-                  {:else}
-                    请按下新的快捷键...
-                  {/if}
-                </div>
-                {#if main_shortcut_error}
-                  <span class="shortcut-error">快捷键设置失败，请重试</span>
-                {/if}
-                <div class="shortcut-actions">
-                  <button class="btn btn-secondary btn-sm" onclick={cancel_main_recording}>取消</button>
-                  <button class="btn btn-primary btn-sm" disabled={!main_recorded_shortcut} onclick={save_main_shortcut}>保存</button>
-                </div>
-              {/if}
-            </div>
-            <div class="shortcut-row" style="margin-top: 10px;">
-              <div class="shortcut-info">
-                <span class="format-name">全局搜索</span>
-                <span class="format-desc">唤起 Spotlight 搜索窗口</span>
-              </div>
-              {#if !spotlight_recording}
-                <div class="shortcut-display">{formatShortcut(spotlight_shortcut) || "未设置"}</div>
-                <button class="btn btn-secondary btn-sm" onclick={start_spotlight_recording}>修改</button>
-              {:else}
-                <div class="shortcut-display recording-area">
-                  {#if spotlight_recorded_shortcut}
-                    {formatShortcut(spotlight_recorded_shortcut)}
-                  {:else}
-                    请按下新的快捷键...
-                  {/if}
-                </div>
-                {#if spotlight_shortcut_error}
-                  <span class="shortcut-error">快捷键设置失败，请重试</span>
-                {/if}
-                <div class="shortcut-actions">
-                  <button class="btn btn-secondary btn-sm" onclick={cancel_spotlight_recording}>取消</button>
-                  <button class="btn btn-primary btn-sm" disabled={!spotlight_recorded_shortcut} onclick={save_spotlight_shortcut}>保存</button>
-                </div>
-              {/if}
-            </div>
-            <div class="shortcut-row" style="margin-top: 10px;">
-              <div class="shortcut-info">
-                <span class="format-name">隐藏窗口</span>
-                <span class="format-desc">隐藏主程序窗口</span>
-              </div>
-              {#if !hide_recording}
-                <div class="shortcut-display">{formatShortcut(hide_shortcut) || "未设置"}</div>
-                <button class="btn btn-secondary btn-sm" onclick={start_hide_recording}>修改</button>
-              {:else}
-                <div class="shortcut-display recording-area">
-                  {#if hide_recorded_shortcut}
-                    {formatShortcut(hide_recorded_shortcut)}
-                  {:else}
-                    请按下新的快捷键...
-                  {/if}
-                </div>
-                {#if hide_shortcut_error}
-                  <span class="shortcut-error">快捷键设置失败，请重试</span>
-                {/if}
-                <div class="shortcut-actions">
-                  <button class="btn btn-secondary btn-sm" onclick={cancel_hide_recording}>取消</button>
-                  <button class="btn btn-primary btn-sm" disabled={!hide_recorded_shortcut} onclick={save_hide_shortcut}>保存</button>
-                </div>
-              {/if}
-            </div>
-          </div>
-        {:else}
-          <div class="format-loading">加载中...</div>
-        {/if}
+        <div class="shortcut-section">
+          {#each shortcuts as s (s.key)}
+            <ShortcutEditor
+              bind:this={shortcutRefs[s.key]}
+              name={s.name}
+              desc={s.desc}
+              getter={s.getter}
+              setter={s.setter}
+            />
+          {/each}
+        </div>
 
         <div class="section-label" style="margin-top: 20px;">外观</div>
         {#if loaded}
@@ -850,63 +576,12 @@
     text-align: center;
   }
 
+  /* shortcut-section: 容器；具体 row 样式在 ShortcutEditor 内 */
   .shortcut-section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-
-  .shortcut-row {
-    display: flex;
-    align-items: center;
     gap: 10px;
-    padding: 10px 12px;
-    border: 1px solid var(--border-1);
-    border-radius: var(--radius-md);
-    background: var(--bg-1);
-    flex-wrap: wrap;
-  }
-
-  .shortcut-info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .shortcut-display {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-1);
-    padding: 4px 10px;
-    border: 1px solid var(--border-1);
-    border-radius: var(--radius-sm);
-    background: var(--bg-2);
-    white-space: nowrap;
-    letter-spacing: 0.5px;
-    font-family: var(--font);
-  }
-
-  .shortcut-display.recording-area {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-    color: var(--accent-text);
-    min-width: 140px;
-    text-align: center;
-  }
-
-  .shortcut-actions {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-
-  .shortcut-error {
-    font-size: 11px;
-    color: var(--danger);
-    width: 100%;
+    margin-bottom: 16px;
   }
 
   .bookmarklet-section {
