@@ -54,6 +54,16 @@ function createLinksStore() {
       }));
       return link;
     },
+    /**
+     * 局部合并某条 link 的部分字段（如后端异步重检 is_broken 后的回推）。
+     * 不命中当前列表时静默忽略——可能该条目已被筛选掉或卸载。
+     */
+    patchItem(id, patch) {
+      update((s) => ({
+        ...s,
+        items: s.items.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+      }));
+    },
     async remove(id) {
       await api.deleteLink(id);
       update((s) => ({

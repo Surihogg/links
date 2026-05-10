@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -146,24 +146,55 @@ pub fn create_link(
     tauri::async_runtime::spawn(async move {
         if check_enabled {
             let reachable = do_check_link(&url_for_check).await.unwrap_or(false);
-            if !reachable {
+            let new_broken = !reachable;
+            // 双向更新:与 update_link 对称。新建时默认 is_broken=0,
+            // 可达时不必写库(免去无谓 SQL),不可达时写并发事件
+            if new_broken {
                 if let Ok(db_guard) = app_clone_check.state::<Db>().0.lock() {
                     let _ = db_guard.execute(
                         "UPDATE links SET is_broken = 1 WHERE id = ?",
                         rusqlite::params![link_id_check],
                     );
                 }
+                let _ = app_clone_check.emit(
+                    "link-broken-changed",
+                    serde_json::json!({ "id": link_id_check, "is_broken": true }),
+                );
             }
         }
         if !needs_meta_fetch { return; }
         match crate::fetcher::fetch_metadata(&url_for_fetch).await {
             Ok(meta) => {
-                let db_state = app_clone.state::<Db>();
-                let Ok(c) = db_state.0.lock() else { return };
-                c.execute(
-                    "UPDATE links SET title = CASE WHEN title = '' THEN ?1 ELSE title END, description = CASE WHEN description = '' THEN ?2 ELSE description END, favicon_url = CASE WHEN favicon_url = '' THEN ?3 ELSE favicon_url END, og_image_url = CASE WHEN og_image_url = '' THEN ?4 ELSE og_image_url END, updated_at = datetime('now','localtime') WHERE id = ?5",
-                    params![meta.title, meta.description, meta.favicon_url, meta.og_image_url, link_id],
-                ).ok();
+                // 在锁内查库读回最新行,锁外再 emit 事件,避免持锁时跨线程通信
+                let updated_link: Option<crate::db::Link> = {
+                    let db_state = app_clone.state::<Db>();
+                    let Ok(c) = db_state.0.lock() else { return };
+                    if c.execute(
+                        "UPDATE links SET title = CASE WHEN title = '' THEN ?1 ELSE title END, description = CASE WHEN description = '' THEN ?2 ELSE description END, favicon_url = CASE WHEN favicon_url = '' THEN ?3 ELSE favicon_url END, og_image_url = CASE WHEN og_image_url = '' THEN ?4 ELSE og_image_url END, updated_at = datetime('now','localtime') WHERE id = ?5",
+                        params![meta.title, meta.description, meta.favicon_url, meta.og_image_url, link_id],
+                    ).is_ok() {
+                        c.query_row(
+                            &format!("SELECT {} FROM links l WHERE id = ?", crate::db::row_mapping::LINK_COLUMNS),
+                            rusqlite::params![link_id],
+                            crate::db::row_mapping::row_to_link,
+                        ).ok()
+                    } else {
+                        None
+                    }
+                };
+                if let Some(l) = updated_link {
+                    let _ = app_clone.emit(
+                        "link-meta-changed",
+                        serde_json::json!({
+                            "id": l.id,
+                            "title": l.title,
+                            "description": l.description,
+                            "favicon_url": l.favicon_url,
+                            "og_image_url": l.og_image_url,
+                            "updated_at": l.updated_at,
+                        }),
+                    );
+                }
             }
             Err(e) => {
                 log::warn!("metadata fetch failed for {}: {}", url_for_fetch, e);
@@ -176,8 +207,56 @@ pub fn create_link(
 }
 
 #[tauri::command]
-pub fn update_link(db: State<'_, Db>, payload: UpdateLinkPayload) -> Result<crate::db::Link, AppError> {
-    db.update_link(&payload)
+pub fn update_link(
+    db: State<'_, Db>,
+    app: AppHandle,
+    config: State<'_, Config>,
+    payload: UpdateLinkPayload,
+) -> Result<crate::db::Link, AppError> {
+    // 取旧 url 用于判断是否需要重检（仅当 url 实际发生变化时才重检）
+    let old_url: Option<String> = {
+        let conn = db.0.lock().unwrap();
+        conn.query_row(
+            "SELECT url FROM links WHERE id = ?",
+            rusqlite::params![payload.id],
+            |r| r.get::<_, String>(0),
+        )
+        .ok()
+    };
+
+    let link = db.update_link(&payload)?;
+
+    // 仅在 url 真正变化、且配置开启时,异步重检可达性。
+    // 与 create_link 不同:这里采用双向更新——可达则清除 is_broken,不可达则置位。
+    let url_changed = match (&old_url, &payload.url) {
+        (Some(old), Some(new)) => old != new,
+        _ => false,
+    };
+    let check_enabled = config.get("check-link-reachability").unwrap_or("true".to_string()) != "false";
+
+    if url_changed && check_enabled {
+        let url_for_check = link.url.clone();
+        let link_id_check = link.id;
+        let app_clone = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let reachable = do_check_link(&url_for_check).await.unwrap_or(false);
+            let new_broken = !reachable;
+            // 双向写回:无论可达与否都显式更新,使原先误判的失效标记可被消除
+            if let Ok(db_guard) = app_clone.state::<Db>().0.lock() {
+                let _ = db_guard.execute(
+                    "UPDATE links SET is_broken = ? WHERE id = ?",
+                    rusqlite::params![new_broken as i32, link_id_check],
+                );
+            }
+            // 通知前端刷新该条 link 的失效标记;前端据此原地更新 store
+            let _ = app_clone.emit(
+                "link-broken-changed",
+                serde_json::json!({ "id": link_id_check, "is_broken": new_broken }),
+            );
+        });
+    }
+
+    Ok(link)
 }
 
 #[tauri::command]

@@ -200,12 +200,29 @@
     // 监听 quick-add 窗口的保存事件
     let unlistenLinksChanged;
     let unlistenSpotlightLocate;
+    let unlistenLinkBroken;
+    let unlistenLinkMeta;
     try {
       const { listen } = await import("@tauri-apps/api/event");
       unlistenLinksChanged = await listen("links-changed", () => {
         refresh_current_view();
         categoriesStore.load();
         tagsStore.load();
+      });
+      // 后端在 create_link / update_link 后异步重检可达性,通过此事件回推结果
+      unlistenLinkBroken = await listen("link-broken-changed", (e) => {
+        const { id, is_broken } = e.payload || {};
+        if (typeof id === "number") {
+          linksStore.patchItem(id, { is_broken: !!is_broken });
+        }
+      });
+      // 元数据抓取完成后回推 title / description / favicon / og_image
+      unlistenLinkMeta = await listen("link-meta-changed", (e) => {
+        const payload = e.payload || {};
+        const { id, ...patch } = payload;
+        if (typeof id === "number") {
+          linksStore.patchItem(id, patch);
+        }
       });
       unlistenSpotlightLocate = await listen("spotlight-locate", async (e) => {
         const { link_id } = e.payload;
@@ -242,6 +259,8 @@
       if (unlistenHidden) unlistenHidden();
       if (unlistenLinksChanged) unlistenLinksChanged();
       if (unlistenSpotlightLocate) unlistenSpotlightLocate();
+      if (unlistenLinkBroken) unlistenLinkBroken();
+      if (unlistenLinkMeta) unlistenLinkMeta();
       if (unlistenMoved) unlistenMoved();
     };
   });
