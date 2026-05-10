@@ -1,6 +1,5 @@
 <script>
   import { onMount, tick } from "svelte";
-  import { marked } from "marked";
   import { linksStore, categoriesStore, tagsStore, settingsStore } from "./lib/stores/index.js";
   import { themeStore } from "./lib/stores/themeStore.svelte.js";
   import * as api from "./lib/api.js";
@@ -14,7 +13,11 @@
   import ExportDialog from "./lib/components/ExportDialog.svelte";
   import SettingsDialog from "./lib/components/SettingsDialog.svelte";
   import UpdateDialog from "./lib/components/UpdateDialog.svelte";
-import SortSelect from "./lib/components/SortSelect.svelte";
+  import SortSelect from "./lib/components/SortSelect.svelte";
+  import StatsPanel from "./lib/components/StatsPanel.svelte";
+  import CloseDialog from "./lib/components/CloseDialog.svelte";
+  import ReleaseNotesDialog from "./lib/components/ReleaseNotesDialog.svelte";
+  import { findCategoryById } from "./lib/utils/categoryTree.js";
 
   let is_macos = $state(false);
 
@@ -27,16 +30,8 @@ import SortSelect from "./lib/components/SortSelect.svelte";
   let categories = $derived($categoriesStore);
   let tags = $derived($tagsStore);
 
-  function find_category_by_id(id, nodes = categories) {
-    for (const node of nodes) {
-      if (node.id === id) return node;
-      if (node.children?.length > 0) {
-        const found = find_category_by_id(id, node.children);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
+  // 在分组树中按 id 查找节点（递归）
+  const find_category_by_id = (id) => findCategoryById(categories, id);
 
   let selected_category = $state(null);
   let selected_tag = $state(null);
@@ -784,42 +779,7 @@ async function on_toggle_favorite(link) {
       </header>
 
       {#if show_stats_view}
-        <div class="stats-panel">
-          {#if sidebar_stats}
-            <div class="stats-overview">
-              <div class="stat-card">
-                <span class="stat-value">{sidebar_stats.total}</span>
-                <span class="stat-label">收藏总数</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-value">+{sidebar_stats.this_week}</span>
-                <span class="stat-label">本周新增</span>
-              </div>
-            </div>
-            {#if sidebar_stats.top.length > 0}
-              <div class="stats-top-section">
-                <h3 class="stats-section-title">最常访问</h3>
-                <div class="stats-top-list">
-                  {#each sidebar_stats.top as link, i}
-                    <div class="stats-top-row">
-                      <span class="stats-rank">{i + 1}</span>
-                      <div class="stats-top-info">
-                        <span class="stats-top-title">{link.title}</span>
-                        <span class="stats-top-url">{link.url}</span>
-                      </div>
-                      <span class="stats-top-count">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                        {link.click_count} 次
-                      </span>
-                    </div>
-                  {/each}
-                </div>
-              </div>
-            {/if}
-          {:else}
-            <div class="stats-loading">加载中...</div>
-          {/if}
-        </div>
+        <StatsPanel stats={sidebar_stats} />
       {:else}
         <LinkList
           links={filtered_links}
@@ -866,16 +826,11 @@ async function on_toggle_favorite(link) {
   {/if}
 
   {#if show_close_dialog}
-    <div class="close-overlay" onclick={() => show_close_dialog = false}>
-      <div class="close-dialog" onclick={(e) => e.stopPropagation()}>
-        <p class="close-title">要走了吗？</p>
-        <p class="close-desc">选择一下你希望的离开方式~</p>
-        <div class="close-actions">
-          <button class="btn btn-primary" style="flex:1" onclick={close_to_tray}>最小化到托盘</button>
-          <button class="btn btn-secondary" style="flex:1" onclick={close_exit}>退出应用</button>
-        </div>
-      </div>
-    </div>
+    <CloseDialog
+      onCancel={() => show_close_dialog = false}
+      onMinimize={close_to_tray}
+      onExit={close_exit}
+    />
   {/if}
 
   {#if show_update_dialog && update_info}
@@ -883,31 +838,11 @@ async function on_toggle_favorite(link) {
   {/if}
 
   {#if show_release_notes}
-    <div class="modal-overlay" onclick={() => show_release_notes = false}>
-      <div class="modal" onclick={(e) => e.stopPropagation()}>
-        <div class="modal-header">
-          <h3 class="modal-title">当前版本：v{current_version}</h3>
-          <button class="modal-close" onclick={() => show_release_notes = false}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-              <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
-            </svg>
-          </button>
-        </div>
-        <div class="modal-body">
-          <p class="release-notes-intro">版本更新内容：</p>
-          <div class="release-notes-content markdown-body">
-            {#if last_update_notes}
-              {@html marked(last_update_notes)}
-            {:else}
-              暂无更新说明
-            {/if}
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-primary" onclick={() => show_release_notes = false}>知道了</button>
-        </div>
-      </div>
-    </div>
+    <ReleaseNotesDialog
+      version={current_version}
+      notes={last_update_notes}
+      onClose={() => show_release_notes = false}
+    />
   {/if}
 </div>
 
@@ -1012,45 +947,6 @@ async function on_toggle_favorite(link) {
     pointer-events: auto;
   }
 
-  .close-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--scrim-bg);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-  }
-
-  .close-dialog {
-    background: var(--bg-0);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-xl);
-    border: 1px solid var(--border-0);
-    padding: 24px;
-    min-width: 300px;
-  }
-
-  .close-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text-0);
-    margin-bottom: 4px;
-  }
-
-  .close-desc {
-    font-size: 13px;
-    color: var(--text-2);
-    margin-bottom: 20px;
-  }
-
-  .close-actions {
-    display: flex;
-    gap: 8px;
-  }
-
   .import-banner {
     display: flex;
     align-items: center;
@@ -1059,168 +955,5 @@ async function on_toggle_favorite(link) {
     color: var(--text-2);
   }
 
-  .spinner-sm {
-    width: 14px;
-    height: 14px;
-    border: 1.5px solid var(--border-1);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .release-notes-intro {
-    font-size: 13px;
-    color: var(--text-2);
-    margin-bottom: 12px;
-  }
-
-  .release-notes-content {
-    background: var(--bg-1);
-    border-radius: var(--radius-md);
-    padding: 16px;
-    max-height: 300px;
-    overflow-y: auto;
-  }
-
-  .modal {
-    max-width: 420px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .modal-body {
-    overflow-y: auto;
-    flex: 1;
-    min-height: 0;
-  }
-
-  .modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 12px 20px 20px;
-    flex-shrink: 0;
-  }
-
-  .stats-panel {
-    flex: 1;
-    padding: 24px;
-    overflow-y: auto;
-  }
-
-  .stats-overview {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 28px;
-  }
-
-  .stat-card {
-    flex: 1;
-    background: var(--bg-1);
-    border: 1px solid var(--border-0);
-    border-radius: var(--radius-lg);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .stat-value {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text-0);
-    letter-spacing: -0.5px;
-  }
-
-  .stat-label {
-    font-size: 12px;
-    color: var(--text-3);
-  }
-
-  .stats-section-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-1);
-    margin-bottom: 12px;
-  }
-
-  .stats-top-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .stats-top-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: var(--bg-1);
-    border: 1px solid var(--border-0);
-    border-radius: var(--radius-md);
-    transition: background var(--transition);
-  }
-
-  .stats-top-row:hover {
-    background: var(--bg-hover);
-  }
-
-  .stats-rank {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    background: var(--accent-soft);
-    color: var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 700;
-    flex-shrink: 0;
-  }
-
-  .stats-top-info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .stats-top-title {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-0);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .stats-top-url {
-    font-size: 11px;
-    color: var(--text-3);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .stats-top-count {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--text-2);
-    font-weight: 500;
-    flex-shrink: 0;
-  }
-
-  .stats-loading {
-    color: var(--text-3);
-    font-size: 13px;
-    padding: 40px 0;
-    text-align: center;
-  }
+  /* import-banner 的小转圈复用 app.css 的 .spinner-sm */
 </style>

@@ -1,8 +1,10 @@
 <script>
   import { categoriesStore } from '../stores/index.js';
-  import { getVersion } from '@tauri-apps/api/app';
-  let version = $state('');
-  getVersion().then(v => version = v);
+  import Brand from './Sidebar/Brand.svelte';
+  import { createCategoryDrag } from '../utils/categoryDragHandler.svelte.js';
+  import { flattenCategories } from '../utils/categoryTree.js';
+  import { cyclePlaceholder, DEFAULT_PLACEHOLDER } from '../utils/cyclePlaceholder.js';
+
   let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, onrename_cat, ontag_delete, onrename_tag, oncreate_tag, dark = false, ontoggle_dark, onexport, onimport, onsettings, importing = false, has_update = false, onupdate } = $props();
   let expanded = $state(new Set());
   let show_new = $state(false);
@@ -15,8 +17,8 @@
   let deleting_tag_id = $state(null);
   let show_new_tag = $state(false);
   let new_tag_name = $state("");
-  let tag_placeholder = $state("给我一点输入");
-  let cat_placeholder = $state("给我一点输入");
+  let tag_placeholder = $state(DEFAULT_PLACEHOLDER);
+  let cat_placeholder = $state(DEFAULT_PLACEHOLDER);
 
   let editing_cat_id = $state(null);
   let editing_cat_name = $state("");
@@ -24,161 +26,15 @@
   let editing_tag_name = $state("");
   let sub_create_parent_id = $state(null);
   let sub_create_name = $state("");
-  let sub_placeholder = $state("给我一点输入");
+  let sub_placeholder = $state(DEFAULT_PLACEHOLDER);
 
-  // 拖拽状态
-  let drag_id = $state(null);
-  let drop_target_id = $state(null);
-  let ghost_el = $state(null);
-  let drag_start_pos = $state({ x: 0, y: 0 });
-  let is_dragging = $state(false);
-  let pending_drag_id = $state(null);
-
-  // Pointer Events 拖拽实现
-  function handle_pointer_down(e, cat) {
-    // 只在鼠标左键时启动拖拽
-    if (e.button !== 0) return;
-    // 如果正在编辑，不启动拖拽
-    if (editing_cat_id === cat.id) return;
-
-    // 延迟设置 drag_id，避免点击时立即产生拖拽视觉效果
-    pending_drag_id = cat.id;
-    drag_start_pos = { x: e.clientX, y: e.clientY };
-    is_dragging = false;
-
-    // 添加全局事件监听
-    window.addEventListener('pointermove', handle_pointer_move);
-    window.addEventListener('pointerup', handle_pointer_up);
-    window.addEventListener('pointercancel', handle_pointer_up);
-  }
-
-  function handle_pointer_move(e) {
-    if (pending_drag_id === null) return;
-
-    const dx = e.clientX - drag_start_pos.x;
-    const dy = e.clientY - drag_start_pos.y;
-
-    // 移动超过 5px 才开始拖拽
-    if (!is_dragging && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
-      is_dragging = true;
-      drag_id = pending_drag_id;
-      create_ghost_element();
-    }
-
-    if (is_dragging) {
-      e.preventDefault();
-      update_ghost_position(e.clientX, e.clientY);
-      update_drop_target(e.clientX, e.clientY);
-    }
-  }
-
-  function handle_pointer_up(e) {
-    if (is_dragging && drag_id !== null) {
-      // 在释放前再更新一次 drop target，确保坐标准确
-      update_drop_target(e.clientX, e.clientY);
-      e.preventDefault();
-      execute_drop();
-    }
-
-    // 清理
-    remove_ghost_element();
-    window.removeEventListener('pointermove', handle_pointer_move);
-    window.removeEventListener('pointerup', handle_pointer_up);
-    window.removeEventListener('pointercancel', handle_pointer_up);
-
-    drag_id = null;
-    pending_drag_id = null;
-    drop_target_id = null;
-    is_dragging = false;
-  }
-
-  function create_ghost_element() {
-    const cat = flat_categories.find(c => c.id === drag_id);
-    if (!cat) return;
-
-    ghost_el = document.createElement('div');
-    // 全部样式由 :global(.drag-ghost) 定义，避免内联 + global 双份维护
-    ghost_el.className = 'drag-ghost';
-    ghost_el.textContent = cat.name;
-    document.body.appendChild(ghost_el);
-  }
-
-  function update_ghost_position(x, y) {
-    if (ghost_el) {
-      ghost_el.style.left = (x + 10) + 'px';
-      ghost_el.style.top = (y + 10) + 'px';
-    }
-  }
-
-  function remove_ghost_element() {
-    if (ghost_el) {
-      ghost_el.remove();
-      ghost_el = null;
-    }
-  }
-
-  function update_drop_target(x, y) {
-    // 隐藏 ghost 以便获取鼠标下的元素
-    if (ghost_el) ghost_el.style.display = 'none';
-
-    const elem = document.elementFromPoint(x, y);
-    const cat_item = elem?.closest('.cat-item[data-cat-id]');
-
-    if (ghost_el) ghost_el.style.display = '';
-
-    if (cat_item) {
-      const target_id = parseInt(cat_item.dataset.catId);
-      // 不能拖到自己，也不能拖到后代
-      if (target_id !== drag_id && !is_descendant(drag_id, target_id)) {
-        drop_target_id = target_id;
-        return;
-      }
-    }
-
-    // 检查是否在"移到根级"区域
-    const root_zone = elem?.closest('.root-drop-zone');
-    if (root_zone) {
-      drop_target_id = 'root';
-      return;
-    }
-
-    drop_target_id = null;
-  }
-
-  function execute_drop() {
-    if (drop_target_id === 'root') {
-      categoriesStore.update({ id: drag_id, unset_parent: true });
-    } else if (drop_target_id !== null && drop_target_id !== drag_id) {
-      categoriesStore.update({ id: drag_id, parent_id: drop_target_id });
-    }
-  }
-
-  // 检查 target_id 是否是 cat_id 的后代（防止循环依赖）
-  function is_descendant(cat_id, target_id) {
-    if (!cat_id || !target_id) return false;
-    function find_in_tree(nodes) {
-      for (const node of nodes) {
-        if (node.id === cat_id) {
-          return check_descendant(node.children || [], target_id);
-        }
-        if (node.children?.length > 0) {
-          const found = find_in_tree(node.children);
-          if (found) return found;
-        }
-      }
-      return false;
-    }
-    function check_descendant(nodes, tid) {
-      for (const node of nodes) {
-        if (node.id === tid) return true;
-        if (node.children?.length > 0) {
-          if (check_descendant(node.children, tid)) return true;
-        }
-      }
-      return false;
-    }
-    return find_in_tree(categories);
-  }
+  // 分组拖拽（创建一次，模板中读取响应式状态）
+  const drag = createCategoryDrag({
+    getCategories: () => categories,
+    onDropToParent: (id, parent_id) => categoriesStore.update({ id, parent_id }),
+    onDropToRoot: (id) => categoriesStore.update({ id, unset_parent: true }),
+    canStartDrag: (cat) => editing_cat_id !== cat.id,
+  });
 
   function toggle_section(key) {
     const next = new Set(collapsed);
@@ -196,7 +52,7 @@
 
   function submit_category() {
     if (!new_name.trim()) {
-      cat_placeholder = cat_placeholder === "给我一点输入" ? "你是认真的吗？" : "给我一点输入";
+      cat_placeholder = cyclePlaceholder(cat_placeholder);
       return;
     }
     const name = new_name.trim();
@@ -212,22 +68,10 @@
     }
     oncreate?.({ name, parent_id: new_parent_id });
     new_name = "";
-    cat_placeholder = "给我一点输入";
+    cat_placeholder = DEFAULT_PLACEHOLDER;
   }
 
-  function flatten_categories(cats, expanded_set, depth = 0) {
-    const result = [];
-    for (const cat of cats) {
-      result.push({ ...cat, depth });
-      // 仅展开的节点才渲染子节点
-      if (cat.children?.length > 0 && expanded_set.has(cat.id)) {
-        result.push(...flatten_categories(cat.children, expanded_set, depth + 1));
-      }
-    }
-    return result;
-  }
-
-  let flat_categories = $derived(flatten_categories(categories, expanded));
+  let flat_categories = $derived(flattenCategories(categories, { expanded }));
   let filtered_categories = $derived(
     cat_search.trim()
       ? flat_categories.filter(c => c.name.toLowerCase().includes(cat_search.trim().toLowerCase()))
@@ -291,13 +135,13 @@
     e.stopPropagation();
     sub_create_parent_id = cat.id;
     sub_create_name = "";
-    sub_placeholder = "给我一点输入";
+    sub_placeholder = DEFAULT_PLACEHOLDER;
     if (!expanded.has(cat.id)) expanded.add(cat.id);
   }
 
   function submit_sub_create() {
     if (!sub_create_name.trim()) {
-      sub_placeholder = sub_placeholder === "给我一点输入" ? "你是认真的吗？" : "给我一点输入";
+      sub_placeholder = cyclePlaceholder(sub_placeholder);
       return;
     }
     const name = sub_create_name.trim();
@@ -314,13 +158,13 @@
     oncreate?.({ name, parent_id: sub_create_parent_id });
     sub_create_parent_id = null;
     sub_create_name = "";
-    sub_placeholder = "给我一点输入";
+    sub_placeholder = DEFAULT_PLACEHOLDER;
   }
 
   function cancel_sub_create() {
     sub_create_parent_id = null;
     sub_create_name = "";
-    sub_placeholder = "给我一点输入";
+    sub_placeholder = DEFAULT_PLACEHOLDER;
   }
 
   function start_rename_tag(e, tag) {
@@ -345,7 +189,7 @@
 
   function submit_tag() {
     if (!new_tag_name.trim()) {
-      tag_placeholder = tag_placeholder === "给我一点输入" ? "你是认真的吗？" : "给我一点输入";
+      tag_placeholder = cyclePlaceholder(tag_placeholder);
       return;
     }
     const name = new_tag_name.trim();
@@ -356,31 +200,12 @@
     }
     oncreate_tag?.(name);
     new_tag_name = "";
-    tag_placeholder = "给我一点输入";
+    tag_placeholder = DEFAULT_PLACEHOLDER;
   }
 </script>
 
 <aside class="sidebar">
-  <div class="sidebar-brand">
-    <span class="brand-icon">◈</span>
-    <span class="brand-text">Links</span>
-    {#if version}
-      <span class="brand-version">v{version}</span>
-    {/if}
-    {#if has_update}
-      <button class="brand-update" onclick={onupdate} data-tooltip="有新版本可用" aria-label="有新版本可用">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
-        </svg>
-      </button>
-    {/if}
-    <button class="brand-settings" onclick={onsettings}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-      </svg>
-    </button>
-  </div>
+  <Brand hasUpdate={has_update} onSettings={onsettings} onUpdate={onupdate} />
 
   <nav class="sidebar-nav">
     <button
@@ -439,13 +264,13 @@
 
     {#if !collapsed.has('categories')}
     {#if show_new}
-      <form class="new-cat-form" onsubmit={(e) => { e.preventDefault(); submit_category(); }} onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { show_new = false; new_name = ""; cat_placeholder = "给我一点输入"; } }}>
+      <form class="new-cat-form" onsubmit={(e) => { e.preventDefault(); submit_category(); }} onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { show_new = false; new_name = ""; cat_placeholder = DEFAULT_PLACEHOLDER; } }}>
         <input
           type="text"
           bind:value={new_name}
           placeholder={cat_placeholder}
           class="new-cat-input"
-          onkeydown={(e) => { if (e.key === 'Enter' && e.isComposing) return; if (e.key === 'Escape') { show_new = false; new_name = ""; cat_placeholder = "给我一点输入"; } }}
+          onkeydown={(e) => { if (e.key === 'Enter' && e.isComposing) return; if (e.key === 'Escape') { show_new = false; new_name = ""; cat_placeholder = DEFAULT_PLACEHOLDER; } }}
           autofocus
         />
       </form>
@@ -467,10 +292,10 @@
         </span>
         <span class="cat-name">未分组</span>
       </button>
-      {#if drag_id !== null}
+      {#if drag.dragId !== null}
         <div
           class="root-drop-zone"
-          class:drop-target={drop_target_id === 'root'}
+          class:drop-target={drag.dropTargetId === 'root'}
         >
           移到根级
         </div>
@@ -480,8 +305,8 @@
           class="nav-item cat-item"
           class:active={selected_id === cat.id}
           class:expanded={cat.children?.length > 0 && expanded.has(cat.id)}
-          class:dragging={drag_id === cat.id}
-          class:drop-target={drop_target_id === cat.id && drag_id !== cat.id && !is_descendant(drag_id, cat.id)}
+          class:dragging={drag.dragId === cat.id}
+          class:drop-target={drag.dropTargetId === cat.id && drag.dragId !== cat.id && !drag.isDescendant(drag.dragId, cat.id)}
           style="--indent: {cat.depth * 12}px; padding-left: {8 + cat.depth * 12}px"
           data-cat-id={cat.id}
           onclick={() => {
@@ -491,7 +316,7 @@
             }
           }}
           onmouseleave={() => { reset_cat_delete(); }}
-          onpointerdown={(e) => handle_pointer_down(e, cat)}
+          onpointerdown={(e) => drag.start(e, cat)}
         >
           {#if cat.children?.length > 0}
             <span class="cat-child-indicator" style="transform: rotate({expanded.has(cat.id) ? 90 : 0}deg)">
@@ -567,13 +392,13 @@
     </div>
     {#if !collapsed.has('tags')}
     {#if show_new_tag}
-      <form class="new-cat-form" onsubmit={(e) => { e.preventDefault(); submit_tag(); }} onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { show_new_tag = false; new_tag_name = ""; tag_placeholder = "给我一点输入"; } }}>
+      <form class="new-cat-form" onsubmit={(e) => { e.preventDefault(); submit_tag(); }} onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { show_new_tag = false; new_tag_name = ""; tag_placeholder = DEFAULT_PLACEHOLDER; } }}>
         <input
           type="text"
           bind:value={new_tag_name}
           placeholder={tag_placeholder}
           class="new-cat-input"
-          onkeydown={(e) => { if (e.key === 'Enter' && e.isComposing) return; if (e.key === 'Escape') { show_new_tag = false; new_tag_name = ""; tag_placeholder = "给我一点输入"; } }}
+          onkeydown={(e) => { if (e.key === 'Enter' && e.isComposing) return; if (e.key === 'Escape') { show_new_tag = false; new_tag_name = ""; tag_placeholder = DEFAULT_PLACEHOLDER; } }}
           autofocus
         />
       </form>
@@ -676,96 +501,6 @@
     background: var(--bg-1);
     border-right: 1px solid var(--border-0);
     overflow: clip;
-  }
-
-  .sidebar-brand {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 16px 16px 12px;
-  }
-
-  .brand-icon {
-    font-size: 18px;
-    color: var(--accent);
-  }
-
-  .brand-text {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text-0);
-    letter-spacing: -0.5px;
-    font-family: "Georgia", "Times New Roman", serif;
-  }
-
-  .brand-version {
-    font-size: 11px;
-    color: var(--text-3);
-    font-weight: 400;
-    margin-left: 2px;
-    align-self: center;
-  }
-
-  .brand-settings {
-    margin-left: auto;
-    width: 24px;
-    height: 24px;
-    border: none;
-    background: none;
-    color: var(--text-3);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all var(--transition);
-  }
-
-  .brand-settings:hover {
-    color: var(--text-1);
-    background: var(--bg-hover);
-  }
-
-  .brand-update {
-    position: relative;
-    width: 24px;
-    height: 24px;
-    border: none;
-    background: none;
-    color: var(--accent);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all var(--transition);
-    animation: pulse-glow 2s ease-in-out infinite;
-  }
-
-  .brand-update:hover {
-    background: var(--accent-soft);
-  }
-
-  .brand-update[data-tooltip]:hover::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-top: 4px;
-    padding: 4px 8px;
-    background: var(--text-0);
-    color: var(--bg-0);
-    font-size: 11px;
-    border-radius: 4px;
-    white-space: nowrap;
-    pointer-events: none;
-    z-index: 100;
-  }
-
-  @keyframes pulse-glow {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
   }
 
   .sidebar-nav {
