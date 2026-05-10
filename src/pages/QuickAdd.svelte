@@ -41,6 +41,8 @@
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     await emit("links-changed");
     await getCurrentWindow().hide();
+    // 窗口隐藏后再清空表单，避免下次 show 时视觉残留（show → emit 异步到达有延迟）
+    form?.reset();
   }
 
   async function on_save(payload) {
