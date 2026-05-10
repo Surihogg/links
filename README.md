@@ -59,107 +59,147 @@ links/
 ├── .github/workflows/     # CI/CD：macOS + Windows 自动构建
 │   └── release.yml
 │
-├── src-tauri/              # Rust 后端
+├── src-tauri/                       # Rust 后端
 │   ├── src/
-│   │   ├── main.rs         # 入口，调用 app_lib::run()
-│   │   ├── lib.rs          # Tauri builder：插件、命令注册、数据库初始化、全局快捷键、系统托盘；支持深度链接和单实例处理
-│   │   ├── db.rs           # SQLite 建表/迁移、数据模型、Db(Mutex<Connection>) 封装、CRUD、搜索、导出
-│   │   ├── fetcher.rs      # URL 元数据异步抓取、Windows 系统代理
-│   │   ├── http_server.rs   # 浏览器扩展本地 HTTP 服务（端口 + 令牌鉴权）
-│   │   ├── commands.rs     # 所有 Tauri 命令、快捷键管理、剪贴板、去重/失效检测
-│   │   ├── config.rs       # config.json 读写、Config(Mutex<HashMap>) 封装
-│   │   └── normalize.rs    # URL 标准化（去重比较用）
-│   ├── Cargo.toml          # Rust 依赖：tauri, rusqlite, reqwest, scraper, tokio...
-│   ├── tauri.conf.json     # 窗口、构建、打包配置（主窗口 + quick-add + spotlight 窗口）
-│   └── capabilities/       # Tauri 权限配置
+│   │   ├── main.rs                  # 入口，调用 app_lib::run()
+│   │   ├── lib.rs                   # Tauri builder：插件、命令注册、数据库初始化、全局快捷键、系统托盘；deep-link + 单实例处理
+│   │   ├── commands.rs              # 39 个 Tauri 命令、快捷键 helper、书签解析、剪贴板、去重/失效检测
+│   │   ├── db/                      # 数据库层（R2 拆分自 db.rs）
+│   │   │   ├── mod.rs               # Db(Mutex<Connection>) 封装 + open()
+│   │   │   ├── error.rs             # AppError 统一错误类型
+│   │   │   ├── models.rs            # Link / Category / Tag / *Payload / Stats
+│   │   │   ├── migration.rs         # PRAGMA user_version 迁移框架（R5）
+│   │   │   ├── row_mapping.rs       # 行映射 + 共享 SQL 工具 + load_tags_for_links 批量加载（R5）
+│   │   │   ├── repository.rs        # 链接 / 分组 / 标签 CRUD 与列表
+│   │   │   ├── search.rs            # FTS5 + 标签 + 分类 + LIKE 四路 UNION 搜索 + 统计
+│   │   │   ├── export.rs            # JSON / Markdown / CSV / Netscape Bookmark HTML
+│   │   │   └── tests.rs             # 30+ 个内嵌单元测试
+│   │   ├── fetcher.rs               # URL 元数据异步抓取；build_http_client 共享 Windows 系统代理（R1）
+│   │   ├── http_server.rs           # 浏览器扩展本地 HTTP 服务（端口 + 令牌鉴权）
+│   │   ├── config.rs                # config.json 读写、Config(Mutex<HashMap>) 封装
+│   │   └── normalize.rs             # URL 标准化（实现完整但未接入；详见 src-tauri/AGENTS.md）
+│   ├── Cargo.toml                   # Rust 依赖：tauri, rusqlite, reqwest, scraper, tiny_http...
+│   ├── tauri.conf.json              # 窗口、构建、打包配置（主窗口 + quick-add + spotlight 三窗口）
+│   └── capabilities/                # Tauri 权限配置
 │
-├── src/                    # Svelte 前端
-│   ├── main.js             # 主窗口挂载入口
-│   ├── quick-add.js        # 快速添加窗口入口
-│   ├── spotlight.js        # 全局搜索窗口入口
-│   ├── App.svelte          # 主布局（侧边栏 + 内容区 + FAB）
-│   ├── app.css             # CSS 变量设计系统 + 明暗主题
+├── src/                             # Svelte 前端
+│   ├── main.js                      # 主窗口挂载入口
+│   ├── quick-add.js                 # 快速添加窗口入口
+│   ├── spotlight.js                 # 全局搜索窗口入口
+│   ├── App.svelte                   # 主布局（侧边栏 + 内容区 + FAB + 各类模态装配）
+│   ├── app.css                      # CSS 变量设计系统 + 全局公共样式（.btn/.modal/.icon-btn/.spinner/.nav-item）
 │   ├── lib/
-│   │   ├── api.js          # Tauri invoke 封装（全部后端命令的 JS 绑定）
-│   │   ├── ready.js        # 启动就绪辅助脚本
-│   │   ├── stores/index.js # Svelte stores（links / categories / tags）
-│   │   └── components/     # UI 组件
+│   │   ├── api.js                   # Tauri invoke 封装（39 个后端命令的 JS 绑定，命名"动词在前"）
+│   │   ├── ready.js                 # 等待后端就绪辅助
+│   │   ├── stores/
+│   │   │   ├── index.js             # linksStore / categoriesStore / tagsStore / settingsStore
+│   │   │   └── themeStore.svelte.js # 主题状态 + 跨窗口同步（R3）
+│   │   ├── utils/                   # 共享工具（R3+R4 抽出）
+│   │   │   ├── time.js              # formatRelativeTime / formatAbsoluteTime
+│   │   │   ├── url.js               # getDomain
+│   │   │   ├── linkShare.js         # formatLinkAs（url/markdown/html）
+│   │   │   ├── imeGuard.svelte.js   # createImeGuard（IME 输入法守卫）
+│   │   │   ├── categoryTree.js      # findCategoryById / flattenCategories / isCategoryDescendant
+│   │   │   ├── categoryDragHandler.svelte.js  # createCategoryDrag（Pointer Events 拖拽）
+│   │   │   └── cyclePlaceholder.js  # placeholder 提示循环
+│   │   └── components/              # UI 组件
 │   │       ├── LinkCard.svelte      # 链接卡片
-│   │       ├── LinkForm.svelte      # 链接编辑/新增表单
+│   │       ├── LinkForm.svelte      # 链接编辑/新增表单（mode="modal" | "standalone"）
 │   │       ├── LinkList.svelte      # 链接列表
 │   │       ├── SearchBar.svelte     # 搜索栏
-│   │       ├── Sidebar.svelte       # 侧边栏（分组 + 标签）
-│   │   ├── TagInput.svelte      # 标签输入
-│   │   ├── CategoryInput.svelte  # 分组选择输入
-│   │   ├── ExportDialog.svelte  # 导出对话框
-│   │       └── SettingsDialog.svelte # 设置对话框
+│   │       ├── Sidebar.svelte       # 侧边栏装配
+│   │       ├── Sidebar/             # 侧边栏子组件（R4+R6）
+│   │       │   ├── Brand.svelte     # 品牌头（图标 + 版本 + 更新铃 + 设置齿轮）
+│   │       │   ├── CategorySection.svelte  # 分组节
+│   │       │   └── TagSection.svelte       # 标签节
+│   │       ├── TagInput.svelte      # 标签输入
+│   │       ├── CategoryInput.svelte # 分组选择输入
+│   │       ├── ExportDialog.svelte  # 导出对话框
+│   │       ├── SettingsDialog.svelte # 设置对话框（4 套快捷键用 ShortcutEditor）
+│   │       ├── ShortcutEditor.svelte # 单条快捷键展示/录制/保存（R3）
+│   │       ├── StatsPanel.svelte    # 统计视图（R4）
+│   │       ├── CloseDialog.svelte   # 关闭确认弹窗（R4）
+│   │       ├── ReleaseNotesDialog.svelte # 升级后发布说明弹窗（R4）
+│   │       ├── UpdateDialog.svelte  # 应用更新下载弹窗
+│   │       └── SortSelect.svelte    # 排序下拉选择
 │   └── pages/
-│       ├── QuickAdd.svelte      # 快速添加页面
-│       └── Spotlight.svelte     # 全局搜索页面
+│       ├── QuickAdd.svelte          # 快速添加（仅 186 行，复用 <LinkForm mode="standalone">）
+│       └── Spotlight.svelte         # 全局搜索浮层
 │
-├── index.html              # 主窗口 HTML（含启动动画）
-├── quick-add.html          # 快速添加窗口 HTML
-├── spotlight.html          # 全局搜索窗口 HTML
-├── browser-extension/     # Chrome 浏览器扩展源码
-├── package.json            # 前端依赖与脚本
-├── vite.config.js          # Vite 配置（三入口：main + quick-add + spotlight）
-├── svelte.config.js        # Svelte 预处理配置
-├── tsconfig.json           # TypeScript 严格模式配置
-├── generate-icons.py       # 图标生成脚本
-└── TODO.md                 # 开发进度跟踪
+├── index.html                       # 主窗口 HTML（含启动动画）
+├── quick-add.html                   # 快速添加窗口 HTML
+├── spotlight.html                   # 全局搜索窗口 HTML
+├── browser-extension/               # Chrome 浏览器扩展源码
+├── package.json                     # 前端依赖与脚本
+├── vite.config.js                   # Vite 配置（三入口：main + quick-add + spotlight）
+├── svelte.config.js                 # Svelte 预处理配置
+├── tsconfig.json                    # TypeScript 配置（strict + checkJs；详见 src/AGENTS.md）
+├── generate-icons.py                # 图标生成脚本
+├── REFACTOR_E2E_CHECKLIST.md        # R1-R6 重构端到端测试清单
+├── E2E_TEST_CHECKLIST.md            # 全功能端到端测试清单
+└── TODO.md                          # 开发进度跟踪 + 重构开发日志
 ```
 
 ### 数据流
 
 ```
 组件 → store 方法 → api.js → invoke() → Rust command → Db / HTTP
+                  ↘ themeStore（跨窗口主题同步事件）
 ```
 
 前端通过 `api.js` 统一封装所有 `invoke()` 调用，store 层管理状态和缓存，组件只与 store 交互。
+主题切换通过 `themeStore.setMode(...)` 触发，自动通过 Tauri `theme-changed` 事件同步到三个窗口。
 
 ### 数据库
 
 | 表 | 说明 |
 |---|---|
-| `links` | URL、标题、描述、备注、分组、收藏、失效标记 |
+| `links` | URL、标题、描述、备注、分组、收藏、失效标记、点击次数、最后打开时间 |
 | `categories` | 分组，支持树形嵌套（parent_id） |
 | `tags` | 标签，独立管理，不随链接删除 |
 | `link_tags` | 多对多关联表 |
 | `links_fts` | FTS5 虚拟表（触发器自动同步） |
 
-`links` 表的 `is_broken` 字段标记链接失效状态，由后台异步检测更新。
+`links` 表的 `is_broken` 字段标记链接失效状态，由后台异步检测更新；
+`click_count` / `last_opened_at` 用于"最多访问"和"最近打开"排序与统计 Top 3。
 
-### 后端命令
+数据库 schema 通过 `PRAGMA user_version` 显式版本管理（见 `src-tauri/src/db/migration.rs`），
+每个迁移用事务包裹、失败回滚；老库（无 user_version）首次启动自动幂等升级到 v1。
+
+### 后端命令（39 个）
+
+R2 重构后所有命令统一为「动词在前」命名风格。
 
 | 命令 | 用途 |
 |---|---|
-| `links_list` | 分页查询（支持分组/标签/收藏/未标签筛选） |
-| `links_create` | 创建链接 + 后台异步抓取元数据 + 可达性检测 |
-| `links_update` | 部分更新（`category_id: -1` 清除分组） |
-| `links_delete` | 删除链接 |
-| `links_search` | FTS5 全文搜索 + 标签名匹配 + LIKE 降级 |
-| `copy_to_clipboard` | 复制内容到系统剪贴板 |
+| `list_links` | 分页查询（支持分组/标签/收藏/未标签/未分组筛选与排序） |
+| `create_link` | 创建链接 + 后台异步抓取元数据 + 可达性检测 |
+| `update_link` | 部分更新（`category_id: -1` 清除分组） |
+| `delete_link` | 删除链接 |
+| `search_links` | FTS5 + 标签名 + 分类名 + LIKE 四路 UNION，FTS 失败时回退 LIKE-only |
+| `get_links_stats` | 统计：总数 + 本周新增 + Top 3 链接 |
 | `check_duplicate` | URL 去重检测（支持排除自身） |
 | `check_link_status` | 链接可达性检测（HEAD → GET 降级） |
-| `categories_list` | 树形结构 |
-| `categories_create/update/delete` | 分组 CRUD |
-| `tags_list/create/delete` | 标签 CRUD |
-| `tags_autocomplete` | 标签模糊搜索 |
-| `export_links` | 导出为 JSON / Markdown / CSV / 浏览器书签 HTML |
-| `import_bookmarks` | 导入浏览器书签 HTML / JSON |
-| `open_url` | 在默认浏览器中打开 |
-| `save_file` | 原生文件保存对话框 |
+| `list_categories` | 分组树形结构 |
+| `create_category` / `update_category` / `delete_category` | 分组 CRUD（update 支持改名 + 改父级 + 清父级） |
+| `list_tags` / `create_tag` / `update_tag` / `delete_tag` | 标签 CRUD |
+| `autocomplete_tags` | 标签模糊搜索（按引用次数排序） |
 | `fetch_metadata` | 手动触发元数据抓取 |
-| `get_setting / set_setting` | 读写配置项 |
-| `get_shortcut / set_shortcut` | 快捷键管理 |
-| `get_main_shortcut / set_main_shortcut` | 主窗口快捷键管理 |
-| `get_spotlight_shortcut / set_spotlight_shortcut` | Spotlight 快捷键管理 |
-| `get_hide_shortcut / set_hide_shortcut` | 隐藏窗口快捷键管理 |
+| `open_url` | 在默认浏览器中打开 |
 | `open_data_dir` | 在文件管理器中打开数据目录 |
+| `save_file` | 原生文件保存对话框 |
+| `copy_to_clipboard` | 复制内容到系统剪贴板 |
+| `export_links` | 导出为 JSON / Markdown / CSV / Netscape Bookmark HTML |
+| `import_bookmarks` | 导入浏览器书签 HTML / JSON（解析与事务分离，避免持锁阻塞） |
+| `get_setting` / `set_setting` | 读写配置项（持久化到 config.json） |
+| `get_shortcut` / `set_shortcut` | 快速添加快捷键 |
+| `get_main_shortcut` / `set_main_shortcut` | 主窗口快捷键 |
+| `get_spotlight_shortcut` / `set_spotlight_shortcut` | Spotlight 快捷键 |
+| `get_hide_shortcut` / `set_hide_shortcut` | 隐藏窗口快捷键 |
 | `get_system_proxy` | 获取系统代理设置（Windows） |
-| `pop_pending_deep_link` | 获取并清除待处理的深度链接数据 |
+| `pop_pending_deep_link` | 取出并清除待处理的深度链接数据 |
 | `check_startup_deep_link` | 检查启动是否由深度链接触发 |
-| `get_local_server_info` | 获取本地 HTTP 服务端口和令牌 |
+| `get_local_server_info` | 获取本地 HTTP 服务端口和令牌（供 Bookmarklet 用） |
 | `exit_app` | 安全退出应用 |
 
 ## 快速开始
@@ -189,7 +229,7 @@ npm run tauri dev          # 开发模式（Rust + 前端热重载）
 npm run dev                # 仅前端（浏览器预览，后端不可用）
 npm run build              # 仅构建前端
 cd src-tauri && cargo check  # 快速检查 Rust 语法
-cd src-tauri && cargo test   # 运行 Rust 单元测试
+cd src-tauri && cargo test   # 运行 Rust 单元测试（共 95 个）
 ```
 
 ## 打包
@@ -245,9 +285,9 @@ macOS: `Cmd+Option+I`，Windows/Linux: `Ctrl+Shift+I`
 
 ```javascript
 const { invoke } = window.__TAURI__.core;
-await invoke("links_list", { params: {} });
-await invoke("links_search", { params: { query: "关键词" } });
-await invoke("categories_list");
+await invoke("list_links", { params: {} });
+await invoke("search_links", { params: { query: "关键词" } });
+await invoke("list_categories");
 await invoke("get_setting", { key: "close-behavior" });
 ```
 
@@ -270,6 +310,26 @@ await invoke("get_setting", { key: "close-behavior" });
 **元数据抓取失败**：检查 `fail_links.log`，Windows 用户确认系统代理设置
 
 ## 版本历史
+
+### 未发布（v1.3.0 之上的 R1-R6 重构，2026-05-10）
+
+仅代码内部结构与性能改进，**无对外可见行为变化**：
+
+- ♻️ R1：修两处后端 bug — `fetcher.rs` Windows 代理解析 `&&`/`||` 优先级缺括号；`import_bookmarks` 持锁做文件 IO 阻塞其它 DB 命令
+- ♻️ R1：抽 `update_shortcut` / `app_data_dir` / `build_http_client` / 单一 `ensure_tags`/`get_or_create_category`，消除 ~118 行后端样板
+- ♻️ R2：拆 `db.rs` 1686 行 → `db/{models,migration,error,row_mapping,repository,search,export,tests}.rs` 9 个文件
+- ♻️ R2：39 个 Tauri 命令统一为「动词在前」命名风格（`links_list` → `list_links` 等）
+- ♻️ R3：抽前端共享 `lib/utils/`（time / url / linkShare / imeGuard）+ `lib/stores/themeStore`；消除 App / QuickAdd / Spotlight 三处 `apply_theme` 副本
+- ♻️ R3：QuickAdd 由 518 行降至 186 行，复用 `<LinkForm mode="standalone">`
+- ♻️ R3：抽 `ShortcutEditor.svelte`，SettingsDialog 中 4 套快捷键样板（~250 行重复）合并为元数据驱动
+- ♻️ R3：8 处硬编码颜色替换为 CSS 变量（`--scrim-bg` / `--shadow-drag`）；`.icon-btn` / `.spinner` / `.spinner-sm` / `@keyframes spin` 提到 `app.css`
+- ♻️ R4：App.svelte 抽 `StatsPanel` / `CloseDialog` / `ReleaseNotesDialog`（marked 依赖跟随转移）；Sidebar 抽 `Brand`
+- ♻️ R4：抽 `categoryTree` / `categoryDragHandler` / `cyclePlaceholder` 工具
+- ♻️ R5：DB schema 用 `PRAGMA user_version` 显式版本管理，老库幂等升级
+- ♻️ R5：消除 list/search/export 路径的 N+1 标签查询，单页满载时 DB 查询次数从 31 降至 2
+- ♻️ R6：Sidebar 拆 `CategorySection` / `TagSection`，主组件从 948 行降至 266 行
+- ♻️ R6：`.nav-item` 提到 `app.css`，3 处共享
+- 📊 测试：`cargo test` 90 → 95（迁移框架 +3、批量加载 +2）；前端构建产物 main bundle 142.5KB → 129.3KB（-9%）
 
 ### v1.2.0 (2026-05-04)
 - ✨ 全局搜索（Spotlight）：`Cmd+Shift+K` 唤起搜索浮层，即时搜索，键盘导航
