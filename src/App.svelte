@@ -342,7 +342,8 @@ async function with_scroll_preserve(fn) {
         const anchorEl2 = el_after.querySelector(`.link-card[data-link-id="${anchorId}"]`);
         if (anchorEl2) {
             const anchorTop2 = anchorEl2.offsetTop;
-            const newScrollTop = anchorTop2 - anchorOffsetTop;
+            // 还原 anchor 在视口中的位置：新 offsetTop - 旧视口偏移（旧 offsetTop - 旧 scrollTop）
+            const newScrollTop = anchorTop2 - anchorOffsetTop + scrollTopBefore;
             const maxScroll = Math.max(0, (el_after.scrollHeight - el_after.clientHeight));
             el_after.scrollTop = Math.max(0, Math.min(newScrollTop, maxScroll));
             return;
