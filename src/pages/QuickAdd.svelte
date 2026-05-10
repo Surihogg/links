@@ -171,11 +171,38 @@
 
   .quick-add-body {
     flex: 1;
-    overflow-y: auto;
+    min-height: 0;
+    overflow: hidden;
     padding: 0 20px 16px;
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+
+  /* standalone 模式下让 LinkForm 撑满 quick-add-body：
+     表单整体填满 → footer 自然贴底；
+     描述/备注两个 textarea 占据中间剩余空间，避免下方留白也避免出现滚动条。
+     注意：LinkForm 是共享组件（modal 模式也用），所以这里只通过 :global 选择器
+     在 standalone 模式（QuickAdd 专用）下覆写布局。 */
+  .quick-add-body :global(.form-body.standalone) {
+    flex: 1;
+    min-height: 0;
+    /* 行：url / title+category / tags / desc / notes / footer
+       desc 与 notes 用 1fr 平分剩余空间 */
+    grid-template-rows: auto auto auto 1fr 1fr auto;
+  }
+
+  .quick-add-body :global(.form-body.standalone .desc-field),
+  .quick-add-body :global(.form-body.standalone .notes-field) {
+    min-height: 0;
+  }
+
+  .quick-add-body :global(.form-body.standalone .desc-field .field-textarea),
+  .quick-add-body :global(.form-body.standalone .notes-field .field-textarea) {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    resize: none;
   }
 
   .message-bar {

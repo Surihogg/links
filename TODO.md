@@ -9,8 +9,8 @@
 ### 工作区
 
 - [x] 导出没有导出统计信息，导入的数据不会记入本周新增
-- [] 链接可达性的更新时机？编辑后似乎没有刷新
-- [] quickAdd下方多出很多空间
+- [x] 链接可达性的更新时机？编辑后似乎没有刷新
+- [x] quickAdd下方多出很多空间
 - [] 第二次打开上次有内容的quickAdd会有视觉残留
 - [] spotlight唤起闪烁问题，搜索出结果之后会轻微改变布局
 - [] 保存修改好的快捷键之后显示的内容和重新打开后看的不一样
@@ -48,6 +48,7 @@
 
 - 2026-05-10 编辑链接后未刷新可达性：`update_link` 新增 url 变化时的异步重检（受 `check-link-reachability` 配置控制），与 `create_link` 相比改为**双向更新** `is_broken`——可达则清除原有失效标记，不可达则置位；通过 `link-broken-changed` 事件回推前端，`linksStore.patchItem` 局部合并。修复了"原 URL 错误，编辑改正后徽章仍然挂着"的体感 bug。
 - 2026-05-10 创建链接后异步检查/抓取的结果不刷新 UI：`create_link` 在可达性检查写库后补发 `link-broken-changed` 事件；元数据抓取成功后查回最新行并发 `link-meta-changed` 事件携带 title/description/favicon/og_image。前端 App.svelte 增加对应监听器走 `linksStore.patchItem`。修复了"初次创建错误 URL 后失效徽章不出现，需切换筛选才看到"以及"抓回的标题/图标不立即显示"的体感 bug。
+- 2026-05-10 QuickAdd 下方留白：窗口固定 540px 而 LinkForm grid 按内容自然撑开，下方留出空白；Windows 装饰差异让缝隙更明显。改方案不动窗口尺寸（避免引入滚动条），通过 `:global` 仅在 standalone 模式覆写 grid：`.form-body.standalone` 设 `flex: 1` 撑满，`grid-template-rows` 把 desc/notes 两行设为 `1fr 1fr` 平分剩余空间，textarea `flex: 1; height: 100%` 自适应；`.quick-add-body` 改为 `overflow: hidden` 杜绝任何滚动条。对 modal 模式无影响。
 
 ## 2026-05-09
 
