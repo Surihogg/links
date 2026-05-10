@@ -12,41 +12,7 @@ use super::Db;
 impl Db {
     pub fn get_stats(&self) -> Result<LinksStats, AppError> {
         let conn = self.0.lock().unwrap();
-        let total: i64 = conn.query_row("SELECT COUNT(*) FROM links", [], |r| r.get(0))?;
-        let this_week: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM links WHERE created_at >= datetime('now','localtime','-7 days')",
-            [],
-            |r| r.get(0),
-        )?;
-        let mut raw_links: Vec<Link> = {
-            let mut stmt = conn.prepare(&format!(
-                "SELECT {} FROM links l WHERE l.click_count > 0 ORDER BY l.click_count DESC LIMIT 3",
-                LINK_COLUMNS
-            ))?;
-            let rows = stmt.query_map([], row_to_link)?;
-            rows.collect::<Result<Vec<_>, _>>()?
-        };
-        // 一次性批量加载 Top 3 的标签
-        load_tags_for_links(&conn, &mut raw_links);
-        let top: Vec<TopLink> = raw_links
-            .into_iter()
-            .map(|link| TopLink {
-                id: link.id,
-                title: if link.title.is_empty() {
-                    link.url.clone()
-                } else {
-                    link.title.clone()
-                },
-                url: link.url,
-                click_count: link.click_count,
-                tags: link.tags,
-            })
-            .collect();
-        Ok(LinksStats {
-            total,
-            this_week,
-            top,
-        })
+        compute_stats(&conn)
     }
 
     pub fn search_links(
@@ -254,4 +220,42 @@ impl Db {
             }
         }
     }
+}
+
+/// 从已有连接计算统计数据（供 get_stats / export 共用，避免重复持锁）。
+pub fn compute_stats(conn: &rusqlite::Connection) -> Result<LinksStats, AppError> {
+    let total: i64 = conn.query_row("SELECT COUNT(*) FROM links", [], |r| r.get(0))?;
+    let this_week: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM links WHERE created_at >= datetime('now','localtime','-7 days')",
+        [],
+        |r| r.get(0),
+    )?;
+    let mut raw_links: Vec<Link> = {
+        let mut stmt = conn.prepare(&format!(
+            "SELECT {} FROM links l WHERE l.click_count > 0 ORDER BY l.click_count DESC LIMIT 3",
+            LINK_COLUMNS
+        ))?;
+        let rows = stmt.query_map([], row_to_link)?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+    load_tags_for_links(conn, &mut raw_links);
+    let top: Vec<TopLink> = raw_links
+        .into_iter()
+        .map(|link| TopLink {
+            id: link.id,
+            title: if link.title.is_empty() {
+                link.url.clone()
+            } else {
+                link.title.clone()
+            },
+            url: link.url,
+            click_count: link.click_count,
+            tags: link.tags,
+        })
+        .collect();
+    Ok(LinksStats {
+        total,
+        this_week,
+        top,
+    })
 }

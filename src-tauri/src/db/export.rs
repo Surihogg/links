@@ -11,6 +11,7 @@ use super::models::{Category, ExportParams, FlatCategory, JsonExport, Link};
 use super::row_mapping::{
     build_category_tree, load_tags_for_links, row_to_category, row_to_link, LINK_COLUMNS,
 };
+use super::search::compute_stats;
 use super::Db;
 
 impl Db {
@@ -62,6 +63,9 @@ impl Db {
         // 批量加载所有过滤后链接的标签
         load_tags_for_links(&conn, &mut links);
 
+        // 计算全局统计（全库维度，不受导出过滤影响）
+        let stats = compute_stats(&conn)?;
+
         match params.format.as_str() {
             "json" => {
                 let cat_sql =
@@ -80,11 +84,32 @@ impl Db {
                 let export = JsonExport {
                     links,
                     categories: cats,
+                    stats: Some(stats),
                 };
                 Ok(serde_json::to_string_pretty(&export)?)
             }
             "markdown" => {
                 let mut md = String::from("# Links Export\n\n");
+                md.push_str(&format!(
+                    "> 收藏总数: {} | 本周新增: {} | 导出时间: {}\n\n",
+                    stats.total,
+                    stats.this_week,
+                    chrono::Local::now().format("%Y-%m-%d %H:%M")
+                ));
+                if !stats.top.is_empty() {
+                    md.push_str("## 最常访问\n\n");
+                    for (i, link) in stats.top.iter().enumerate() {
+                        md.push_str(&format!(
+                            "{}. [{}]({}) — {} 次\n",
+                            i + 1,
+                            link.title,
+                            link.url,
+                            link.click_count
+                        ));
+                    }
+                    md.push_str("\n---\n\n");
+                }
+                md.push_str("## 链接列表\n\n");
                 for link in &links {
                     md.push_str(&format!("- [{}]({})", link.title, link.url));
                     if !link.tags.is_empty() {

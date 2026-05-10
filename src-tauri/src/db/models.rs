@@ -91,7 +91,7 @@ pub struct UpdateTagPayload {
     pub name: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TopLink {
     pub id: i64,
     pub title: String,
@@ -100,7 +100,7 @@ pub struct TopLink {
     pub tags: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LinksStats {
     pub total: i64,
     pub this_week: i64,
@@ -155,10 +155,12 @@ pub struct FlatCategory {
     pub parent_id: Option<i64>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JsonExport {
     pub links: Vec<Link>,
     pub categories: Vec<FlatCategory>,
+    #[serde(default)]
+    pub stats: Option<LinksStats>,
 }
 
 impl Default for UpdateLinkPayload {
