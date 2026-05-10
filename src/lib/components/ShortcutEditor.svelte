@@ -25,12 +25,30 @@
 
   function format(rawValue) {
     if (!rawValue) return "";
-    const parts = rawValue.split("+");
-    const map = isMac
+    const parts = rawValue.split("+").map((p) => p.trim()).filter(Boolean);
+    const modMap = isMac
       ? { super: "\u2318", cmdorctrl: "\u2318", control: "\u2325", alt: "\u2325", shift: "\u21E7" }
       : { super: "Win", cmdorctrl: "Ctrl", control: "Ctrl", alt: "Alt", shift: "Shift" };
+    // macOS 标准修饰键显示顺序：⌃ ⌥ ⇧ ⌘；Windows：Ctrl Alt Shift Win
+    const modOrder = isMac
+      ? ["control", "alt", "shift", "cmdorctrl", "super"]
+      : ["control", "cmdorctrl", "super", "alt", "shift"];
     const sep = isMac ? " " : "+";
-    return parts.map((p) => map[p.toLowerCase()] ?? p.toUpperCase()).join(sep);
+    const mods = [];
+    let key = "";
+    for (const p of parts) {
+      const lower = p.toLowerCase();
+      if (modMap[lower] !== undefined) {
+        if (!mods.includes(lower)) mods.push(lower);
+      } else {
+        // 规范化键名：KeyL → L，Digit1 → 1，其余短键大写、长键保留
+        if (/^Key([A-Za-z])$/.test(p)) key = p.slice(3).toUpperCase();
+        else if (/^Digit([0-9])$/.test(p)) key = p.slice(5);
+        else key = p.length === 1 ? p.toUpperCase() : p;
+      }
+    }
+    mods.sort((a, b) => modOrder.indexOf(a) - modOrder.indexOf(b));
+    return [...mods.map((m) => modMap[m]), key].join(sep);
   }
 
   function buildFromEvent(e) {

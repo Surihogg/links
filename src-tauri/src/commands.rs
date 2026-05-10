@@ -781,9 +781,11 @@ fn update_shortcut(
         .register(parsed)
         .map_err(|e| AppError::General(e.to_string()))?;
 
-    config.set(kind.config_key, new_shortcut)?;
+    // 存储规范化后的字符串，确保 getter 读回的值与 setter 返回值一致
+    let normalized = parsed.to_string();
+    config.set(kind.config_key, &normalized)?;
     config.save(&app_data_dir(app)?)?;
-    Ok(parsed.to_string())
+    Ok(normalized)
 }
 
 #[tauri::command]
