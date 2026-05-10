@@ -1,39 +1,49 @@
 <script>
-  import { categoriesStore } from '../stores/index.js';
-  import Brand from './Sidebar/Brand.svelte';
-  import { createCategoryDrag } from '../utils/categoryDragHandler.svelte.js';
-  import { flattenCategories } from '../utils/categoryTree.js';
-  import { cyclePlaceholder, DEFAULT_PLACEHOLDER } from '../utils/cyclePlaceholder.js';
+  // 侧边栏：品牌头 + 顶部固定 nav（全部 / 特别关注 / 统计） +
+  // CategorySection（分组节） + TagSection（标签节） + 底部 footer。
+  //
+  // 主组件只承担：折叠状态、拖拽对象、跨节联动（拖拽期间禁止 rename），
+  // 各节内部状态由各 Section 自管。
 
-  let { categories = [], tags = [], selected_id = null, selected_tag = null, onselect, onselect_tag, oncreate, ondelete_cat, onrename_cat, ontag_delete, onrename_tag, oncreate_tag, dark = false, ontoggle_dark, onexport, onimport, onsettings, importing = false, has_update = false, onupdate } = $props();
-  let expanded = $state(new Set());
-  let show_new = $state(false);
-  let new_name = $state("");
-  let new_parent_id = $state(null);
+  import { categoriesStore } from "../stores/index.js";
+  import Brand from "./Sidebar/Brand.svelte";
+  import CategorySection from "./Sidebar/CategorySection.svelte";
+  import TagSection from "./Sidebar/TagSection.svelte";
+  import { createCategoryDrag } from "../utils/categoryDragHandler.svelte.js";
+
+  let {
+    categories = [],
+    tags = [],
+    selected_id = null,
+    selected_tag = null,
+    onselect,
+    onselect_tag,
+    oncreate,
+    ondelete_cat,
+    onrename_cat,
+    ontag_delete,
+    onrename_tag,
+    oncreate_tag,
+    dark = false,
+    ontoggle_dark,
+    onexport,
+    onimport,
+    onsettings,
+    importing = false,
+    has_update = false,
+    onupdate,
+  } = $props();
+
   let collapsed = $state(new Set());
-  let cat_search = $state("");
-  let tag_search = $state("");
-  let deleting_id = $state(null);
-  let deleting_tag_id = $state(null);
-  let show_new_tag = $state(false);
-  let new_tag_name = $state("");
-  let tag_placeholder = $state(DEFAULT_PLACEHOLDER);
-  let cat_placeholder = $state(DEFAULT_PLACEHOLDER);
+  /** @type {CategorySection | undefined} */
+  let categorySectionRef;
 
-  let editing_cat_id = $state(null);
-  let editing_cat_name = $state("");
-  let editing_tag_id = $state(null);
-  let editing_tag_name = $state("");
-  let sub_create_parent_id = $state(null);
-  let sub_create_name = $state("");
-  let sub_placeholder = $state(DEFAULT_PLACEHOLDER);
-
-  // 分组拖拽（创建一次，模板中读取响应式状态）
+  // 分组拖拽：通过 ref 询问 CategorySection 当前是否在重命名某条
   const drag = createCategoryDrag({
     getCategories: () => categories,
     onDropToParent: (id, parent_id) => categoriesStore.update({ id, parent_id }),
     onDropToRoot: (id) => categoriesStore.update({ id, unset_parent: true }),
-    canStartDrag: (cat) => editing_cat_id !== cat.id,
+    canStartDrag: (cat) => !categorySectionRef?.isEditing(cat.id),
   });
 
   function toggle_section(key) {
@@ -41,166 +51,6 @@
     if (next.has(key)) next.delete(key);
     else next.add(key);
     collapsed = next;
-  }
-
-  function toggle(id) {
-    const next = new Set(expanded);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    expanded = next;
-  }
-
-  function submit_category() {
-    if (!new_name.trim()) {
-      cat_placeholder = cyclePlaceholder(cat_placeholder);
-      return;
-    }
-    const name = new_name.trim();
-    if (name.includes('/')) {
-      new_name = "";
-      cat_placeholder = "分组名不能包含 /";
-      return;
-    }
-    if (flat_categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-      new_name = "";
-      cat_placeholder = "已经有这个分组了";
-      return;
-    }
-    oncreate?.({ name, parent_id: new_parent_id });
-    new_name = "";
-    cat_placeholder = DEFAULT_PLACEHOLDER;
-  }
-
-  let flat_categories = $derived(flattenCategories(categories, { expanded }));
-  let filtered_categories = $derived(
-    cat_search.trim()
-      ? flat_categories.filter(c => c.name.toLowerCase().includes(cat_search.trim().toLowerCase()))
-      : flat_categories
-  );
-  let filtered_tags = $derived(
-    tag_search.trim()
-      ? tags.filter(t => t.name.toLowerCase().includes(tag_search.trim().toLowerCase()))
-      : tags
-  );
-
-  async function handle_delete_cat(e, id) {
-    e.stopPropagation();
-    if (deleting_id === id) {
-      ondelete_cat?.(id);
-      deleting_id = null;
-    } else {
-      deleting_id = id;
-    }
-  }
-
-  async function handle_delete_tag(e, id) {
-    e.stopPropagation();
-    if (deleting_tag_id === id) {
-      ontag_delete?.(id);
-      deleting_tag_id = null;
-    } else {
-      deleting_tag_id = id;
-    }
-  }
-
-  function reset_cat_delete() {
-    deleting_id = null;
-  }
-
-  function reset_tag_delete() {
-    deleting_tag_id = null;
-  }
-
-  function start_rename_cat(e, cat) {
-    e.stopPropagation();
-    editing_cat_id = cat.id;
-    editing_cat_name = cat.name;
-  }
-
-  function confirm_rename_cat(cat) {
-    const name = editing_cat_name.trim();
-    if (name && name !== cat.name) {
-      onrename_cat?.({ id: cat.id, name });
-    }
-    editing_cat_id = null;
-    editing_cat_name = "";
-  }
-
-  function cancel_rename_cat() {
-    editing_cat_id = null;
-    editing_cat_name = "";
-  }
-
-  function start_sub_create(e, cat) {
-    e.stopPropagation();
-    sub_create_parent_id = cat.id;
-    sub_create_name = "";
-    sub_placeholder = DEFAULT_PLACEHOLDER;
-    if (!expanded.has(cat.id)) expanded.add(cat.id);
-  }
-
-  function submit_sub_create() {
-    if (!sub_create_name.trim()) {
-      sub_placeholder = cyclePlaceholder(sub_placeholder);
-      return;
-    }
-    const name = sub_create_name.trim();
-    if (name.includes('/')) {
-      sub_create_name = "";
-      sub_placeholder = "分组名不能包含 /";
-      return;
-    }
-    if (flat_categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
-      sub_create_name = "";
-      sub_placeholder = "已经有这个分组了";
-      return;
-    }
-    oncreate?.({ name, parent_id: sub_create_parent_id });
-    sub_create_parent_id = null;
-    sub_create_name = "";
-    sub_placeholder = DEFAULT_PLACEHOLDER;
-  }
-
-  function cancel_sub_create() {
-    sub_create_parent_id = null;
-    sub_create_name = "";
-    sub_placeholder = DEFAULT_PLACEHOLDER;
-  }
-
-  function start_rename_tag(e, tag) {
-    e.stopPropagation();
-    editing_tag_id = tag.id;
-    editing_tag_name = tag.name;
-  }
-
-  function confirm_rename_tag(tag) {
-    const name = editing_tag_name.trim();
-    if (name && name !== tag.name) {
-      onrename_tag?.({ id: tag.id, name });
-    }
-    editing_tag_id = null;
-    editing_tag_name = "";
-  }
-
-  function cancel_rename_tag() {
-    editing_tag_id = null;
-    editing_tag_name = "";
-  }
-
-  function submit_tag() {
-    if (!new_tag_name.trim()) {
-      tag_placeholder = cyclePlaceholder(tag_placeholder);
-      return;
-    }
-    const name = new_tag_name.trim();
-    if (tags.some(t => t.name.toLowerCase() === name.toLowerCase())) {
-      new_tag_name = "";
-      tag_placeholder = "已经有这个标签了";
-      return;
-    }
-    oncreate_tag?.(name);
-    new_tag_name = "";
-    tag_placeholder = DEFAULT_PLACEHOLDER;
   }
 </script>
 
@@ -246,218 +96,29 @@
   </nav>
 
   <div class="sidebar-section">
-    <div class="section-header" onclick={() => toggle_section('categories')}>
-      <span class="section-label" style="cursor:pointer;">
-        <svg class="chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({collapsed.has('categories') ? 0 : 90}deg); transition: transform var(--transition);">
-          <path d="M3 1l4 4-4 4"/>
-        </svg>
-        分组管理
-      </span>
-      {#if !collapsed.has('categories')}
-        <button class="section-action" onclick={(e) => { e.stopPropagation(); show_new = true; }} title="新建分组">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
-      {/if}
-    </div>
+    <CategorySection
+      bind:this={categorySectionRef}
+      {categories}
+      {selected_id}
+      collapsed={collapsed.has('categories')}
+      {drag}
+      onSelect={onselect}
+      onCreate={oncreate}
+      onDelete={ondelete_cat}
+      onRename={onrename_cat}
+      onToggle={() => toggle_section('categories')}
+    />
 
-    {#if !collapsed.has('categories')}
-    {#if show_new}
-      <form class="new-cat-form" onsubmit={(e) => { e.preventDefault(); submit_category(); }} onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { show_new = false; new_name = ""; cat_placeholder = DEFAULT_PLACEHOLDER; } }}>
-        <input
-          type="text"
-          bind:value={new_name}
-          placeholder={cat_placeholder}
-          class="new-cat-input"
-          onkeydown={(e) => { if (e.key === 'Enter' && e.isComposing) return; if (e.key === 'Escape') { show_new = false; new_name = ""; cat_placeholder = DEFAULT_PLACEHOLDER; } }}
-          autofocus
-        />
-      </form>
-    {/if}
-    {#if flat_categories.length > 10}
-    <div class="section-search">
-      <input type="text" bind:value={cat_search} placeholder="翻翻你的分组" class="section-search-input" />
-    </div>
-    {/if}
-    <div class="category-list">
-      <button
-        class="nav-item cat-item"
-        class:active={selected_id === 'uncategorized'}
-        style="padding-left: 8px"
-        onclick={() => onselect?.('uncategorized')}
-      >
-        <span class="cat-icon-area">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 2" class="cat-icon icon-static"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
-        </span>
-        <span class="cat-name">未分组</span>
-      </button>
-      {#if drag.dragId !== null}
-        <div
-          class="root-drop-zone"
-          class:drop-target={drag.dropTargetId === 'root'}
-        >
-          移到根级
-        </div>
-      {/if}
-      {#each filtered_categories as cat (cat.id)}
-        <button
-          class="nav-item cat-item"
-          class:active={selected_id === cat.id}
-          class:expanded={cat.children?.length > 0 && expanded.has(cat.id)}
-          class:dragging={drag.dragId === cat.id}
-          class:drop-target={drag.dropTargetId === cat.id && drag.dragId !== cat.id && !drag.isDescendant(drag.dragId, cat.id)}
-          style="--indent: {cat.depth * 12}px; padding-left: {8 + cat.depth * 12}px"
-          data-cat-id={cat.id}
-          onclick={() => {
-            if (editing_cat_id !== cat.id) {
-              if (cat.children?.length > 0) toggle(cat.id);
-              onselect?.(cat.id);
-            }
-          }}
-          onmouseleave={() => { reset_cat_delete(); }}
-          onpointerdown={(e) => drag.start(e, cat)}
-        >
-          {#if cat.children?.length > 0}
-            <span class="cat-child-indicator" style="transform: rotate({expanded.has(cat.id) ? 90 : 0}deg)">
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M2.5 1l3.5 3-3.5 3"/>
-              </svg>
-            </span>
-          {/if}
-          <span class="cat-icon-area"
-            onclick={(e) => handle_delete_cat(e, cat.id)}
-            onpointerdown={(e) => e.stopPropagation()}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon icon-folder"><path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z"/></svg>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon icon-open-folder"><path d="M3 7h1.5l1.2-1.8c.2-.4.6-.7 1.1-.7H9l2 2h8c1.1 0 2 .9 2 2v8c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V7z"/></svg>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="cat-icon icon-delete"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
-          </span>
-          {#if editing_cat_id === cat.id}
-            <input
-              type="text"
-              class="rename-input"
-              bind:value={editing_cat_name}
-              onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirm_rename_cat(cat); } if (e.key === 'Escape') cancel_rename_cat(); }}
-              onblur={() => confirm_rename_cat(cat)}
-              onclick={(e) => e.stopPropagation()}
-              autofocus
-            />
-          {:else if deleting_id === cat.id}
-            <span class="cat-delete-hint">再点一下就删除</span>
-          {:else}
-            <span class="cat-name">{cat.name}</span>
-          {/if}
-            <span class="cat-action-btn" onclick={(e) => start_rename_cat(e, cat)} onpointerdown={(e) => e.stopPropagation()}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-            </span>
-            <span class="cat-action-btn" onclick={(e) => start_sub_create(e, cat)} onpointerdown={(e) => e.stopPropagation()}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-            </span>
-          </button>
-          {#if sub_create_parent_id === cat.id}
-            <form class="new-cat-form" style="padding-left: {8 + (cat.depth + 1) * 12}px" onsubmit={(e) => { e.preventDefault(); submit_sub_create(); }} onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) cancel_sub_create(); }}>
-              <input
-                type="text"
-                bind:value={sub_create_name}
-                placeholder={sub_placeholder}
-                class="new-cat-input"
-                onkeydown={(e) => { if (e.key === 'Escape') cancel_sub_create(); }}
-                autofocus
-              />
-            </form>
-          {/if}
-        {/each}
-    </div>
-    {/if}
-
-    <div class="section-header" onclick={() => toggle_section('tags')}>
-      <span class="section-label" style="cursor:pointer;">
-        <svg class="chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({collapsed.has('tags') ? 0 : 90}deg); transition: transform var(--transition);">
-          <path d="M3 1l4 4-4 4"/>
-        </svg>
-        标签管理
-      </span>
-      {#if !collapsed.has('tags')}
-        <button class="section-action" onclick={(e) => { e.stopPropagation(); show_new_tag = true; }} title="新建标签">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
-      {/if}
-    </div>
-    {#if !collapsed.has('tags')}
-    {#if show_new_tag}
-      <form class="new-cat-form" onsubmit={(e) => { e.preventDefault(); submit_tag(); }} onfocusout={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { show_new_tag = false; new_tag_name = ""; tag_placeholder = DEFAULT_PLACEHOLDER; } }}>
-        <input
-          type="text"
-          bind:value={new_tag_name}
-          placeholder={tag_placeholder}
-          class="new-cat-input"
-          onkeydown={(e) => { if (e.key === 'Enter' && e.isComposing) return; if (e.key === 'Escape') { show_new_tag = false; new_tag_name = ""; tag_placeholder = DEFAULT_PLACEHOLDER; } }}
-          autofocus
-        />
-      </form>
-    {/if}
-    {#if tags.length > 10}
-    <div class="section-search">
-      <input type="text" bind:value={tag_search} placeholder="找找你的标签" class="section-search-input" />
-    </div>
-    {/if}
-    <div class="tag-list">
-      <button
-        class="nav-item tag-item"
-        class:active={selected_tag === '__untagged__'}
-        style="padding-left: 12px"
-        onclick={() => onselect_tag?.('__untagged__')}
-      >
-        <span class="tag-icon-area">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 2" class="tag-icon icon-static"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-        </span>
-        <span class="cat-name">无标签</span>
-      </button>
-      {#each filtered_tags as tag (tag.id)}
-        <button
-          class="nav-item tag-item"
-          class:active={selected_tag === tag.name}
-          style="padding-left: 12px"
-          onclick={() => { if (editing_tag_id !== tag.id) onselect_tag?.(tag.name); }}
-          onmouseleave={() => { reset_tag_delete(); }}
-        >
-          <span class="tag-icon-area"
-            onclick={(e) => handle_delete_tag(e, tag.id)}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tag-icon icon-tag"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tag-icon icon-delete"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
-          </span>
-          {#if editing_tag_id === tag.id}
-            <input
-              type="text"
-              class="rename-input"
-              bind:value={editing_tag_name}
-              onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); confirm_rename_tag(tag); } if (e.key === 'Escape') cancel_rename_tag(); }}
-              onblur={() => confirm_rename_tag(tag)}
-              onclick={(e) => e.stopPropagation()}
-              autofocus
-            />
-          {:else if deleting_tag_id === tag.id}
-            <span class="cat-delete-hint">再点一下就删除</span>
-          {:else}
-            <span class="cat-name">{tag.name}</span>
-          {/if}
-           <span class="tag-action-btn" onclick={(e) => start_rename_tag(e, tag)}>
-             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-               <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-             </svg>
-           </span>
-         </button>
-       {/each}
-    </div>
-    {/if}
+    <TagSection
+      {tags}
+      {selected_tag}
+      collapsed={collapsed.has('tags')}
+      onSelect={onselect_tag}
+      onCreate={oncreate_tag}
+      onDelete={ontag_delete}
+      onRename={onrename_tag}
+      onToggle={() => toggle_section('tags')}
+    />
   </div>
 
   <div class="sidebar-footer">
@@ -503,6 +164,9 @@
     overflow: clip;
   }
 
+  /* —— 顶部 nav（与 CategorySection / TagSection 共享 .nav-item，
+       基础样式见 app.css；以下仅是顶部 nav 的容器与 svg 调整） —— */
+
   .sidebar-nav {
     padding: 0 8px;
     display: flex;
@@ -510,385 +174,42 @@
     gap: 1px;
   }
 
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    width: 100%;
-    padding: 6px 6px;
-    border: none;
-    background: none;
-    color: var(--text-2);
-    font-size: 13px;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition: all var(--transition);
-    text-align: left;
-  }
-
-  .nav-item:hover {
-    background: var(--bg-hover);
-    color: var(--text-1);
-  }
-
-  .nav-item.active {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-
-  .cat-item.active {
-    background: var(--cat-soft);
-    color: var(--cat-text);
-  }
-
-  .cat-icon, .tag-icon {
+  /* sidebar-nav 下的 nav-item 自带 svg；缩进与 CategorySection 不同 */
+  .sidebar-nav .nav-item :global(svg) {
     flex-shrink: 0;
     margin: 0 5px;
   }
 
-  .cat-icon-area, .tag-icon-area {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin: 0 1px;
-    cursor: pointer;
-  }
-
-  .cat-icon-area .cat-icon,
-  .tag-icon-area .tag-icon {
-    margin: 0;
-  }
-
-  .icon-static {
-    opacity: 0.5;
-  }
-
-  .icon-delete {
-    display: none;
-    color: var(--danger);
-  }
-
-  .icon-folder, .icon-tag, .icon-open-folder {
-    display: block;
-  }
-
-  .icon-open-folder {
-    display: none;
-  }
-
-  .cat-item.expanded .icon-folder {
-    display: none;
-  }
-
-  .cat-item.expanded .icon-open-folder {
-    display: block;
-    opacity: 0.7;
-  }
-
-  .nav-item:hover .cat-icon-area .icon-folder,
-  .nav-item:hover .cat-icon-area .icon-open-folder,
-  .nav-item:hover .tag-icon-area .icon-tag {
-    display: none;
-  }
-
-  .nav-item:hover .cat-icon-area .icon-delete,
-  .nav-item:hover .tag-icon-area .icon-delete {
-    display: block;
-  }
-
+  /* —— 主滚动容器（包裹两个 Section） —— */
   .sidebar-section {
     flex: 1;
     padding: 8px 8px 0;
     overflow-y: auto;
   }
 
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 6px 6px;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition: background var(--transition);
-  }
-
-  .section-header:hover {
-    background: var(--bg-hover);
-  }
-
-  .section-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-2);
-    letter-spacing: 0.3px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .section-action {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text-3);
-    padding: 2px;
-    border-radius: 4px;
-    display: flex;
-    transition: all var(--transition);
-  }
-
-  .section-action:hover {
-    color: var(--text-1);
-    background: var(--bg-2);
-  }
-
-  .category-list {
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-
-  .cat-item {
-    font-size: 13px;
-    position: relative;
-    touch-action: none;
-  }
-
-  .cat-item:hover {
-    background: var(--bg-2);
-  }
-
-  .cat-item.active {
-    background: var(--cat-soft);
-    font-weight: 500;
-  }
-
-  .cat-item.expanded::before {
-    content: '';
-    position: absolute;
-    left: var(--indent, 0px);
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--cat-text);
-    border-radius: 0 2px 2px 0;
-  }
-
-  .cat-item.dragging {
-    opacity: 0.4;
-  }
-
-  .cat-item.drop-target {
-    background: var(--accent-soft);
-    outline: 2px dashed var(--accent);
-    outline-offset: -2px;
-    border-radius: 4px;
-  }
-
-  .root-drop-zone {
-    padding: 6px 10px;
-    margin: 2px 0;
-    border: 1px solid var(--border-2);
-    border-radius: var(--radius-sm);
-    text-align: center;
-    color: var(--text-3);
-    font-size: 12px;
-    background: var(--bg-1);
-  }
-
-  .root-drop-zone.drop-target {
-    border-color: transparent;
-    color: var(--accent);
-    background: var(--accent-soft);
-    outline: 2px dashed var(--accent);
-    outline-offset: -2px;
-  }
-
+  /* —— 暗色模式下分组/标签的 hover/active：
+       两个 Section 内部的 .cat-item / .tag-item 用 :global(.dark) 选择器
+       覆盖，但 :global(.dark) 在子组件 scoped style 中不生效（class 不匹配
+       到子组件根的 .cat-item），所以这里在父组件用 :global(...) 定义 —— */
   :global(.dark) .cat-item:hover {
     background: var(--bg-2);
   }
-
   :global(.dark) .cat-item.active {
     background: var(--cat-soft);
     color: var(--cat-text);
   }
-
   :global(.dark) .cat-item.expanded::before {
     background: var(--cat-text);
   }
-
-  .tag-item {
-    font-size: 13px;
-    position: relative;
-  }
-
-  .tag-item:hover {
-    background: var(--bg-2);
-  }
-
-  .tag-item.active {
-    background: var(--accent-soft);
-    font-weight: 500;
-  }
-
   :global(.dark) .tag-item:hover {
     background: var(--bg-2);
   }
-
   :global(.dark) .tag-item.active {
     background: var(--accent-soft);
     color: var(--accent-text);
   }
 
-  .cat-action-btn {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 4px;
-    margin-left: auto;
-    flex-shrink: 0;
-    color: var(--text-3);
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-
-  .cat-item:hover .cat-action-btn {
-    display: flex;
-  }
-
-  .cat-action-btn:hover {
-    color: var(--text-1);
-    background: var(--bg-hover);
-  }
-
-  .cat-action-btn + .cat-action-btn {
-    margin-left: 2px;
-  }
-
-  .section-search {
-    padding: 6px 6px 4px;
-  }
-
-  .section-search-input {
-    width: 100%;
-    padding: 4px 8px;
-    border: 1px solid var(--border-1);
-    border-radius: var(--radius-sm);
-    background: var(--bg-0);
-    color: var(--text-0);
-    font-size: 11px;
-    outline: none;
-    transition: border-color var(--transition);
-  }
-
-  .section-search-input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
-  }
-
-  .cat-toggle {
-    display: none;
-  }
-
-  .cat-toggle-spacer {
-    display: none;
-  }
-
-  .cat-child-indicator {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 8px;
-    height: 8px;
-    flex-shrink: 0;
-    margin-right: 4px;
-    color: var(--text-3);
-    transition: transform 0.15s ease;
-  }
-
-  .cat-name, .cat-delete-hint {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 13px;
-  }
-
-  .cat-delete-hint {
-    color: var(--danger);
-    flex: 1;
-    text-align: left;
-  }
-
-  .rename-input {
-    flex: 1;
-    min-width: 0;
-    padding: 1px 4px;
-    border: 1px solid var(--accent);
-    border-radius: 3px;
-    background: var(--bg-0);
-    color: var(--text-0);
-    font-size: 13px;
-    outline: none;
-    box-shadow: 0 0 0 2px var(--accent-soft);
-  }
-
-  .new-cat-form {
-    padding: 8px 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .new-cat-input {
-    width: 100%;
-    padding: 7px 10px;
-    border: 1px solid var(--border-1);
-    border-radius: var(--radius-md);
-    background: var(--bg-0);
-    color: var(--text-0);
-    font-size: 13px;
-    outline: none;
-    transition: all var(--transition);
-  }
-
-  .new-cat-input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
-  }
-
-  .tag-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-
-  .tag-action-btn {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 4px;
-    margin-left: auto;
-    flex-shrink: 0;
-    color: var(--text-3);
-    cursor: pointer;
-    transition: all var(--transition);
-  }
-
-  .tag-item:hover .tag-action-btn {
-    display: flex;
-  }
-
-  .tag-action-btn:hover {
-    color: var(--text-1);
-    background: var(--bg-hover);
-  }
-
+  /* —— 底部 footer —— */
   .sidebar-footer {
     padding: 8px 12px;
     background: var(--bg-2);
@@ -924,10 +245,7 @@
     animation: spin 1s linear infinite;
   }
 
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
+  /* —— 分组拖拽时附着到 body 的浮层（categoryDragHandler 创建） —— */
   :global(.drag-ghost) {
     position: fixed;
     pointer-events: none;

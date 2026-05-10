@@ -507,3 +507,32 @@ input, textarea, select, button {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ===== Sidebar 通用 nav-item =====
+   被 Sidebar 顶部三按钮 / CategorySection / TagSection 共享。
+   分组特有的 .cat-item 与标签特有的 .tag-item 样式分别在各自组件里覆盖 */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 6px;
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
