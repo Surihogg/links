@@ -2,7 +2,6 @@ name: Release
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
@@ -50,13 +49,10 @@ jobs:
         id: notes
         shell: bash
         run: |
-          # 获取上一个 tag（排除当前 HEAD 自身的 tag）
-          PREV_TAG=$(git tag --sort=-version:refname | head -1)
-          # 如果当前 commit 正好有 tag，取第二个
-          CURRENT_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "")
-          if [ "$PREV_TAG" = "$CURRENT_TAG" ] || [ -z "$PREV_TAG" ]; then
-            PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
-          fi
+          # 从 GITHUB_REF 获取当前 tag 名（tag push 触发时为 refs/tags/vX.Y.Z）
+          CURRENT_TAG="${GITHUB_REF#refs/tags/}"
+          # 取版本号仅次于当前 tag 的上一个 tag
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${CURRENT_TAG}$" | head -1)
 
           if [ -n "$PREV_TAG" ]; then
             RANGE="${PREV_TAG}..HEAD"
