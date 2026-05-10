@@ -118,6 +118,8 @@
     const { LogicalSize, PhysicalPosition } = await import("@tauri-apps/api/window");
     const unlisten = await listen("main-shown", () => {
       search_bar?.focus();
+      refresh_current_view();
+      tagsStore.load();
     });
     const unlistenHidden = await listen("main-hidden", () => {
       reset_filters();
@@ -486,7 +488,18 @@ async function on_toggle_favorite(link) {
   }
 
   async function on_rename_tag(payload) {
+    const { id, name: new_name } = payload;
+    // 在 tagsStore.update 之前找到旧名字
+    const old_name = $tagsStore.find(t => t.id === id)?.name;
     await tagsStore.update(payload);
+    if (old_name && old_name !== new_name) {
+      // 本地替换 linksStore 中所有包含旧标签名的链接，与分组重命名效果一致
+      linksStore.renameTag(old_name, new_name);
+      // 如果当前正在筛选该标签，更新搜索框中的标签名
+      if (selected_tag === old_name) {
+        selected_tag = new_name;
+      }
+    }
   }
 
   async function on_create_tag(name) {

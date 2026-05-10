@@ -64,6 +64,19 @@ function createLinksStore() {
         items: s.items.map((l) => (l.id === id ? { ...l, ...patch } : l)),
       }));
     },
+    /**
+     * 本地替换所有链接中的旧标签名为新标签名（标签重命名后调用，
+     * 避免全量 load() 破坏无限滚动状态，与分组重命名行为一致）。
+     */
+    renameTag(old_name, new_name) {
+      update((s) => ({
+        ...s,
+        items: s.items.map((l) => ({
+          ...l,
+          tags: l.tags.map((t) => (t === old_name ? new_name : t)),
+        })),
+      }));
+    },
     async remove(id) {
       await api.deleteLink(id);
       update((s) => ({
