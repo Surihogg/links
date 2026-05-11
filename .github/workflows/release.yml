@@ -3,56 +3,59 @@ name: Release
 on:
   push:
     tags: ['v*']
+    branches: [main]
   workflow_dispatch:
 
+# 同一分支/标签的新推送自动取消上一次未完成的构建
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-            args: --target aarch64-apple-darwin
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
-          - platform: windows-latest
-            args: ""
-
-    runs-on: ${{ matrix.platform }}
-
+  # 推算版本号与 release 元信息
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+      is_tag: ${{ steps.version.outputs.is_tag }}
+      notes_body: ${{ steps.notes.outputs.body }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          cache: npm
+      - name: 推算版本号
+        id: version
+        shell: bash
+        run: |
+          PKG_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          SHORT_SHA=$(git rev-parse --short HEAD)
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-
-      - name: Cache Rust
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: ./src-tauri -> target
-
-      - run: npm install
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            # tag 触发 → 使用 tag 自带的版本号
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+            echo "version=${PKG_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+            echo "is_tag=true" >> "$GITHUB_OUTPUT"
+            echo "🏷️ Tag 触发: ${TAG_NAME}"
+          else
+            # main 分支 push 触发 → 追加 commit hash
+            DEV_VERSION="${PKG_VERSION}+${SHORT_SHA}"
+            TAG_NAME="v${DEV_VERSION}"
+            echo "version=${DEV_VERSION}" >> "$GITHUB_OUTPUT"
+            echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
+            echo "🔨 开发构建: ${TAG_NAME}"
+          fi
 
       - name: 生成 Release Notes
         id: notes
         shell: bash
         run: |
-          # 从 GITHUB_REF 获取当前 tag 名（tag push 触发时为 refs/tags/vX.Y.Z）
-          CURRENT_TAG="${GITHUB_REF#refs/tags/}"
-          # 取版本号仅次于当前 tag 的上一个 tag
-          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${CURRENT_TAG}$" | head -1)
+          CURRENT_TAG="${{ steps.version.outputs.tag_name }}"
+          # 取版本号仅次于当前 tag 的上一个 tag（只看正式 tag，忽略 dev tag）
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${CURRENT_TAG}$" | grep -vE '\+[0-9a-f]+$' | head -1)
 
           if [ -n "$PREV_TAG" ]; then
             RANGE="${PREV_TAG}..HEAD"
@@ -100,17 +103,57 @@ jobs:
             echo "RELEASE_NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
 
+  build:
+    needs: prepare
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: windows-latest
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - run: npm install
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: "Links v__VERSION__"
-          releaseBody: ${{ steps.notes.outputs.body }}
+          tagName: ${{ needs.prepare.outputs.tag_name }}
+          releaseName: "Links ${{ needs.prepare.outputs.tag_name }}"
+          releaseBody: ${{ needs.prepare.outputs.notes_body }}
           releaseDraft: true
-          prerelease: false
+          prerelease: ${{ needs.prepare.outputs.is_tag != 'true' }}
           args: ${{ matrix.args }}
 
       - name: 上传浏览器扩展
@@ -118,10 +161,10 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          VERSION="${{ needs.prepare.outputs.version }}"
           cd browser-extension
           7z a -tzip "../links-browser-extension-v${VERSION}.zip" .
           cd ..
-          gh release upload "v${VERSION}" "links-browser-extension-v${VERSION}.zip" --clobber
+          gh release upload "${{ needs.prepare.outputs.tag_name }}" "links-browser-extension-v${VERSION}.zip" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
