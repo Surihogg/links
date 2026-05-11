@@ -178,14 +178,23 @@
 
     listCategories().then(c => categories = c);
 
-    const unlistenShown = await listen("spotlight-shown", () => {
+    // 初始 resize：将窗口从 tauri.conf.json 的默认高度调整为实际搜索区高度，
+    // 在 onMount 时窗口还是 hidden，不会影响后续 show 的焦点
+    await resize_window();
+
+    const unlistenShown = await listen("spotlight-shown", async () => {
       hiding = false;
+      // 先聚焦输入框：此时窗口已被 Rust 端 show()+set_focus()，
+      // input 也已挂载，立即 focus 最稳妥；setTimeout 玄学时序不可靠。
+      input_el?.focus();
       const { availWidth, availHeight } = window.screen;
-      getCurrentWindow().setPosition(new LogicalPosition(
+      await getCurrentWindow().setPosition(new LogicalPosition(
         Math.round((availWidth - WIN_WIDTH) / 2),
         Math.round(availHeight * 0.25)
       ));
-      setTimeout(() => input_el?.focus(), 50);
+      // setPosition 后再补一次 focus：某些平台/多显示器下重新定位会让
+      // 窗口短暂失焦，导致首次 focus 被吞。下一帧再保险一次。
+      requestAnimationFrame(() => input_el?.focus());
     });
 
     const unlistenFocus = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {

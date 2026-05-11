@@ -67,11 +67,11 @@
     await waitForBackendReady();
     console.log("[startup] backend ready");
     const isDeepLinkStartup = await api.checkStartupDeepLink();
+    // 先加载主题，确保 CSS 变量就绪再 show 窗口（避免 Windows transparent 窗口白屏）
+    await themeStore.init();
     if (!isDeepLinkStartup) {
       try { await mainWindow.show(); } catch (e) {}
     }
-    // 主题加载、系统主题监听、跨窗口同步全部由 themeStore 接管
-    await themeStore.init();
 
     const savedSort = await api.getSetting("sort-by");
     if (savedSort) sort_by = savedSort;
