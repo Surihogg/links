@@ -1,7 +1,13 @@
 <script>
   import { autocompleteTags, createTag } from "../api.js";
+  import { createTagDrag } from "../utils/tagDragHandler.svelte.js";
 
   let { tags = $bindable([]), onchange } = $props();
+
+  const drag = createTagDrag({
+    getTags: () => tags,
+    onReorder: (newTags) => { tags = newTags; onchange?.(tags); },
+  });
   let input = $state("");
   let suggestions = $state([]);
   let show_suggestions = $state(false);
@@ -85,7 +91,13 @@
 <div class="tag-input-wrap">
   <div class="tag-input-field">
     {#each tags as tag, i}
-      <span class="tag-pill">
+      <span
+        class="tag-pill"
+        class:tag-dragging={drag.isDragging && drag.dragIndex === i}
+        class:tag-drop-target={drag.isDragging && drag.dropIndex === i}
+        data-tag-index={i}
+        onpointerdown={(e) => drag.start(e, i)}
+      >
         {tag}
         <button type="button" class="tag-remove" onclick={() => remove_tag(i)}>×</button>
       </span>
@@ -163,6 +175,22 @@
     border-radius: 4px;
     font-size: 12px;
     font-weight: 500;
+    cursor: grab;
+    user-select: none;
+    transition: opacity var(--transition), box-shadow var(--transition), transform var(--transition);
+  }
+
+  .tag-pill:active { cursor: grabbing; }
+
+  /* 正在被拖拽的标签 — 半透明占位 */
+  .tag-pill.tag-dragging {
+    opacity: 0.3;
+  }
+
+  /* 拖拽放置目标 — 微微抬起 + 边框指示 */
+  .tag-pill.tag-drop-target {
+    box-shadow: 0 0 0 2px var(--accent);
+    transform: scale(1.05);
   }
 
   .tag-remove {
@@ -231,5 +259,20 @@
     text-align: center;
     color: var(--text-3);
     font-size: 12px;
+  }
+
+  :global(.tag-drag-ghost) {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    padding: 2px 8px;
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: var(--shadow-drag);
+    opacity: 0.9;
+    white-space: nowrap;
   }
 </style>
