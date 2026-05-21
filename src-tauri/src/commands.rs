@@ -638,10 +638,10 @@ fn import_json_entries(
         if !link.tags.is_empty() {
             // 复用 db.rs 中唯一的 ensure_tags 实现，避免双份维护
             let tag_ids = crate::db::ensure_tags(&tx, &link.tags);
-            for tid in tag_ids {
+            for (pos, tid) in tag_ids.iter().enumerate() {
                 tx.execute(
-                    "INSERT OR IGNORE INTO link_tags (link_id, tag_id) VALUES (?, ?)",
-                    rusqlite::params![id, tid],
+                    "INSERT OR IGNORE INTO link_tags (link_id, tag_id, position) VALUES (?, ?, ?)",
+                    rusqlite::params![id, tid, pos as i64],
                 )?;
             }
         }

@@ -64,10 +64,10 @@ impl Db {
 
         let tags = payload.tags.as_deref().unwrap_or(&[]);
         let tag_ids = ensure_tags(&conn, &tags.iter().cloned().collect::<Vec<_>>());
-        for tid in tag_ids {
+        for (pos, tid) in tag_ids.iter().enumerate() {
             conn.execute(
-                "INSERT OR IGNORE INTO link_tags (link_id, tag_id) VALUES (?, ?)",
-                rusqlite::params![id, tid],
+                "INSERT OR IGNORE INTO link_tags (link_id, tag_id, position) VALUES (?, ?, ?)",
+                rusqlite::params![id, tid, pos as i64],
             )?;
         }
 
@@ -143,10 +143,10 @@ impl Db {
                 rusqlite::params![payload.id],
             )?;
             let tag_ids = ensure_tags(&conn, tags);
-            for tid in tag_ids {
+            for (pos, tid) in tag_ids.iter().enumerate() {
                 conn.execute(
-                    "INSERT OR IGNORE INTO link_tags (link_id, tag_id) VALUES (?, ?)",
-                    rusqlite::params![payload.id, tid],
+                    "INSERT OR IGNORE INTO link_tags (link_id, tag_id, position) VALUES (?, ?, ?)",
+                    rusqlite::params![payload.id, tid, pos as i64],
                 )?;
             }
         }

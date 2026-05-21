@@ -26,6 +26,7 @@ struct Migration {
 
 const MIGRATIONS: &[Migration] = &[
     Migration { version: 1, apply: m1_baseline },
+    Migration { version: 2, apply: m2_link_tags_position },
     // 未来新增迁移按版本号递增追加；不要修改已发布的迁移函数
 ];
 
@@ -101,6 +102,36 @@ fn m1_baseline(tx: &rusqlite::Transaction) -> SqlResult<()> {
     )?;
     try_alter(tx, "ALTER TABLE links ADD COLUMN click_count INTEGER NOT NULL DEFAULT 0")?;
     try_alter(tx, "ALTER TABLE links ADD COLUMN last_opened_at INTEGER DEFAULT NULL")?;
+
+    Ok(())
+}
+
+/// v2：link_tags 增加 position 列，支持标签排序。
+///
+/// 存量数据回填策略：按 link_id 分组、组内按 tag name 字母序赋予递增 position，
+/// 确保老数据升级后展示顺序与升级前（ORDER BY t.name）一致。
+fn m2_link_tags_position(tx: &rusqlite::Transaction) -> SqlResult<()> {
+    try_alter(tx, "ALTER TABLE link_tags ADD COLUMN position INTEGER NOT NULL DEFAULT 0")?;
+
+    // 回填存量数据：为已有 link_tags 行按 (link_id, tag name) 分配递增 position。
+    // 需要在 UPDATE 语句中 JOIN tags 表来获取 tag name 进行排序比较。
+    tx.execute_batch(
+        "
+        UPDATE link_tags
+        SET position = (
+            SELECT COUNT(*)
+            FROM link_tags AS lt2
+            JOIN tags AS t2 ON t2.id = lt2.tag_id
+            JOIN tags AS t_ref ON t_ref.id = link_tags.tag_id
+            WHERE lt2.link_id = link_tags.link_id
+              AND (t2.name COLLATE NOCASE < t_ref.name COLLATE NOCASE
+                   OR (t2.name COLLATE NOCASE = t_ref.name COLLATE NOCASE
+                       AND lt2.rowid < link_tags.rowid))
+        )
+        WHERE position = 0
+          AND EXISTS (SELECT 1 FROM link_tags WHERE position = 0 LIMIT 1);
+        ",
+    )?;
 
     Ok(())
 }
@@ -237,12 +268,12 @@ mod tests {
             .unwrap();
         }
 
-        // 应当幂等地补齐 link_tags / fts / 触发器，并把版本号推到 1
+        // 应当幂等地补齐 link_tags / fts / 触发器，并把版本号推到最新
         db.migrate().unwrap();
 
         let conn = db.0.lock().unwrap();
         let v: i32 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
-        assert_eq!(v, 1);
+        assert_eq!(v, MIGRATIONS.last().unwrap().version);
 
         let link_tags_exists: i32 = conn
             .query_row(

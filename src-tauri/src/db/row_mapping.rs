@@ -60,7 +60,7 @@ pub(crate) fn row_to_tag(row: &rusqlite::Row) -> rusqlite::Result<Tag> {
 /// 单条查询版本；批量场景请用 [`load_tags_for_links`] 避免 N+1。
 pub(crate) fn load_tags_for_link(conn: &Connection, link_id: i64) -> Vec<String> {
     let Ok(mut stmt) = conn.prepare(
-        "SELECT t.name FROM tags t JOIN link_tags lt ON lt.tag_id = t.id WHERE lt.link_id = ?",
+        "SELECT t.name FROM tags t JOIN link_tags lt ON lt.tag_id = t.id WHERE lt.link_id = ? ORDER BY lt.position",
     ) else {
         return vec![];
     };
@@ -95,7 +95,7 @@ pub(crate) fn load_tags_for_links(conn: &Connection, links: &mut [super::models:
         "SELECT lt.link_id, t.name \
          FROM link_tags lt JOIN tags t ON t.id = lt.tag_id \
          WHERE lt.link_id IN ({}) \
-         ORDER BY lt.link_id, t.name",
+         ORDER BY lt.link_id, lt.position",
         placeholders
     );
 
