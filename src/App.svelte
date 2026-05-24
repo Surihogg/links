@@ -5,7 +5,10 @@
   import * as api from "./lib/api.js";
   import { waitForBackendReady } from "./lib/ready.js";
   import { getCurrentWindow } from "@tauri-apps/api/window";
-  import { emit, listen } from "@tauri-apps/api/event";
+  import { createCleanupManager } from "./lib/lifecycle/cleanup.js";
+  import { restoreWindowState, setupWindowStateSaving } from "./lib/lifecycle/windowState.js";
+  import { checkForUpdates, checkVersionNotes } from "./lib/lifecycle/updates.js";
+  import { registerEventListeners } from "./lib/lifecycle/eventListeners.js";
   import SearchBar from "./lib/components/SearchBar.svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import LinkList from "./lib/components/LinkList.svelte";
@@ -61,18 +64,7 @@
   let last_update_notes = $state("");
   let current_version = $state("");
 
-  onMount(async () => {
-    const mainWindow = getCurrentWindow();
-    console.log("[startup] App onMount start");
-    await waitForBackendReady();
-    console.log("[startup] backend ready");
-    const isDeepLinkStartup = await api.checkStartupDeepLink();
-    // 先加载主题，确保 CSS 变量就绪再 show 窗口（避免 Windows transparent 窗口白屏）
-    await themeStore.init();
-    if (!isDeepLinkStartup) {
-      try { await mainWindow.show(); } catch (e) {}
-    }
-
+  async function load_app_settings() {
     const savedSort = await api.getSetting("sort-by");
     if (savedSort) sort_by = savedSort;
     try {
@@ -80,111 +72,71 @@
       settingsStore.update(s => ({ ...s, check_link_reachability: v }));
     } catch {}
     is_macos = /mac/i.test(navigator.userAgentData?.platform ?? navigator.platform);
-    console.log("[startup] loading data...");
-    await load_data();
-    console.log("[startup] data loaded");
+  }
 
-    // 检查应用更新（受配置控制）
-    const auto_check_update = await api.getSetting("auto-check-update");
-    if (auto_check_update !== "false") {
-      check_for_update();
-    }
-
-    // 首次启动更新后显示更新说明（优先从 GitHub API 获取，缓存兜底）
-    try {
-      const last_version = await api.getSetting("last-known-version");
-      const { getVersion } = await import("@tauri-apps/api/app");
-      current_version = await getVersion();
-      if (last_version && last_version !== current_version) {
-        let notes = "";
-        try {
-          notes = await api.fetchReleaseNotes(`v${current_version}`) || "";
-        } catch (e) {
-          console.warn("[update] failed to fetch release notes for post-update:", e);
-        }
-        if (!notes) {
-          notes = await api.getSetting("last-update-notes") || "";
-        }
-        if (notes) {
-          last_update_notes = notes;
-          show_release_notes = true;
-        }
-      }
-      await api.setSetting("last-known-version", current_version);
-    } catch (e) {
-      console.warn("[update] version check failed:", e);
-    }
-
-    const { LogicalSize, PhysicalPosition } = await import("@tauri-apps/api/window");
-    const unlisten = await listen("main-shown", () => {
-      search_bar?.focus();
-      refresh_current_view();
-      tagsStore.load();
-    });
-    const unlistenHidden = await listen("main-hidden", () => {
-      reset_filters();
-    });
-
-    const savedSize = await api.getSetting("window-size");
-    if (savedSize) {
-      try {
-        const { width, height } = JSON.parse(savedSize);
-        await mainWindow.setSize(new LogicalSize(width, height));
-      } catch (e) {}
-    }
-
-    const savedPos = await api.getSetting("window-position");
-    if (savedPos) {
-      try {
-        const { x, y } = JSON.parse(savedPos);
-        await mainWindow.setPosition(new PhysicalPosition(x, y));
-      } catch (e) {}
-    }
-
+  function remove_splash() {
     const splash = document.getElementById("splash");
     if (splash) {
       splash.classList.add("fade-out");
       setTimeout(() => splash.remove(), 300);
     }
+  }
 
-    let resize_restore_done = false;
-    const resize_restore_timeout = setTimeout(() => { resize_restore_done = true; }, 2000);
+  onMount(async () => {
+    const mainWindow = getCurrentWindow();
+    const cleanup = createCleanupManager();
 
-    let resize_timer;
-    async function save_window_state() {
-      try {
-        const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        const win = getCurrentWindow();
-        const physicalSize = await win.innerSize();
-        const scaleFactor = await win.scaleFactor();
-        const logical = physicalSize.toLogical(scaleFactor);
-        await api.setSetting("window-size", JSON.stringify({
-          width: Math.round(logical.width),
-          height: Math.round(logical.height)
-        }));
-        const pos = await win.outerPosition();
-        await api.setSetting("window-position", JSON.stringify({
-          x: pos.x,
-          y: pos.y
-        }));
-      } catch (e) {}
+    console.log("[startup] App onMount start");
+    await waitForBackendReady();
+    console.log("[startup] backend ready");
+
+    const isDeepLinkStartup = await api.checkStartupDeepLink();
+    await themeStore.init();
+    if (!isDeepLinkStartup) {
+      try { await mainWindow.show(); } catch (e) {}
     }
-    function on_resize() {
-      clearTimeout(resize_timer);
-      if (!resize_restore_done) return;
-      resize_timer = setTimeout(save_window_state, 500);
-    }
-    window.addEventListener("resize", on_resize);
-    let unlistenMoved;
-    try {
-      unlistenMoved = await mainWindow.onMoved(() => {
-        clearTimeout(resize_timer);
-        if (!resize_restore_done) return;
-        resize_timer = setTimeout(save_window_state, 500);
-      });
-    } catch (e) {
-      console.warn("[window] onMoved not available:", e);
-    }
+
+    await load_app_settings();
+    console.log("[startup] loading data...");
+    await load_data();
+    console.log("[startup] data loaded");
+
+    await checkForUpdates(check_for_update);
+    await checkVersionNotes({
+      setCurrentVersion: (v) => { current_version = v; },
+      setLastUpdateNotes: (v) => { last_update_notes = v; },
+      setShowReleaseNotes: (v) => { show_release_notes = v; },
+    });
+
+    await restoreWindowState(mainWindow);
+    remove_splash();
+    await setupWindowStateSaving(mainWindow, cleanup);
+
+    await registerEventListeners(mainWindow, cleanup, {
+      getSearchBar: () => search_bar,
+      resetFilters: reset_filters,
+      refreshCurrentView: refresh_current_view,
+      onSpotlightLocate: async (e) => {
+        const { link_id } = e.payload;
+        try { await mainWindow.show(); } catch {}
+        try { await mainWindow.setFocus(); } catch {}
+        selected_category = null;
+        selected_tag = null;
+        search_query = "";
+        selected_link_index = -1;
+        await linksStore.load({ per_page: 100 });
+        await tick();
+        await new Promise(r => requestAnimationFrame(r));
+        const index = filtered_links.findIndex(l => l.id === link_id);
+        if (index >= 0) {
+          selected_link_index = index;
+          scroll_selected_into_view();
+          edit_link = filtered_links[index];
+        } else {
+          console.warn("[spotlight-locate] link not found:", link_id);
+        }
+      },
+    });
 
     await mainWindow.onCloseRequested(async (event) => {
       event.preventDefault();
@@ -199,72 +151,7 @@
       }
     });
 
-    // 监听 quick-add 窗口的保存事件
-    let unlistenLinksChanged;
-    let unlistenSpotlightLocate;
-    let unlistenLinkBroken;
-    let unlistenLinkMeta;
-    try {
-      const { listen } = await import("@tauri-apps/api/event");
-      unlistenLinksChanged = await listen("links-changed", () => {
-        refresh_current_view();
-        categoriesStore.load();
-        tagsStore.load();
-      });
-      // 后端在 create_link / update_link 后异步重检可达性,通过此事件回推结果
-      unlistenLinkBroken = await listen("link-broken-changed", (e) => {
-        const { id, is_broken } = e.payload || {};
-        if (typeof id === "number") {
-          linksStore.patchItem(id, { is_broken: !!is_broken });
-        }
-      });
-      // 元数据抓取完成后回推 title / description / favicon / og_image
-      unlistenLinkMeta = await listen("link-meta-changed", (e) => {
-        const payload = e.payload || {};
-        const { id, ...patch } = payload;
-        if (typeof id === "number") {
-          linksStore.patchItem(id, patch);
-        }
-      });
-      unlistenSpotlightLocate = await listen("spotlight-locate", async (e) => {
-        const { link_id } = e.payload;
-        // 显示主窗口并聚焦
-        try { await mainWindow.show(); } catch {}
-        try { await mainWindow.setFocus(); } catch {}
-        // 清除筛选
-        selected_category = null;
-        selected_tag = null;
-        search_query = "";
-        selected_link_index = -1;
-        // 加载所有链接（最多100条）
-        await linksStore.load({ per_page: 100 });
-        // 等待 DOM 更新
-        await tick();
-        await new Promise(r => requestAnimationFrame(r));
-        // 查找链接索引
-        const index = filtered_links.findIndex(l => l.id === link_id);
-        if (index >= 0) {
-          selected_link_index = index;
-          scroll_selected_into_view();
-          edit_link = filtered_links[index];
-        } else {
-          console.warn("[spotlight-locate] link not found:", link_id);
-        }
-      });
-    } catch (e) {}
-
-    return () => {
-      clearTimeout(resize_restore_timeout);
-      clearTimeout(resize_timer);
-      window.removeEventListener("resize", on_resize);
-      if (unlisten) unlisten();
-      if (unlistenHidden) unlistenHidden();
-      if (unlistenLinksChanged) unlistenLinksChanged();
-      if (unlistenSpotlightLocate) unlistenSpotlightLocate();
-      if (unlistenLinkBroken) unlistenLinkBroken();
-      if (unlistenLinkMeta) unlistenLinkMeta();
-      if (unlistenMoved) unlistenMoved();
-    };
+    return () => cleanup.run();
   });
 
   async function load_data() {
