@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import { searchLinks, openUrl, getSetting, setSetting, listCategories } from "../lib/api.js";
+  import { searchLinks, listLinks, openUrl, getSetting, setSetting, listCategories } from "../lib/api.js";
   import { waitForBackendReady } from "../lib/ready.js";
   import { formatAbsoluteTime, formatRelativeTime } from "../lib/utils/time.js";
   import { getDomain } from "../lib/utils/url.js";
@@ -11,6 +11,8 @@
   const WIN_WIDTH = 560;
   const WIN_MIN_HEIGHT = 52;
   const WIN_MAX_HEIGHT = 420;
+  // 默认列表与搜索结果均按 30 条/页加载，与主页 LinkList 行为一致
+  const PAGE_SIZE = 30;
 
   let query = $state("");
   let results = $state([]);
@@ -19,10 +21,20 @@
   let has_searched = $state(false);
   let search_timer = null;
   let input_el;
+  let results_el;
   let categories = $state([]);
   let mouse_moved = $state(false);
   let hiding = false;
   let current_sort = $state("");
+  // 是否在空查询时默认展示主页搜索结果（由设置项 spotlight-show-default 控制）
+  let show_default_results = $state(false);
+  // 标记当前 results 是"默认展示结果"而非"用户搜索结果"
+  let is_showing_defaults = $state(false);
+  // 分页状态：默认列表与搜索列表共用，按当前模式向后端要不同接口
+  let current_page = $state(1);
+  let total_count = $state(0);
+  let has_more = $state(false);
+  let loading_more = $state(false);
 
   function category_name(cid) {
     if (cid == null) return null;
@@ -36,8 +48,24 @@
     const searchEl = document.querySelector(".search-area");
     if (!searchEl) return;
     const search_h = searchEl.getBoundingClientRect().height;
-    const resultsEl = document.querySelector(".results-container");
-    const content_h = resultsEl ? resultsEl.scrollHeight : 0;
+    // 测量内部 wrapper 的真实内容高度而非 results-container 的 scrollHeight：
+    // results-container 是 flex:1 + overflow:auto，scrollHeight 在多数浏览器下
+    // 会 max(clientHeight, content-height)，导致内容很短时窗口仍按上一帧的高度
+    // 锁定，无法收缩。
+    const innerEl = document.querySelector(".results-inner");
+    const containerEl = document.querySelector(".results-container");
+    let content_h = 0;
+    if (innerEl) {
+      content_h = innerEl.scrollHeight;
+    } else if (containerEl) {
+      content_h = containerEl.scrollHeight;
+    }
+    // 加上 .results-container 自身的 padding（CSS: 0 16px 16px），
+    // wrapper 的 scrollHeight 不含 container 的 padding-bottom
+    if (innerEl && containerEl) {
+      const cs = window.getComputedStyle(containerEl);
+      content_h += parseFloat(cs.paddingTop || "0") + parseFloat(cs.paddingBottom || "0");
+    }
     // +2 补偿 .spotlight 的 1px border 上下（border-box 下内容区 = 窗口高度 - 2px）
     const total_h = search_h + content_h + 2;
     const h = Math.min(total_h, WIN_MAX_HEIGHT);
@@ -54,24 +82,122 @@
 
   async function do_search(q) {
     if (!q.trim()) {
-      results = [];
-      has_searched = false;
-      resize_window();
+      // 空查询：若开启「显示默认结果」则加载主页同款列表第一页，否则清空
+      if (show_default_results) {
+        await load_default_results();
+      } else {
+        results = [];
+        has_searched = false;
+        is_showing_defaults = false;
+        current_page = 1;
+        total_count = 0;
+        has_more = false;
+        // 切回搜索区独立时滚动归零，避免上一次的 scrollTop 残留
+        if (results_el) results_el.scrollTop = 0;
+        resize_window();
+      }
       return;
     }
     searching = true;
     try {
-      const res = await searchLinks({ query: q.trim(), sort_by: current_sort || undefined });
+      const res = await searchLinks({
+        query: q.trim(),
+        page: 1,
+        per_page: PAGE_SIZE,
+        sort_by: current_sort || undefined,
+      });
       results = res.items || [];
+      total_count = res.total ?? results.length;
+      current_page = res.page ?? 1;
+      has_more = results.length < total_count;
       has_searched = true;
+      is_showing_defaults = false;
     } catch {
       results = [];
+      total_count = 0;
+      current_page = 1;
+      has_more = false;
       has_searched = true;
+      is_showing_defaults = false;
     }
     searching = false;
     selected_index = -1;
     mouse_moved = false;
+    // 新一轮搜索：滚动归零，再让窗口按新内容收缩/扩张
+    if (results_el) results_el.scrollTop = 0;
     resize_window();
+  }
+
+  // 加载"默认展示结果":调用 listLinks 拿到主页同款列表第一页
+  // 与主页 load_links 保持一致：无搜索、无分类/标签筛选，仅按 sort_by 排序
+  async function load_default_results() {
+    searching = true;
+    try {
+      const res = await listLinks({
+        page: 1,
+        per_page: PAGE_SIZE,
+        sort_by: current_sort || undefined,
+      });
+      results = res.items || [];
+      total_count = res.total ?? results.length;
+      current_page = res.page ?? 1;
+      has_more = results.length < total_count;
+      // 不设 has_searched=true：避免空数据时显示"没有找到相关链接"
+      has_searched = false;
+      is_showing_defaults = results.length > 0;
+    } catch {
+      results = [];
+      total_count = 0;
+      current_page = 1;
+      has_more = false;
+      has_searched = false;
+      is_showing_defaults = false;
+    }
+    searching = false;
+    selected_index = -1;
+    mouse_moved = false;
+    if (results_el) results_el.scrollTop = 0;
+    resize_window();
+  }
+
+  // 无限滚动：搜索 / 默认列表 下一页追加
+  async function load_more() {
+    if (loading_more || !has_more) return;
+    const q = query.trim();
+    // 搜索结果与默认列表分别走对应 API
+    loading_more = true;
+    try {
+      const next_page = current_page + 1;
+      const res = q
+        ? await searchLinks({
+            query: q,
+            page: next_page,
+            per_page: PAGE_SIZE,
+            sort_by: current_sort || undefined,
+          })
+        : await listLinks({
+            page: next_page,
+            per_page: PAGE_SIZE,
+            sort_by: current_sort || undefined,
+          });
+      const more_items = res.items || [];
+      results = [...results, ...more_items];
+      total_count = res.total ?? total_count;
+      current_page = res.page ?? next_page;
+      has_more = results.length < total_count;
+    } catch {
+      // 单次追加失败：保留已有数据，下次滚动还可重试
+    }
+    loading_more = false;
+    // 追加新条目后内容增高，要求 resize 重新计算（在未到 max 高度时窗口同步增高）
+    resize_window();
+  }
+
+  function on_results_scroll() {
+    if (!results_el || loading_more || !has_more) return;
+    if (results_el.scrollHeight - results_el.scrollTop - results_el.clientHeight < 200) {
+      load_more();
+    }
   }
 
   function on_input() {
@@ -83,11 +209,22 @@
     query = "";
     results = [];
     has_searched = false;
+    is_showing_defaults = false;
+    current_page = 1;
+    total_count = 0;
+    has_more = false;
+    loading_more = false;
     selected_index = -1;
     searching = false;
     clearTimeout(search_timer);
     input_el?.focus();
-    resize_window();
+    if (results_el) results_el.scrollTop = 0;
+    // 清空后若开启默认展示，重新加载默认结果
+    if (show_default_results) {
+      load_default_results();
+    } else {
+      resize_window();
+    }
   }
 
   async function hide_window() {
@@ -98,6 +235,11 @@
     query = "";
     results = [];
     has_searched = false;
+    is_showing_defaults = false;
+    current_page = 1;
+    total_count = 0;
+    has_more = false;
+    loading_more = false;
     selected_index = -1;
     searching = false;
     mouse_moved = false;
@@ -134,7 +276,12 @@
       const idx = SORT_CYCLE.indexOf(current_sort);
       current_sort = SORT_CYCLE[(idx + 1) % SORT_CYCLE.length];
       setSetting("spotlight-sort-by", current_sort);
-      if (query.trim()) do_search(query);
+      if (query.trim()) {
+        do_search(query);
+      } else if (show_default_results) {
+        // 空查询且开启默认展示：用新排序刷新默认结果
+        load_default_results();
+      }
       return;
     }
     if (results.length === 0) return;
@@ -176,6 +323,13 @@
     const savedSort = await getSetting("spotlight-sort-by");
     if (savedSort) current_sort = savedSort;
 
+    // 读取"唤起后默认展示主页前 N 条"开关；默认关闭以保持原有行为
+    try {
+      show_default_results = (await getSetting("spotlight-show-default")) === "true";
+    } catch {
+      show_default_results = false;
+    }
+
     listCategories().then(c => categories = c);
 
     // 初始 resize：将窗口从 tauri.conf.json 的默认高度调整为实际搜索区高度，
@@ -187,11 +341,29 @@
       // 先聚焦输入框：此时窗口已被 Rust 端 show()+set_focus()，
       // input 也已挂载，立即 focus 最稳妥；setTimeout 玄学时序不可靠。
       input_el?.focus();
-      const { availWidth, availHeight } = window.screen;
-      await getCurrentWindow().setPosition(new LogicalPosition(
-        Math.round((availWidth - WIN_WIDTH) / 2),
-        Math.round(availHeight * 0.25)
-      ));
+      // 唤起时若开启默认展示且当前 query 为空，加载主页前 N 条
+      // 重读配置确保设置变更后再次唤起即时生效
+      // 放在 setPosition 之前：避免 setPosition 权限/异常打断后续逻辑
+      try {
+        const raw = await getSetting("spotlight-show-default");
+        show_default_results = raw === "true";
+      } catch {
+        // 保持现有值
+      }
+      if (show_default_results && !query.trim()) {
+        load_default_results();
+      }
+      // 居中窗口：Rust 端已在 show() 前调用 set_position，这里是冗余兜底
+      // 包裹 try/catch 防止前端权限缺失抛 unhandled rejection 中断后续 focus
+      try {
+        const { availWidth, availHeight } = window.screen;
+        await getCurrentWindow().setPosition(new LogicalPosition(
+          Math.round((availWidth - WIN_WIDTH) / 2),
+          Math.round(availHeight * 0.25)
+        ));
+      } catch {
+        // 缺 core:window:allow-set-position 权限或其它原因，忽略：Rust 端已定位
+      }
       // setPosition 后再补一次 focus：某些平台/多显示器下重新定位会让
       // 窗口短暂失焦，导致首次 focus 被吞。下一帧再保险一次。
       requestAnimationFrame(() => input_el?.focus());
@@ -240,7 +412,14 @@
   </div>
 
   {#if has_searched || results.length > 0}
-  <div class="results-container" class:scrollable={results.length > 0} onmousemove={() => mouse_moved = true}>
+  <div
+    bind:this={results_el}
+    class="results-container"
+    class:scrollable={results.length > 0}
+    onmousemove={() => mouse_moved = true}
+    onscroll={on_results_scroll}
+  >
+  <div class="results-inner">
     {#if has_searched && results.length === 0}
       <div class="empty-state">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -290,9 +469,15 @@
             </div>
         </div>
       {/each}
+      {#if loading_more}
+        <div class="load-more-state">
+          <span class="spinner"></span>
+        </div>
+      {/if}
     {:else if !has_searched}
       <div class="hint">输入关键词搜索已保存的链接</div>
     {/if}
+  </div>
   </div>
   {/if}
 </div>
@@ -533,6 +718,13 @@
     color: var(--text-3);
     font-size: 13px;
     animation: fade-in 200ms ease;
+  }
+
+  .load-more-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 0 8px;
   }
 
   @keyframes spin {

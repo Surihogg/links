@@ -35,6 +35,8 @@
   // 启动时自动检查更新
   let auto_check_update = $state(true);
   let check_link_reachability = $state(true);
+  // 唤起 Spotlight 时默认展示主页搜索结果前 7 个
+  let spotlight_show_default = $state(false);
   let bookmarklet_copied = $state(false);
   let bookmarklet_code = $state("");
   let ext_step = $state(0);
@@ -68,6 +70,12 @@
       settingsStore.update(s => ({ ...s, check_link_reachability: check_link_reachability }));
     } catch {
       check_link_reachability = true;
+    }
+    // Spotlight 默认展示主页前 7 条
+    try {
+      spotlight_show_default = (await api.getSetting("spotlight-show-default")) === "true";
+    } catch {
+      spotlight_show_default = false;
     }
     loaded = true;
     try {
@@ -184,6 +192,11 @@
     check_link_reachability = !check_link_reachability;
     await api.setSetting("check-link-reachability", String(check_link_reachability));
     settingsStore.update(s => ({ ...s, check_link_reachability: check_link_reachability }));
+  }
+
+  async function toggleSpotlightShowDefault() {
+    spotlight_show_default = !spotlight_show_default;
+    await api.setSetting("spotlight-show-default", String(spotlight_show_default));
   }
 
   async function copy_bookmarklet() {
@@ -359,6 +372,13 @@
               <span class="format-desc">添加链接时检测网址是否可正常访问</span>
             </div>
             <button class="toggle" class:active={check_link_reachability} onclick={toggleCheckLinkReachability}></button>
+          </div>
+          <div class="format-option autostart-row" style="justify-content: space-between; align-items: center; margin-top: 6px;">
+            <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+              <span class="format-name">Spotlight 默认展示</span>
+              <span class="format-desc">唤起 Spotlight 时直接显示主页前 7 个搜索结果</span>
+            </div>
+            <button class="toggle" class:active={spotlight_show_default} onclick={toggleSpotlightShowDefault}></button>
           </div>
           <div class="format-option autostart-row" style="justify-content: space-between; align-items: center; margin-top: 6px;">
             <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
