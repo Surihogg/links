@@ -311,14 +311,50 @@ async function with_scroll_preserve(fn) {
   async function on_save_link(data) {
     show_add_form = false;
     edit_link = null;
-    if (data.id) {
-      await linksStore.update(data);
-    } else {
-      await linksStore.create(data);
+    try {
+      if (data.id) {
+        await linksStore.update(data);
+        console.log('[App] Link updated successfully:', data.id);
+      } else {
+        await linksStore.create(data);
+        console.log('[App] Link created successfully:', data.url);
+      }
+      await categoriesStore.load();
+      await tagsStore.load();
+      load_stats();
+    } catch (e) {
+      console.error('[App] on_save_link failed:', e);
+      // 重新打开表单，让用户知道保存失败
+      show_add_form = true;
+      // 延迟设置表单数据
+      setTimeout(() => {
+        const event = new CustomEvent('fill-link-form', {
+          detail: data
+        });
+        document.dispatchEvent(event);
+      }, 100);
     }
-    await categoriesStore.load();
-    await tagsStore.load();
-    load_stats();
+  }
+
+  function on_copy_link(link) {
+    // 打开添加链接窗口，并预填复制的链接信息
+    edit_link = null;
+    show_add_form = true;
+    // 延迟设置表单数据，确保 LinkForm 已渲染
+    setTimeout(() => {
+      // 通过事件通知 LinkForm 填充数据
+      const event = new CustomEvent('fill-link-form', {
+        detail: {
+          url: link.url,
+          title: link.title,
+          description: link.description,
+          notes: link.notes,
+          category_id: link.category_id,
+          tags: link.tags
+        }
+      });
+      document.dispatchEvent(event);
+    }, 100);
   }
 
 async function on_toggle_favorite(link) {
@@ -715,6 +751,7 @@ async function on_toggle_favorite(link) {
           onremovecategory={on_remove_category}
           onremovetag={on_remove_tag}
           onremovenotes={on_remove_notes}
+          oncopy={on_copy_link}
         />
       {/if}
 

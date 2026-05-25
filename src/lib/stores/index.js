@@ -38,13 +38,19 @@ function createLinksStore() {
       }));
     },
     async create(payload) {
-      const link = await api.createLink(payload);
-      update((s) => ({
-        ...s,
-        items: [link, ...s.items],
-        total: s.total + 1,
-      }));
-      return link;
+      try {
+        const link = await api.createLink(payload);
+        update((s) => ({
+          ...s,
+          items: [link, ...s.items],
+          total: s.total + 1,
+        }));
+        console.log('[store] Link created successfully:', link);
+        return link;
+      } catch (e) {
+        console.error('[store] linksStore.create failed:', e);
+        throw e;
+      }
     },
     async update(payload) {
       const link = await api.updateLink(payload);

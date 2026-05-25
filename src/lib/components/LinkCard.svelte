@@ -7,7 +7,7 @@
   import { getDomain } from "../utils/url.js";
   import { formatLinkAs } from "../utils/linkShare.js";
 
-  let { link, highlight = "", category_name = null, selected = false, onedit, ondelete, ontoggle_favorite, onremovecategory, onremovetag, onremovenotes } = $props();
+  let { link, highlight = "", category_name = null, selected = false, onedit, ondelete, ontoggle_favorite, onremovecategory, onremovetag, onremovenotes, oncopy } = $props();
   let show_confirm = $state(false);
   let show_share_menu = $state(false);
   let copy_success = $state(false);
@@ -97,6 +97,11 @@
   function check_desc_overflow(e) {
     const el = e.target;
     desc_truncated = el.scrollWidth > el.clientWidth;
+  }
+
+  function copy_link(e) {
+    e.stopPropagation();
+    oncopy?.(link);
   }
 </script>
 
@@ -218,6 +223,12 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+      </button>
+      <button class="action-btn" onclick={copy_link} data-tooltip="复制链接">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
         </svg>
       </button>
       <button class="action-btn danger" onclick={delete_link}>

@@ -1,7 +1,7 @@
 <script>
   import LinkCard from "./LinkCard.svelte";
 
-  let { links = [], categories = [], loading = false, highlight = "", has_more = false, selected_index = -1, onedit, ondelete, ontoggle_favorite, onloadmore, onremovecategory, onremovetag, onremovenotes } = $props();
+  let { links = [], categories = [], loading = false, highlight = "", has_more = false, selected_index = -1, onedit, ondelete, ontoggle_favorite, onloadmore, onremovecategory, onremovetag, onremovenotes, oncopy } = $props();
 
   // 构建分组 id -> 完整路径映射（如 "level1/level2/level3"）
   let cat_map = $derived(() => {
@@ -41,7 +41,7 @@
     </div>
   {:else}
     {#each links as link, i (link.id)}
-      <LinkCard {link} {highlight} selected={i === selected_index} category_name={link.category_id ? cat_map()[link.category_id] : null} onedit={onedit} ondelete={ondelete} ontoggle_favorite={ontoggle_favorite} onremovecategory={onremovecategory} onremovetag={onremovetag} onremovenotes={onremovenotes} />
+      <LinkCard {link} {highlight} selected={i === selected_index} category_name={link.category_id ? cat_map()[link.category_id] : null} onedit={onedit} ondelete={ondelete} ontoggle_favorite={ontoggle_favorite} onremovecategory={onremovecategory} onremovetag={onremovetag} onremovenotes={onremovenotes} oncopy={oncopy} />
     {/each}
     {#if loading}
       <div class="load-more-state">

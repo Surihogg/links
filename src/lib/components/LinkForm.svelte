@@ -52,6 +52,27 @@
     if (url_input) setTimeout(() => url_input.focus(), 50);
   });
 
+  // 监听填充表单事件（用于复制链接功能）
+  $effect(() => {
+    const handleFillForm = (event) => {
+      const data = event.detail;
+      url = data.url || "";
+      title = data.title || "";
+      description = data.description || "";
+      notes = data.notes || "";
+      category_id = data.category_id || null;
+      tags = data.tags?.slice() || [];
+      user_edited = { title: false, description: false };
+      // 聚焦到 URL 输入框
+      if (url_input) url_input.focus();
+    };
+
+    document.addEventListener('fill-link-form', handleFillForm);
+    return () => {
+      document.removeEventListener('fill-link-form', handleFillForm);
+    };
+  });
+
   function mark_edited(field) {
     return (e) => { user_edited[field] = true; };
   }
@@ -109,8 +130,8 @@
       url: url.trim(),
       title: title.trim() || undefined,
       description: description.trim() || undefined,
-      notes: notes.trim(),
-      category_id: category_id || -1,
+      notes: notes.trim() || undefined,
+      category_id: category_id || undefined,
       tags,
       favicon_url: fetched_meta.favicon_url || undefined,
       og_image_url: fetched_meta.og_image_url || undefined,
