@@ -1,9 +1,9 @@
 # Links 项目知识库
 
-**最后刷新:** 2026-05-10（R1-R6 重构后同步）
-**对应提交:** 7d9b5c8
-**对应分支:** refactor/test
-**应用版本:** v1.3.0（重构未发布新 tag）
+**最后刷新:** 2026-05-25
+**对应提交:** 8820e95
+**对应分支:** main
+**应用版本:** v1.3.3
 
 ## 概述
 
@@ -51,7 +51,8 @@ links/
 | 链接 / 分组 / 标签 store | `src/lib/stores/index.js` | linksStore / categoriesStore / tagsStore |
 | 共享工具 | `src/lib/utils/` | time / url / linkShare / imeGuard / categoryTree / categoryDragHandler / cyclePlaceholder |
 | 主布局 | `src/App.svelte` | 顶部内容头 + Sidebar + LinkList + FAB + 各类模态 |
-| 链接表单 | `src/lib/components/LinkForm.svelte` | 支持 `mode="modal" \| "standalone"`，QuickAdd 复用其 standalone 模式 |
+| 链接表单 | `src/lib/components/LinkForm.svelte` | 支持 `mode="modal" \| "standalone"`；导出 `reset` / `focusUrl` / `triggerFetch` / `setSaving` 给父组件；含 IME 守卫；监听 `fill-link-form` 事件预填表单 |
+| 链接卡片 | `src/lib/components/LinkCard.svelte` | 卡片 UI、hint 浮层、失效标记、书签图标、复制按钮；时间用 `formatRelativeTime` / `formatAbsoluteTime`；域名用 `getDomain`；分享格式用 `formatLinkAs` |
 | 侧边栏组合 | `src/lib/components/Sidebar.svelte` | 仅装配子组件 |
 | 侧边栏子节 | `src/lib/components/Sidebar/` | Brand / CategorySection / TagSection |
 | 单条快捷键编辑 | `src/lib/components/ShortcutEditor.svelte` | 替代 SettingsDialog 中 4 套样板 |
@@ -76,6 +77,8 @@ links/
 | `build_http_client` | fn | `src-tauri/src/fetcher.rs` | reqwest builder + Windows 系统代理（fetch / link 检查共用） |
 | `update_shortcut` | fn | `src-tauri/src/commands.rs` | 4 套快捷键 setter 的统一 helper |
 | `app_data_dir` | fn | `src-tauri/src/commands.rs` | 数据目录 helper（替代散落的 `expect`） |
+| `ReachabilityUpdateStrategy` | enum | `src-tauri/src/commands.rs` | 可达性检查更新策略（UpdateOnlyIfBroken / AlwaysUpdate） |
+| `check_and_update_link_reachability` | fn | `src-tauri/src/commands.rs` | 异步检查链接可达性并更新数据库状态（create_link / update_link 共用） |
 | `Config` | struct | `src-tauri/src/config.rs` | 配置管理（Mutex<HashMap>） |
 | `themeStore` | store | `src/lib/stores/themeStore.svelte.js` | 主题状态 + 跨窗口同步 |
 | `linksStore` / `categoriesStore` / `tagsStore` / `settingsStore` | store | `src/lib/stores/index.js` | 各类状态 |
@@ -125,6 +128,7 @@ links/
 - 长标题/描述：hover 时用 hint 浮层展示全文，而非截断
 - URL 展示：域名常态显示，hover 原地展开完整 URL
 - 快速添加窗口：独立窗口，始终置顶，无任务栏图标，不可调整大小
+- 链接复制：点击卡片复制按钮，弹出添加窗口并预填原链接信息（URL/标题/描述/备注/分类/标签）
 
 ## 命令
 
@@ -147,8 +151,8 @@ cargo test                 # Rust 单元测试（95 个，覆盖 db 各层、fet
 - Vite 开发服务器端口固定 1420，被占用会报错（不会自动换端口）
 - `normalize.rs` 仍标记为 `#[allow(dead_code)]`，URL 标准化功能仍未接入去重流程（R5 评估后决定保留为未来工具，避免擅改用户原始数据）
 - macOS + Windows 双平台 CI 自动构建，Release 为 Draft 模式，需手动确认发布
-- 后端最大文件：`commands.rs` 1094 行 / `db/tests.rs` 822 行（测试）/ `fetcher.rs` 566 行；其它生产代码单文件均 ≤ 455 行
-- 前端最大文件：`App.svelte` 959 / `LinkCard.svelte` 716 / `SettingsDialog.svelte` 699 / `Sidebar/CategorySection.svelte` 639；Sidebar 主组件仅 266 行
+- 后端最大文件：`commands.rs` 1167 行 / `db/tests.rs` 822 行（测试）/ `fetcher.rs` 566 行；其它生产代码单文件均 ≤ 455 行
+- 前端最大文件：`App.svelte` ~916 / `LinkCard.svelte` 727 / `SettingsDialog.svelte` 699 / `Sidebar/CategorySection.svelte` 639；Sidebar 主组件仅 266 行
 - 关键 crate：`tauri-plugin-updater` / `tauri-plugin-deep-link` / `tauri-plugin-single-instance` / `tiny_http`（浏览器扩展本地 HTTP 服务）/ `marked`（Release Notes Markdown 渲染）
 
 ## 变更与提交约束

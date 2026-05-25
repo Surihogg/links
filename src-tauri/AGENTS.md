@@ -41,6 +41,7 @@ R2 重构后 `db.rs` 1686 行已拆为 `db/` 子模块；R5 引入 `PRAGMA user_
 - **快捷键管理**：4 套快捷键（quick-add/main/spotlight/hide）通过 `update_shortcut(app, config, &KIND, value)` 统一处理
 - **HTTP 客户端**：`fetch_metadata` 与 `check_link_status` 共用 `fetcher::build_http_client(url, timeout, ua)`；不再各写一份代理装配
 - **日志**：`log::info!` / `log::warn!` / `log::error!`，自动写入 `links.log`（tauri-plugin-log）；元数据抓取失败额外写 `fail_links.log`
+- **可达性检查**：`create_link` 与 `update_link` 的可达性检查逻辑统一通过 `check_and_update_link_reachability(app, url, link_id, strategy)` 异步函数处理；策略由 `ReachabilityUpdateStrategy` 枚举控制（`UpdateOnlyIfBroken` 仅不可达时写库，`AlwaysUpdate` 双向写回）；禁止在两处分别重写检查逻辑
 - **测试**：内嵌 `#[cfg(test)] mod tests` 或独立 `tests.rs`；用 `Connection::open_in_memory()` 隔离
 
 ## 反模式
@@ -57,7 +58,7 @@ R2 重构后 `db.rs` 1686 行已拆为 `db/` 子模块；R5 引入 `PRAGMA user_
 ## 备注
 
 - `db/` 子模块（R2 拆分后）：`mod.rs` 53 / `error.rs` 25 / `models.rs` 180 / `migration.rs` 256 / `row_mapping.rs` 192 / `repository.rs` 455 / `search.rs` 257 / `export.rs` 247 / `tests.rs` 822（测试占比 26%）
-- 生产代码最大文件：`commands.rs` 1094 行（导入解析 + 39 个命令 + 共享 helper）
+- 生产代码最大文件：`commands.rs` 1167 行（导入解析 + 39 个命令 + 共享 helper）
 - `fetcher.rs` 566 行（含 Windows 代理逻辑与 13 个测试）；截取前 2MB HTML 防 OOM；标题/描述截断 500/2000 字符
 - `lib.rs` 518 行：插件、托盘、deep-link、HTTP 服务装配；`invoke_handler!` 注册全部 39 个命令
 - `normalize.rs` 仍是死代码（127 行 + 14 个测试）：R5 评估后决定**不接入**——库内已存的 URL 是用户粘贴的原文，强制归一化会让"按 URL 查询/对比"在用户眼里突然变样；现有 `find_by_url` 的尾斜杠容错已覆盖最常见场景

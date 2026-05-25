@@ -19,13 +19,13 @@
 
 | 功能 | 说明 |
 |---|---|
-| 链接管理 | 创建、编辑、删除，支持 URL / 标题 / 描述 / 备注 |
+| 链接管理 | 创建、编辑、删除、复制，支持 URL / 标题 / 描述 / 备注 |
 | 元数据抓取 | 自动抓取标题、描述、favicon、og:image（异步，不阻塞 UI），支持手动刷新 |
 | 分组管理 | 树形分组，支持嵌套、创建 / 删除 / 收缩展开 |
 | 标签系统 | 多标签关联，独立管理，模糊搜索，智能推荐，手动创建 / 删除 |
 | 书签收藏 | 一键收藏，书签样式图标，星标筛选 |
 | 全文搜索 | FTS5 实时搜索，结果高亮，同时搜索标签名，LIKE 降级兜底 |
-| 链接分享 | 复制到剪贴板，支持 URL / Markdown / HTML 三种格式 |
+| 链接分享 | 复制到剪贴板，支持 URL / Markdown / HTML 三种格式；复制链接信息快速创建新链接 |
 | 去重检测 | URL 重复时自动提示，编辑时排除自身 |
 | 失效检测 | 添加时自动检测可达性，卡片显示警告图标 |
 | 书签导入 | 支持 Chrome / Firefox / Safari 书签 HTML + JSON + CSV 导入 |
@@ -63,7 +63,7 @@ links/
 │   ├── src/
 │   │   ├── main.rs                  # 入口，调用 app_lib::run()
 │   │   ├── lib.rs                   # Tauri builder：插件、命令注册、数据库初始化、全局快捷键、系统托盘；deep-link + 单实例处理
-│   │   ├── commands.rs              # 39 个 Tauri 命令、快捷键 helper、书签解析、剪贴板、去重/失效检测
+│   │   ├── commands.rs              # 39 个 Tauri 命令、快捷键 helper、书签解析、剪贴板、去重/失效检测、可达性检查共享函数
 │   │   ├── db/                      # 数据库层（R2 拆分自 db.rs）
 │   │   │   ├── mod.rs               # Db(Mutex<Connection>) 封装 + open()
 │   │   │   ├── error.rs             # AppError 统一错误类型
@@ -103,7 +103,7 @@ links/
 │   │   │   ├── categoryDragHandler.svelte.js  # createCategoryDrag（Pointer Events 拖拽）
 │   │   │   └── cyclePlaceholder.js  # placeholder 提示循环
 │   │   └── components/              # UI 组件
-│   │       ├── LinkCard.svelte      # 链接卡片
+│   │       ├── LinkCard.svelte      # 链接卡片（含复制按钮）
 │   │       ├── LinkForm.svelte      # 链接编辑/新增表单（mode="modal" | "standalone"）
 │   │       ├── LinkList.svelte      # 链接列表
 │   │       ├── SearchBar.svelte     # 搜索栏
@@ -330,6 +330,10 @@ await invoke("get_setting", { key: "close-behavior" });
 - ♻️ R6：Sidebar 拆 `CategorySection` / `TagSection`，主组件从 948 行降至 266 行
 - ♻️ R6：`.nav-item` 提到 `app.css`，3 处共享
 - 📊 测试：`cargo test` 90 → 95（迁移框架 +3、批量加载 +2）；前端构建产物 main bundle 142.5KB → 129.3KB（-9%）
+
+### v1.3.3 (2026-05-25)
+- ✨ 链接复制：点击卡片复制按钮，弹出添加窗口并预填原链接信息
+- ♻️ 提取可达性检查为共享函数（`check_and_update_link_reachability`），消除 create_link / update_link 重复逻辑
 
 ### v1.2.0 (2026-05-04)
 - ✨ 全局搜索（Spotlight）：`Cmd+Shift+K` 唤起搜索浮层，即时搜索，键盘导航

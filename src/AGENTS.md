@@ -12,10 +12,10 @@ Svelte 5 + Vite 构建。三窗口入口（主窗口 / 快速添加 / 全局搜�
 | 新增 API 调用 | `lib/api.js` | 每个后端命令一个 async 函数；invoke 名采用「动词在前」（如 `list_links` / `create_link`）；invoke 第二参数 key 与 Rust snake_case 一致 |
 | 链接 / 分组 / 标签状态 | `lib/stores/index.js` | linksStore（分页 + 搜索）/ categoriesStore（树形）/ tagsStore（排序）/ settingsStore |
 | 主题状态 | `lib/stores/themeStore.svelte.js` | 一次 `themeStore.init()` 即接管：theme-mode 加载、prefers-color-scheme 监听、跨窗口 theme-changed 同步 |
-| 主布局 | `App.svelte` | 顶部内容头 + Sidebar + LinkList + FAB；onMount 编排生命周期模块（数据加载、updater、窗口状态、事件监听） |
-| 链接卡片 | `lib/components/LinkCard.svelte` | 卡片 UI、hint 浮层、失效标记、书签图标；时间用 `formatRelativeTime` / `formatAbsoluteTime`；域名用 `getDomain`；分享格式用 `formatLinkAs` |
-| 链接列表 | `lib/components/LinkList.svelte` | 列表容器、空状态、滚动加载、键盘导航辅助 |
-| 链接表单（共用） | `lib/components/LinkForm.svelte` | 支持 `mode="modal" \| "standalone"`；导出 `reset` / `focusUrl` / `triggerFetch` / `setSaving` 给父组件；含 IME 守卫 |
+| 主布局 | `App.svelte` | 顶部内容头 + Sidebar + LinkList + FAB；onMount 编排生命周期模块（数据加载、updater、窗口状态、事件监听）；`on_copy_link` 处理链接复制 |
+| 链接卡片 | `lib/components/LinkCard.svelte` | 卡片 UI、hint 浮层、失效标记、书签图标、复制按钮；时间用 `formatRelativeTime` / `formatAbsoluteTime`；域名用 `getDomain`；分享格式用 `formatLinkAs`；回调 `oncopy` 传递给父组件 |
+| 链接列表 | `lib/components/LinkList.svelte` | 列表容器、空状态、滚动加载、键盘导航辅助；透传 `oncopy` 回调 |
+| 链接表单（共用） | `lib/components/LinkForm.svelte` | 支持 `mode="modal" \| "standalone"`；导出 `reset` / `focusUrl` / `triggerFetch` / `setSaving` 给父组件；含 IME 守卫；监听 `fill-link-form` 自定义事件预填表单数据 |
 | 侧边栏装配 | `lib/components/Sidebar.svelte` | 仅 266 行，装配 Brand + 顶部 nav + CategorySection + TagSection + footer，承担拖拽对象创建与跨节联动 |
 | 侧边栏品牌头 | `lib/components/Sidebar/Brand.svelte` | 图标 + 版本 + 更新铃 + 设置齿轮 |
 | 侧边栏分组节 | `lib/components/Sidebar/CategorySection.svelte` | 折叠头 / 新建 / 节内搜索 / 未分组项 / 分组列表（拖拽 / 重命名 / 删除两阶段确认 / 子分组创建）；导出 `isEditing(id)` 给父组件查询 |
@@ -70,7 +70,7 @@ Svelte 5 + Vite 构建。三窗口入口（主窗口 / 快速添加 / 全局搜�
 
 ## 备注
 
-- 前端总行数约 7925；最大文件：`LinkCard.svelte` 716 / `SettingsDialog.svelte` 699 / `Sidebar/CategorySection.svelte` 639 / `Spotlight.svelte` 546 / `Sidebar/TagSection.svelte` 450 / `LinkForm.svelte` 447 / `App.svelte` ~830
+- 前端总行数约 7925；最大文件：`LinkCard.svelte` 727 / `SettingsDialog.svelte` 699 / `Sidebar/CategorySection.svelte` 639 / `Spotlight.svelte` 546 / `Sidebar/TagSection.svelte` 450 / `LinkForm.svelte` 468 / `App.svelte` ~916
 - `Sidebar.svelte` 主组件仅 266 行（拆分前 1213）；CategorySection / TagSection 内部各保留一份 `.section-header` / `.rename-input` / `.new-cat-form` 样式（约 50 行重复）——这是有意权衡，保证子组件独立可用
 - `App.svelte` 不再 `import { marked }`；marked 依赖跟随 ReleaseNotesDialog 转移
 - `themeStore.init()` 多次调用安全（内部 `initialized` 标记）；三窗口可各自调用，不会重复注册监听
