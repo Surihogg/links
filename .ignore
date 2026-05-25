@@ -1,0 +1,55 @@
+# === 构建产物 ===
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# === 依赖 ===
+node_modules/
+
+# === Git ===
+.git/
+
+# === IDE / 编辑器 ===
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# === 系统文件 ===
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# === 日志 ===
+*.log
+
+# === Lock 文件（扫描无意义） ===
+package-lock.json
+src-tauri/Cargo.lock
+
+# === 工具内部目录 ===
+.sisyphus/
+.opencode/
+
+# === 测试数据（非源码） ===
+test-data/
+
+# === 图片/静态资源 ===
+*.png
+*.ico
+*.icns
+*.bmp
+*.svg
+
+# === 浏览器扩展（独立项目，非主代码） ===
+browser-extension/
+
+# === 文档/清单（非代码） ===
+CHROME_STORE_LISTING.md
+E2E_TEST_CHECKLIST.md
+REFACTOR_E2E_CHECKLIST.md
+TODO.md
+USER_GUIDE.md
+README.md
+AGENTS.md

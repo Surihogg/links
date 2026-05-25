@@ -145,22 +145,12 @@ pub fn create_link(
     let check_enabled = config.get("check-link-reachability").unwrap_or("true".to_string()) != "false";
     tauri::async_runtime::spawn(async move {
         if check_enabled {
-            let reachable = do_check_link(&url_for_check).await.unwrap_or(false);
-            let new_broken = !reachable;
-            // 双向更新:与 update_link 对称。新建时默认 is_broken=0,
-            // 可达时不必写库(免去无谓 SQL),不可达时写并发事件
-            if new_broken {
-                if let Ok(db_guard) = app_clone_check.state::<Db>().0.lock() {
-                    let _ = db_guard.execute(
-                        "UPDATE links SET is_broken = 1 WHERE id = ?",
-                        rusqlite::params![link_id_check],
-                    );
-                }
-                let _ = app_clone_check.emit(
-                    "link-broken-changed",
-                    serde_json::json!({ "id": link_id_check, "is_broken": true }),
-                );
-            }
+            check_and_update_link_reachability(
+                app_clone_check,
+                url_for_check,
+                link_id_check,
+                ReachabilityUpdateStrategy::UpdateOnlyIfBroken,
+            ).await;
         }
         if !needs_meta_fetch { return; }
         match crate::fetcher::fetch_metadata(&url_for_fetch).await {
@@ -239,20 +229,12 @@ pub fn update_link(
         let link_id_check = link.id;
         let app_clone = app.clone();
         tauri::async_runtime::spawn(async move {
-            let reachable = do_check_link(&url_for_check).await.unwrap_or(false);
-            let new_broken = !reachable;
-            // 双向写回:无论可达与否都显式更新,使原先误判的失效标记可被消除
-            if let Ok(db_guard) = app_clone.state::<Db>().0.lock() {
-                let _ = db_guard.execute(
-                    "UPDATE links SET is_broken = ? WHERE id = ?",
-                    rusqlite::params![new_broken as i32, link_id_check],
-                );
-            }
-            // 通知前端刷新该条 link 的失效标记;前端据此原地更新 store
-            let _ = app_clone.emit(
-                "link-broken-changed",
-                serde_json::json!({ "id": link_id_check, "is_broken": new_broken }),
-            );
+            check_and_update_link_reachability(
+                app_clone,
+                url_for_check,
+                link_id_check,
+                ReachabilityUpdateStrategy::AlwaysUpdate,
+            ).await;
         });
     }
 
@@ -841,6 +823,53 @@ pub fn set_hide_shortcut(app: AppHandle, config: State<'_, Config>, shortcut: St
 #[tauri::command]
 pub fn check_duplicate(db: State<'_, Db>, url: String, exclude_id: Option<i64>) -> Result<Option<crate::db::Link>, AppError> {
     db.find_by_url(&url, exclude_id)
+}
+
+/// 可达性检查更新策略
+enum ReachabilityUpdateStrategy {
+    /// 仅在不可达时更新（用于 create_link，避免无谓的 SQL 写入）
+    UpdateOnlyIfBroken,
+    /// 双向更新，无论可达与否都写回数据库（用于 update_link，消除误判标记）
+    AlwaysUpdate,
+}
+
+/// 异步检查链接可达性并更新数据库状态
+/// 
+/// # 参数
+/// - `app`: Tauri AppHandle，用于访问数据库和发送事件
+/// - `url`: 要检查的链接 URL
+/// - `link_id`: 链接 ID
+/// - `strategy`: 更新策略
+async fn check_and_update_link_reachability(
+    app: AppHandle,
+    url: String,
+    link_id: i64,
+    strategy: ReachabilityUpdateStrategy,
+) {
+    let reachable = do_check_link(&url).await.unwrap_or(false);
+    let new_broken = !reachable;
+    
+    // 根据策略决定是否更新数据库
+    let should_update = match strategy {
+        ReachabilityUpdateStrategy::UpdateOnlyIfBroken => new_broken,
+        ReachabilityUpdateStrategy::AlwaysUpdate => true,
+    };
+    
+    if should_update {
+        // 更新数据库
+        if let Ok(db_guard) = app.state::<Db>().0.lock() {
+            let _ = db_guard.execute(
+                "UPDATE links SET is_broken = ? WHERE id = ?",
+                rusqlite::params![new_broken as i32, link_id],
+            );
+        }
+        
+        // 发送事件通知前端
+        let _ = app.emit(
+            "link-broken-changed",
+            serde_json::json!({ "id": link_id, "is_broken": new_broken }),
+        );
+    }
 }
 
 async fn do_check_link(url: &str) -> Result<bool, AppError> {
