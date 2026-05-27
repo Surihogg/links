@@ -36,6 +36,10 @@
 
 ## 开发日志
 
+## 2026-05-27
+
+- 2026-05-27 19:43:12 macOS 首次唤起 Spotlight 输入框无焦点：根因是 `visible:false + transparent:true + alwaysOnTop:true` 的 NSWindow 首次 `show()` 时 makeKeyAndOrderFront 状态机尚未完成初始化，同步调用的 `set_focus` 被 AppKit 忽略，导致 webview 拿不到键盘焦点（按字母键完全无反应，不只是光标显示问题）。前端再加多少 `setTimeout` focus 都救不了，因为根本不是 input 没拿到 DOM 焦点。修复采用**预热**策略：macOS 启动后 800ms 在屏幕外 (-10000, -10000) `show + set_focus + 120ms + hide`，让 NSWindow 经历完整 key 周期；用户实际唤起时走"已激活过"的稳态路径。前端配合加 `boot_guard` 标志位屏蔽预热产生的 `onFocusChanged` 事件（防止误触发 hide_window）；Rust 端唤起后 spawn 异步轮询 `is_focused`（兌底，最多 200ms）并带 hide 竞态保护避免误 emit。同结构的 quick-add 不复现是因为它没有 transparent + alwaysOnTop，所以无需预热。
+
 ## 2026-05-11
 
 - [x] spotlight安装后初次唤起会有多余的下方空隙，每次重启应用的第一次唤起，输入框下方的间隙要比上方大
