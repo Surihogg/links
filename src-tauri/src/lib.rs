@@ -29,6 +29,43 @@ fn data_dir(app: &tauri::AppHandle) -> PathBuf {
     commands::app_data_dir(app).expect("failed to resolve app data dir")
 }
 
+fn ensure_window_on_screen(window: &tauri::WebviewWindow, app: &tauri::AppHandle) {
+    let pos = match window.outer_position() {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let size = match window.inner_size() {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    let wx = pos.x;
+    let wy = pos.y;
+    let ww = size.width as i32;
+    let wh = size.height as i32;
+    if let Ok(monitors) = app.available_monitors() {
+        for monitor in monitors {
+            let area = monitor.work_area();
+            if wx + ww > area.position.x
+                && wx < area.position.x + area.size.width as i32
+                && wy + wh > area.position.y
+                && wy < area.position.y + area.size.height as i32
+            {
+                return;
+            }
+        }
+    }
+    let _ = window.center();
+}
+
+fn show_and_focus_main_window(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        ensure_window_on_screen(&w, app);
+        let _ = w.set_focus();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Ensure data directory exists before any plugin tries to write to it.
@@ -57,20 +94,12 @@ pub fn run() {
                             .map(|p| p.0.lock().unwrap().is_some())
                             .unwrap_or(false);
                         if !has_pending {
-                            if let Some(w) = app_clone.get_webview_window("main") {
-                                let _ = w.show();
-                                let _ = w.unminimize();
-                                let _ = w.set_focus();
-                            }
+                            show_and_focus_main_window(&app_clone);
                         }
                     });
                 }
                 #[cfg(not(target_os = "macos"))]
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.show();
-                    let _ = w.unminimize();
-                    let _ = w.set_focus();
-                }
+                show_and_focus_main_window(app);
             }
         }))
         .plugin(tauri_plugin_deep_link::init())
@@ -128,10 +157,8 @@ pub fn run() {
                             let _ = app.emit("quick-add-shown", ());
                         }
                     } else if *shortcut == main_shortcut {
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.unminimize();
-                            let _ = w.set_focus();
+                        if app.get_webview_window("main").is_some() {
+                            show_and_focus_main_window(app);
                             let _ = app.emit("main-shown", ());
                         }
                     } else if *shortcut == hide_sc {
@@ -267,11 +294,7 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "show" => {
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.unminimize();
-                            let _ = w.set_focus();
-                        }
+                        show_and_focus_main_window(app);
                     }
                     "quit" => {
                         app.exit(0);
@@ -286,11 +309,7 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.unminimize();
-                            let _ = w.set_focus();
-                        }
+                        show_and_focus_main_window(app);
                     }
                 })
                 .build(app)?;

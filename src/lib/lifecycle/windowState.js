@@ -1,5 +1,26 @@
 import * as api from "../api.js";
 
+async function isWindowOnScreen(mainWindow) {
+  try {
+    const { availableMonitors } = await import("@tauri-apps/api/window");
+    const monitors = await availableMonitors();
+    const pos = await mainWindow.outerPosition();
+    const size = await mainWindow.innerSize();
+    const wx = pos.x;
+    const wy = pos.y;
+    const ww = size.width;
+    const wh = size.height;
+    for (const m of monitors) {
+      const a = m.workArea;
+      if (wx + ww > a.position.x && wx < a.position.x + a.size.width &&
+          wy + wh > a.position.y && wy < a.position.y + a.size.height) {
+        return true;
+      }
+    }
+  } catch (e) {}
+  return false;
+}
+
 export async function restoreWindowState(mainWindow) {
   const { LogicalSize, PhysicalPosition } = await import("@tauri-apps/api/window");
 
@@ -16,6 +37,9 @@ export async function restoreWindowState(mainWindow) {
     try {
       const { x, y } = JSON.parse(savedPos);
       await mainWindow.setPosition(new PhysicalPosition(x, y));
+      if (!(await isWindowOnScreen(mainWindow))) {
+        await mainWindow.center();
+      }
     } catch (e) {}
   }
 }
