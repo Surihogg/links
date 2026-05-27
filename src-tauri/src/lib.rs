@@ -186,7 +186,30 @@ pub fn run() {
                                 }
                                 let _ = window.show();
                                 let _ = window.set_focus();
-                                let _ = app.emit("spotlight-shown", ());
+                                // macOS 上首次唤起时，transparent + alwaysOnTop 窗口刚从 hidden 过渡到屏幕，
+                                // 同步调用的 set_focus 在 NSWindow 完成 makeKeyAndOrderFront 之前可能被系统忽略，
+                                // 导致 webview 拿不到键盘焦点（用户按字母键完全无反应）。
+                                // 解法：异步轮询窗口是否 focused，最多 5 轮（每轮 40ms，合计 200ms 上限），
+                                // focused 后再 emit 通知前端 focus input；若中途窗口被 hide 则取消。
+                                let window_async = window.clone();
+                                let app_async = app.clone();
+                                tauri::async_runtime::spawn(async move {
+                                    for _ in 0..5 {
+                                        tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+                                        // 用户在等待期间又按快捷键导致窗口隐藏：放弃 emit，避免与 hide 路径竞态
+                                        if !window_async.is_visible().unwrap_or(false) {
+                                            return;
+                                        }
+                                        let _ = window_async.set_focus();
+                                        if window_async.is_focused().unwrap_or(false) {
+                                            break;
+                                        }
+                                    }
+                                    // 再次确认窗口仍可见再 emit
+                                    if window_async.is_visible().unwrap_or(false) {
+                                        let _ = app_async.emit("spotlight-shown", ());
+                                    }
+                                });
                             }
                         }
                     }
@@ -374,6 +397,32 @@ pub fn run() {
                     if let Err(e) = app.deep_link().register_all() {
                         log::warn!("[deep-link] 运行时注册失败: {}", e);
                     }
+                }
+            }
+
+            // 预热 spotlight 窗口：在启动后异步执行一次 "屏幕外 show → hide"，
+            // 让 AppKit 完成 NSWindow 首次 makeKeyAndOrderFront 状态机初始化。
+            // 这样用户首次按快捷键唤起时，窗口已经经历过完整的 key 周期，
+            // 不再触发"首次 show 同步 set_focus 被忽略"的 race，输入框可立即响应键盘。
+            // macOS 特有问题（transparent + alwaysOnTop + initial hidden）：
+            // 不在 Windows/Linux 上预热以避免任务栏闪烁。
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(spotlight) = app.get_webview_window("spotlight") {
+                    let sp = spotlight.clone();
+                    tauri::async_runtime::spawn(async move {
+                        // 等前端 onMount 完成 listener 注册（保守 800ms）
+                        tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+                        // 移到屏幕外，避免预热闪屏被用户看到
+                        let _ = sp.set_position(tauri::Position::Logical(
+                            tauri::LogicalPosition::new(-10000.0, -10000.0),
+                        ));
+                        let _ = sp.show();
+                        let _ = sp.set_focus();
+                        // 等几个事件循环 tick，让 NSWindow 完成 makeKey 流程
+                        tokio::time::sleep(std::time::Duration::from_millis(120)).await;
+                        let _ = sp.hide();
+                    });
                 }
             }
 

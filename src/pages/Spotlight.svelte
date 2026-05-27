@@ -26,6 +26,9 @@
   let mouse_moved = $state(false);
   let hiding = false;
   let just_shown = false;
+  // 启动预热保护：Rust 端在启动后会做一次屏幕外的 show/hide 以激活 NSWindow
+  // 状态机（macOS only）。在这期间窗口的 focus 变化不应被前端误认为真实唤起。
+  let boot_guard = true;
   let current_sort = $state("");
   // 是否在空查询时默认展示主页搜索结果（由设置项 spotlight-show-default 控制）
   let show_default_results = $state(false);
@@ -351,9 +354,18 @@
     await resize_window();
 
     const unlistenShown = await listen("spotlight-shown", async () => {
+      // 真实唤起：立刻解除启动预热保护
+      boot_guard = false;
       hiding = false;
       just_shown = true;
-      input_el?.focus();
+      // Rust 端已在 sleep 后才 emit 此事件，窗口此时应已成为 key window。
+      // 仍做一次 rAF 兜底以应对 input_el 挂载/重 layout 的边缘情况。
+      const focus_input = () => {
+        if (!input_el) return;
+        if (document.activeElement !== input_el) input_el.focus();
+      };
+      focus_input();
+      requestAnimationFrame(focus_input);
       // 重读配置确保设置变更后再次唤起即时生效
       try {
         const raw = await getSetting("spotlight-show-default");
@@ -392,6 +404,9 @@
     });
 
     const unlistenFocus = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      // 启动预热期间不响应任何 focus 变化（Rust 端会主动 show 一次屏幕外窗口
+      // 激活 NSWindow key 状态，然后立即 hide；这段时间窗口非用户可见）
+      if (boot_guard) return;
       if (focused) {
         if (!hiding) input_el?.focus();
       } else if (!hiding && !just_shown) {
@@ -400,6 +415,9 @@
         }, 150);
       }
     });
+
+    // 启动 1.5 秒后解除保护：预热 800ms 等待 + 120ms show + 缓冲都覆盖
+    setTimeout(() => { boot_guard = false; }, 1500);
 
     window.addEventListener("keydown", handle_keydown);
 
