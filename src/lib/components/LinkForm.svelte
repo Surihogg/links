@@ -77,14 +77,14 @@
     return (e) => { user_edited[field] = true; };
   }
 
-  async function do_fetch(u) {
+  async function do_fetch(u, force = false) {
     fetching = true;
     fetch_error = "";
     try {
       const meta = await fetchMeta(u);
       if (meta.title || meta.description) {
-        if (!user_edited.title && meta.title) title = meta.title;
-        if (!user_edited.description && meta.description) description = meta.description;
+        if (!user_edited.title && meta.title && (force || !title.trim())) title = meta.title;
+        if (!user_edited.description && meta.description && (force || !description.trim())) description = meta.description;
       } else {
         fetch_error = "这个小站很神秘呢，手动补充一下缺失的信息吧";
       }
@@ -193,8 +193,7 @@
   async function refresh_meta() {
     const u = url.trim();
     if (!u) return;
-    // 不重置 user_edited，保留用户已手动编辑的字段
-    await do_fetch(u);
+    await do_fetch(u, true);
   }
 
   let mouseDownInside = false;
