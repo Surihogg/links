@@ -25,6 +25,7 @@
   let categories = $state([]);
   let mouse_moved = $state(false);
   let hiding = false;
+  let just_shown = false;
   let current_sort = $state("");
   // 是否在空查询时默认展示主页搜索结果（由设置项 spotlight-show-default 控制）
   let show_default_results = $state(false);
@@ -230,12 +231,8 @@
   async function hide_window() {
     if (hiding) return;
     hiding = true;
-    // 先重置状态（和 QuickAdd 的 close_window 同理：hide 前清空，
-    // 下次 show 时内容已是干净的，无需 opacity 闪烁过渡）
     query = "";
-    results = [];
     has_searched = false;
-    is_showing_defaults = false;
     current_page = 1;
     total_count = 0;
     has_more = false;
@@ -244,14 +241,22 @@
     searching = false;
     mouse_moved = false;
     clearTimeout(search_timer);
-    // 等一帧让 DOM 更新（清空搜索结果），再缩小窗口
-    await new Promise(r => requestAnimationFrame(r));
-    if (!hiding) return;
-    const searchEl = document.querySelector(".search-area");
-    const h = searchEl ? Math.ceil(searchEl.getBoundingClientRect().height + 2) : WIN_MIN_HEIGHT;
-    await getCurrentWindow().setSize(new LogicalSize(WIN_WIDTH, h));
-    if (!hiding) return;
-    await getCurrentWindow().hide();
+    if (show_default_results) {
+      // 开启默认展示时保留 results 且不缩小窗口，
+      // 下次 show 时窗口高度和内容都已就绪，零闪烁零抖动
+      await getCurrentWindow().hide();
+    } else {
+      results = [];
+      is_showing_defaults = false;
+      // 等一帧让 DOM 更新，再缩小窗口
+      await new Promise(r => requestAnimationFrame(r));
+      if (!hiding) return;
+      const searchEl = document.querySelector(".search-area");
+      const h = searchEl ? Math.ceil(searchEl.getBoundingClientRect().height + 2) : WIN_MIN_HEIGHT;
+      await getCurrentWindow().setSize(new LogicalSize(WIN_WIDTH, h));
+      if (!hiding) return;
+      await getCurrentWindow().hide();
+    }
     hiding = false;
   }
 
@@ -332,45 +337,68 @@
 
     listCategories().then(c => categories = c);
 
-    // 初始 resize：将窗口从 tauri.conf.json 的默认高度调整为实际搜索区高度，
-    // 在 onMount 时窗口还是 hidden，不会影响后续 show 的焦点
+    // 预加载默认结果：窗口 hidden 时就把数据准备好，
+    // 这样 Rust 端 show() 后内容立即可见，无闪烁
+    if (show_default_results) {
+      await load_default_results();
+    }
+
+    // 初始 resize：窗口 hidden 时默认高度仅 52px，DOM 被压缩导致测量不准。
+    // 先临时放大到 WIN_MAX_HEIGHT 让 DOM 自然布局，测量后再设为正确高度。
+    if (show_default_results) {
+      await getCurrentWindow().setSize(new LogicalSize(WIN_WIDTH, WIN_MAX_HEIGHT));
+    }
     await resize_window();
 
     const unlistenShown = await listen("spotlight-shown", async () => {
       hiding = false;
-      // 先聚焦输入框：此时窗口已被 Rust 端 show()+set_focus()，
-      // input 也已挂载，立即 focus 最稳妥；setTimeout 玄学时序不可靠。
+      just_shown = true;
       input_el?.focus();
-      // 唤起时若开启默认展示且当前 query 为空，加载主页前 N 条
       // 重读配置确保设置变更后再次唤起即时生效
-      // 放在 setPosition 之前：避免 setPosition 权限/异常打断后续逻辑
       try {
         const raw = await getSetting("spotlight-show-default");
         show_default_results = raw === "true";
       } catch {
         // 保持现有值
       }
+      // 窗口可见后 resize 确保高度正确（onMount 中 hidden 状态下测量可能不准）
+      await resize_window();
+      // 开启默认展示时，异步刷新数据
       if (show_default_results && !query.trim()) {
         load_default_results();
       }
-      // 居中窗口：Rust 端已在 show() 前调用 set_position，这里是冗余兜底
-      // 包裹 try/catch 防止前端权限缺失抛 unhandled rejection 中断后续 focus
-      try {
-        const { availWidth, availHeight } = window.screen;
-        await getCurrentWindow().setPosition(new LogicalPosition(
-          Math.round((availWidth - WIN_WIDTH) / 2),
-          Math.round(availHeight * 0.25)
-        ));
-      } catch {
-        // 缺 core:window:allow-set-position 权限或其它原因，忽略：Rust 端已定位
+      // 延迟解除保护，避免快捷键释放导致焦点变化误触发 hide
+      setTimeout(() => { just_shown = false; }, 400);
+    });
+
+    const unlistenHide = await listen("spotlight-hide", () => {
+      // Rust 端已 hide 窗口，只做状态清理
+      hiding = true;
+      query = "";
+      has_searched = false;
+      current_page = 1;
+      total_count = 0;
+      has_more = false;
+      loading_more = false;
+      selected_index = -1;
+      searching = false;
+      mouse_moved = false;
+      clearTimeout(search_timer);
+      if (!show_default_results) {
+        results = [];
+        is_showing_defaults = false;
       }
-      // setPosition 后再补一次 focus：某些平台/多显示器下重新定位会让
-      // 窗口短暂失焦，导致首次 focus 被吞。下一帧再保险一次。
-      requestAnimationFrame(() => input_el?.focus());
+      hiding = false;
     });
 
     const unlistenFocus = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-      if (!focused) hide_window();
+      if (focused) {
+        if (!hiding) input_el?.focus();
+      } else if (!hiding && !just_shown) {
+        setTimeout(() => {
+          if (!just_shown && !hiding) hide_window();
+        }, 150);
+      }
     });
 
     window.addEventListener("keydown", handle_keydown);
@@ -378,6 +406,7 @@
     return () => {
       window.removeEventListener("keydown", handle_keydown);
       unlistenShown();
+      unlistenHide();
       unlistenFocus();
       clearTimeout(search_timer);
     };
@@ -516,7 +545,8 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 6px 8px;
+    padding: 0 8px;
+    height: 34px;
     border: 1px solid var(--border-1);
     border-radius: var(--radius-md);
     background: var(--bg-1);
@@ -562,7 +592,8 @@
     background: var(--bg-1);
     color: var(--text-0);
     font-size: 14px;
-    padding: 6px 36px 6px 36px;
+    padding: 0 36px 0 36px;
+    height: 34px;
     border-radius: 10px;
   }
 

@@ -113,7 +113,7 @@
     border: 1px solid var(--border-1);
     border-radius: var(--radius-md);
     background: var(--bg-0);
-    min-height: 36px;
+    height: 34px;
     color: var(--text-2);
     font-size: 12px;
     cursor: pointer;

@@ -12,7 +12,7 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_deep_link::DeepLinkExt;
 use std::str::FromStr;
 use crate::config::Config;
@@ -117,7 +117,10 @@ pub fn run() {
         )
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(move |app, shortcut, _event| {
+                .with_handler(move |app, shortcut, event| {
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
                     let cfg = app.state::<Config>();
                     let quick_add_str = cfg
                         .get("global-shortcut")
@@ -168,18 +171,23 @@ pub fn run() {
                         }
                     } else if *shortcut == spotlight_sc {
                         if let Some(window) = app.get_webview_window("spotlight") {
-                            if let Ok(Some(monitor)) = window.current_monitor() {
-                                let size = monitor.size();
-                                let scale = monitor.scale_factor();
-                                let logical_w = size.width as f64 / scale;
-                                let logical_h = size.height as f64 / scale;
-                                let x = ((logical_w - 560.0) / 2.0).max(0.0);
-                                let y = (logical_h * 0.25).max(0.0);
-                                let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition::new(x, y)));
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = app.emit("spotlight-hide", ());
+                                let _ = window.hide();
+                            } else {
+                                if let Ok(Some(monitor)) = window.current_monitor() {
+                                    let size = monitor.size();
+                                    let scale = monitor.scale_factor();
+                                    let logical_w = size.width as f64 / scale;
+                                    let logical_h = size.height as f64 / scale;
+                                    let x = ((logical_w - 560.0) / 2.0).max(0.0);
+                                    let y = (logical_h * 0.25).max(0.0);
+                                    let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition::new(x, y)));
+                                }
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                                let _ = app.emit("spotlight-shown", ());
                             }
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                            let _ = app.emit("spotlight-shown", ());
                         }
                     }
                 })
