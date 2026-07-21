@@ -1,9 +1,9 @@
 # Links 项目知识库
 
-**最后刷新:** 2026-06-15
-**对应提交:** b2fdab2
+**最后刷新:** 2026-07-21
+**对应提交:** 93531c4
 **对应分支:** main
-**应用版本:** v1.3.4
+**应用版本:** v1.3.5
 
 ## 概述
 
@@ -168,4 +168,4 @@ cargo test                 # Rust 单元测试（95 个，覆盖 db 各层、fet
 - **TODO 工作区开发日志归档**：若任务来自 TODO 工作区，完成后将相关条目写入 `TODO.md` 的开发日志（在工作区 TODO.md 内的 `## 开发日志` 小节），按时间戳追加归档，格式为 `YYYY-MM-DD HH:MM:SS`。
 - **Release 文档刷新**：每当发布新版本（打 tag `vX.Y.Z`），必须同步刷新 `AGENTS.md`、`README.md`、`USER_GUIDE.md` 三个文档。更新内容包括版本号引用、新功能描述、工作流变更、弃用/迁移说明、资源链接等，确保文档与代码保持一致。
 - **重构刷新**：大规模重构（如 R1-R6）即使未打 tag，也应在合并前刷新本文件、`src-tauri/AGENTS.md`、`src/AGENTS.md` 三份知识库文档；REA​DME / USER_GUIDE 仅在涉及对外可见变化时刷新。
-- **版本号**：分别在 `tauri.conf.json` 的 `version`、`Cargo.toml` 与 `Cargo.lock` 的 `package.version`、`package.json` 的 `version`；四者当前均同步至 `1.3.4`。
+- **版本号**：分别在 `tauri.conf.json` 的 `version`、`Cargo.toml` 与 `Cargo.lock` 的 `package.version`、`package.json` 的 `version`；四者当前均同步至 `1.3.5`。
