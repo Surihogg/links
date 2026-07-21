@@ -718,8 +718,8 @@ async function on_toggle_favorite(link) {
             {/if}
           </div>
         {/if}
-        <div class="header-right">
-          {#if !show_stats_view}
+        {#if !show_stats_view}
+          <div class="header-right">
             <SortSelect
               bind:value={sort_by}
               options={[
@@ -729,9 +729,9 @@ async function on_toggle_favorite(link) {
               ]}
               onchange={(v) => on_sort_change(v)}
             />
-          {/if}
-          <SearchBar bind:this={search_bar} bind:query={search_query} {filter_chip} onremovefilter={on_remove_filter} onsearch={on_search} ontab={on_tab_sort} />
-        </div>
+            <SearchBar bind:this={search_bar} bind:query={search_query} {filter_chip} onremovefilter={on_remove_filter} onsearch={on_search} ontab={on_tab_sort} />
+          </div>
+        {/if}
       </header>
 
       {#if show_stats_view}
