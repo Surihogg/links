@@ -70,7 +70,7 @@ Svelte 5 + Vite 构建。三窗口入口（主窗口 / 快速添加 / 全局搜�
 
 ## 备注
 
-- 前端总行数约 7925；最大文件：`LinkCard.svelte` 727 / `SettingsDialog.svelte` 699 / `Sidebar/CategorySection.svelte` 639 / `Spotlight.svelte` 546 / `Sidebar/TagSection.svelte` 450 / `LinkForm.svelte` 468 / `App.svelte` ~916
+- 前端总行数约 7925；最大文件：`LinkCard.svelte` 727 / `SettingsDialog.svelte` 719 / `Sidebar/CategorySection.svelte` 639 / `Spotlight.svelte` 546 / `Sidebar/TagSection.svelte` 450 / `LinkForm.svelte` 468 / `App.svelte` ~916
 - `Sidebar.svelte` 主组件仅 266 行（拆分前 1213）；CategorySection / TagSection 内部各保留一份 `.section-header` / `.rename-input` / `.new-cat-form` 样式（约 50 行重复）——这是有意权衡，保证子组件独立可用
 - `App.svelte` 不再 `import { marked }`；marked 依赖跟随 ReleaseNotesDialog 转移
 - `themeStore.init()` 多次调用安全（内部 `initialized` 标记）；三窗口可各自调用，不会重复注册监听

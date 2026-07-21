@@ -57,10 +57,10 @@ R2 重构后 `db.rs` 1686 行已拆为 `db/` 子模块；R5 引入 `PRAGMA user_
 
 ## 备注
 
-- `db/` 子模块（R2 拆分后）：`mod.rs` 53 / `error.rs` 25 / `models.rs` 180 / `migration.rs` 256 / `row_mapping.rs` 192 / `repository.rs` 455 / `search.rs` 257 / `export.rs` 247 / `tests.rs` 822（测试占比 26%）
+- `db/` 子模块（R2 拆分后）：`mod.rs` 53 / `error.rs` 25 / `models.rs` 182 / `migration.rs` 287 / `row_mapping.rs` 192 / `repository.rs` 455 / `search.rs` 261 / `export.rs` 272 / `tests.rs` 822（测试占比 26%）
 - 生产代码最大文件：`commands.rs` 1167 行（导入解析 + 39 个命令 + 共享 helper）
 - `fetcher.rs` 566 行（含 Windows 代理逻辑与 13 个测试）；截取前 2MB HTML 防 OOM；标题/描述截断 500/2000 字符
-- `lib.rs` 518 行：插件、托盘、deep-link、HTTP 服务装配；`invoke_handler!` 注册全部 39 个命令
+- `lib.rs` 593 行：插件、托盘、deep-link、HTTP 服务装配；`invoke_handler!` 注册全部 39 个命令
 - `normalize.rs` 仍是死代码（127 行 + 14 个测试）：R5 评估后决定**不接入**——库内已存的 URL 是用户粘贴的原文，强制归一化会让"按 URL 查询/对比"在用户眼里突然变样；现有 `find_by_url` 的尾斜杠容错已覆盖最常见场景
 - `is_broken` / `click_count` / `last_opened_at` / `tags.updated_at` 都是历史 ALTER TABLE 加的列；R5 后由 v1 基线迁移用 `try_alter` 容忍重复添加
 - 抓取失败日志：`commands::log_fetch_failure` 写入 `fail_links.log`（独立于 tauri-plugin-log，便于事后排查）

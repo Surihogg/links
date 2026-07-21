@@ -1,9 +1,9 @@
 # Links 项目知识库
 
-**最后刷新:** 2026-05-25
-**对应提交:** 8820e95
+**最后刷新:** 2026-06-15
+**对应提交:** b2fdab2
 **对应分支:** main
-**应用版本:** v1.3.3
+**应用版本:** v1.3.4
 
 ## 概述
 
@@ -20,9 +20,11 @@ links/
 │   │   └── Sidebar/            # R4+R6 抽出：Brand / CategorySection / TagSection
 │   ├── lib/stores/             # 状态管理：list/category/tag store + R3 themeStore
 │   ├── lib/utils/              # R3+R4 抽出的共享工具：time / url / linkShare / imeGuard / categoryTree / categoryDragHandler / cyclePlaceholder
+│   ├── lib/lifecycle/          # App.svelte onMount 生命周期拆分：cleanup / windowState / updates / eventListeners
 │   └── pages/                  # 多窗口入口的页面：QuickAdd / Spotlight
 ├── .github/workflows/          # CI/CD（macOS + Windows 自动构建）
-├── browser-extension/          # Chrome 扩展源码
+├── browser-extension/          # Chrome MV3 扩展（deep-link links://add 推送当前页面）
+├── test-data/                  # 导入测试样本（Bookmarks HTML / JSON 多种格式）
 ├── index.html                  # 主窗口入口
 ├── quick-add.html              # 快速添加窗口入口
 ├── spotlight.html              # 全局搜索浮层入口
@@ -94,6 +96,10 @@ links/
 | `ShortcutEditor` | component | `src/lib/components/ShortcutEditor.svelte` | 单条快捷键展示 / 录制 / 保存 |
 | `StatsPanel` / `CloseDialog` / `ReleaseNotesDialog` | component | `src/lib/components/` | App.svelte 抽出的内联模态 |
 | `Sidebar/Brand` / `Sidebar/CategorySection` / `Sidebar/TagSection` | component | `src/lib/components/Sidebar/` | Sidebar 拆出的子节 |
+| `createCleanupManager` | factory | `src/lib/lifecycle/cleanup.js` | 统一管理 onMount 监听器清理（`add` / `run`） |
+| `registerEventListeners` | fn | `src/lib/lifecycle/eventListeners.js` | 跨窗口事件注册（main-shown/hidden、links-changed、link-broken 等） |
+| `restoreWindowState` / `setupWindowStateSaving` | fn | `src/lib/lifecycle/windowState.js` | 窗口尺寸/位置恢复与自动保存 |
+| `checkForUpdates` / `checkVersionNotes` | fn | `src/lib/lifecycle/updates.js` | 更新检查 + 版本变更弹发布说明 |
 
 ## 约定
 
@@ -107,7 +113,7 @@ links/
 - **三窗口架构**：主窗口（index.html / App.svelte）、快速添加（quick-add.html / pages/QuickAdd.svelte）、全局搜索（spotlight.html / pages/Spotlight.svelte）三个独立入口共享 `lib/`
 - **主题状态**：通过 `themeStore.init()` 一次性初始化；切换用 `themeStore.setMode(next)` 自动跨窗口同步
 - **IME 守卫**：表单组件用 `createImeGuard()` 防止中文/日文输入法组词期间 Enter 误触发提交
-- **浏览器扩展**：通过 deep-link 协议（links://）和本地 HTTP 服务与主应用通信
+- **浏览器扩展**：Chrome MV3 扩展，通过 deep-link 协议（`links://add?url=...&title=...`）将当前页面推送到桌面应用；本地 HTTP 服务（`http_server.rs`）用于 Bookmarklet 功能，与浏览器扩展独立
 - **自动更新**：`tauri-plugin-updater`，启动检查（受 `auto-check-update` 配置控制）+ 设置页手动检查
 
 ## 反模式（本项目）
@@ -151,8 +157,8 @@ cargo test                 # Rust 单元测试（95 个，覆盖 db 各层、fet
 - Vite 开发服务器端口固定 1420，被占用会报错（不会自动换端口）
 - `normalize.rs` 仍标记为 `#[allow(dead_code)]`，URL 标准化功能仍未接入去重流程（R5 评估后决定保留为未来工具，避免擅改用户原始数据）
 - macOS + Windows 双平台 CI 自动构建，Release 为 Draft 模式，需手动确认发布
-- 后端最大文件：`commands.rs` 1167 行 / `db/tests.rs` 822 行（测试）/ `fetcher.rs` 566 行；其它生产代码单文件均 ≤ 455 行
-- 前端最大文件：`App.svelte` ~916 / `LinkCard.svelte` 727 / `SettingsDialog.svelte` 699 / `Sidebar/CategorySection.svelte` 639；Sidebar 主组件仅 266 行
+- 后端最大文件：`commands.rs` 1167 行 / `db/tests.rs` 822 行（测试）/ `lib.rs` 593 行 / `fetcher.rs` 566 行；其它生产代码单文件均 ≤ 455 行
+- 前端最大文件：`App.svelte` ~916 / `LinkCard.svelte` 727 / `SettingsDialog.svelte` 719 / `Sidebar/CategorySection.svelte` 639；Sidebar 主组件仅 266 行
 - 关键 crate：`tauri-plugin-updater` / `tauri-plugin-deep-link` / `tauri-plugin-single-instance` / `tiny_http`（浏览器扩展本地 HTTP 服务）/ `marked`（Release Notes Markdown 渲染）
 
 ## 变更与提交约束
@@ -162,4 +168,4 @@ cargo test                 # Rust 单元测试（95 个，覆盖 db 各层、fet
 - **TODO 工作区开发日志归档**：若任务来自 TODO 工作区，完成后将相关条目写入 `TODO.md` 的开发日志（在工作区 TODO.md 内的 `## 开发日志` 小节），按时间戳追加归档，格式为 `YYYY-MM-DD HH:MM:SS`。
 - **Release 文档刷新**：每当发布新版本（打 tag `vX.Y.Z`），必须同步刷新 `AGENTS.md`、`README.md`、`USER_GUIDE.md` 三个文档。更新内容包括版本号引用、新功能描述、工作流变更、弃用/迁移说明、资源链接等，确保文档与代码保持一致。
 - **重构刷新**：大规模重构（如 R1-R6）即使未打 tag，也应在合并前刷新本文件、`src-tauri/AGENTS.md`、`src/AGENTS.md` 三份知识库文档；REA​DME / USER_GUIDE 仅在涉及对外可见变化时刷新。
-- **版本号**：分别在 `tauri.conf.json` 的 `version`、`Cargo.toml` 与 `Cargo.lock` 的 `package.version`、`package.json` 的 `version`（仅前端构建版本，非应用版本，当前未同步）。
+- **版本号**：分别在 `tauri.conf.json` 的 `version`、`Cargo.toml` 与 `Cargo.lock` 的 `package.version`、`package.json` 的 `version`；四者当前均同步至 `1.3.4`。
