@@ -477,8 +477,19 @@ pub fn run() {
             commands::check_startup_deep_link,
             commands::get_local_server_info,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            match event {
+                // macOS 点击 Dock 图标时恢复被隐藏或最小化的主窗口
+                #[cfg(target_os = "macos")]
+                tauri::RunEvent::Reopen { .. } => {
+                    show_and_focus_main_window(app_handle);
+                    let _ = app_handle.emit("main-shown", ());
+                }
+                _ => {}
+            }
+        });
 }
 
 /// 纯逻辑版本的深度链接解析（不依赖 Tauri runtime），用于测试
