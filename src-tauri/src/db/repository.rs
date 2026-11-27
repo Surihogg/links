@@ -41,7 +41,11 @@ impl Db {
             stmt.query(rusqlite::params![normalized, with_slash])?
         };
         if let Some(row) = rows.next()? {
-            Ok(Some(row_to_link(row)?))
+            let mut link = row_to_link(row)?;
+            drop(rows);
+            // 去重提示可直接跳转到编辑，必须带回完整标签，避免覆盖原数据。
+            link.tags = load_tags_for_link(&conn, link.id);
+            Ok(Some(link))
         } else {
             Ok(None)
         }

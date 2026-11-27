@@ -45,6 +45,22 @@
     form?.reset();
   }
 
+  async function on_edit_duplicate(link) {
+    try {
+      const { Window, getCurrentWindow } = await import("@tauri-apps/api/window");
+      const main_window = await Window.getByLabel("main");
+      if (!main_window) return;
+      await main_window.show();
+      await main_window.unminimize();
+      await main_window.setFocus();
+      await emit("edit-existing-link", link);
+      await getCurrentWindow().hide();
+      form?.reset();
+    } catch {
+      message = "暂时打不开已有链接，请再试一次";
+    }
+  }
+
   async function on_save(payload) {
     message = "";
     try {
@@ -113,6 +129,7 @@
       mode="standalone"
       {categories}
       onsave={on_save}
+      oneditduplicate={on_edit_duplicate}
       oncancel={close_window}
     />
     {#if message}

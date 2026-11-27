@@ -15,7 +15,7 @@ Svelte 5 + Vite 构建。三窗口入口（主窗口 / 快速添加 / 全局搜�
 | 主布局 | `App.svelte` | 顶部内容头 + Sidebar + LinkList + FAB；onMount 编排生命周期模块（数据加载、updater、窗口状态、事件监听）；`on_copy_link` 处理链接复制 |
 | 链接卡片 | `lib/components/LinkCard.svelte` | 卡片 UI、hint 浮层、失效标记、书签图标、复制按钮；时间用 `formatRelativeTime` / `formatAbsoluteTime`；域名用 `getDomain`；分享格式用 `formatLinkAs`；回调 `oncopy` 传递给父组件 |
 | 链接列表 | `lib/components/LinkList.svelte` | 列表容器、空状态、滚动加载、键盘导航辅助；透传 `oncopy` 回调 |
-| 链接表单（共用） | `lib/components/LinkForm.svelte` | 支持 `mode="modal" \| "standalone"`；导出 `reset` / `focusUrl` / `triggerFetch` / `setSaving` 给父组件；含 IME 守卫；监听 `fill-link-form` 自定义事件预填表单数据 |
+| 链接表单（共用） | `lib/components/LinkForm.svelte` | 支持 `mode="modal" \| "standalone"`；含 IME 守卫与去重竞态防护；`oneditduplicate` 支持主窗口 / QuickAdd 跳转编辑已有链接 |
 | 侧边栏装配 | `lib/components/Sidebar.svelte` | 仅 266 行，装配 Brand + 顶部 nav + CategorySection + TagSection + footer，承担拖拽对象创建与跨节联动 |
 | 侧边栏品牌头 | `lib/components/Sidebar/Brand.svelte` | 图标 + 版本 + 更新铃 + 设置齿轮 |
 | 侧边栏分组节 | `lib/components/Sidebar/CategorySection.svelte` | 折叠头 / 新建 / 节内搜索 / 未分组项 / 分组列表（拖拽 / 重命名 / 删除两阶段确认 / 子分组创建）；导出 `isEditing(id)` 给父组件查询 |
@@ -37,9 +37,12 @@ Svelte 5 + Vite 构建。三窗口入口（主窗口 / 快速添加 / 全局搜�
 | 工具：分组拖拽 | `lib/utils/categoryDragHandler.svelte.js` | `createCategoryDrag({ getCategories, onDropToParent, onDropToRoot, canStartDrag })` |
 | 工具：placeholder 循环 | `lib/utils/cyclePlaceholder.js` | `cyclePlaceholder(current)` + `DEFAULT_PLACEHOLDER` / `NAGGED_PLACEHOLDER` |
 | 生命周期：清理管理 | `lib/lifecycle/cleanup.js` | `createCleanupManager()` 返回 `{ add, run }`，统一管理 onMount 中所有监听器的清理 |
-| 生命周期：窗口状态 | `lib/lifecycle/windowState.js` | `restoreWindowState(mainWindow)` 恢复尺寸/位置；`setupWindowStateSaving(mainWindow, cleanup)` 监听 resize/move 自动保存 |
+| 生命周期：窗口状态 | `lib/lifecycle/windowState.js` | 启动先恢复再显示；非法尺寸回退 900×600；隐藏 / 最小化不保存，屏幕可见区域不足时居中 |
 | 生命周期：更新检查 | `lib/lifecycle/updates.js` | `checkForUpdates(check_fn)` 按配置检查更新；`checkVersionNotes(callbacks)` 版本变更时显示更新说明 |
-| 生命周期：事件监听 | `lib/lifecycle/eventListeners.js` | `registerEventListeners(mainWindow, cleanup, callbacks)` 注册 main-shown/hidden、links-changed、link-broken/meta-changed、spotlight-locate |
+| 生命周期：事件监听 | `lib/lifecycle/eventListeners.js` | 注册 main-shown/hidden、links-changed、link-broken/meta-changed、spotlight-locate、edit-existing-link |
+| 全局错误边界 | `lib/components/ErrorBoundary.svelte` | 三个 JS 入口统一挂载动态页面组件；Svelte boundary + 非致命错误 toast |
+| 错误监控 | `lib/monitoring/errorMonitor.svelte.js` | window error / unhandledrejection 捕获，5 秒同错误去重，`logFrontendEvent` 上报 Rust |
+| 性能监控 | `lib/monitoring/performance.js` | Performance API 测量 links/Spotlight 搜索和 LinkList DOM 更新；仅慢操作额外写日志 |
 | 主题/CSS 变量 | `app.css` | CSS 变量设计系统 + 公共样式（`.btn` / `.modal-*` / `.icon-btn` / `.spinner` / `.spinner-sm` / `.nav-item` / `@keyframes spin`） |
 
 ## 约定
@@ -49,7 +52,7 @@ Svelte 5 + Vite 构建。三窗口入口（主窗口 / 快速添加 / 全局搜�
 - **主题切换**：唯一入口 `themeStore.setMode(next)`；其它窗口通过 `theme-changed` 事件自动同步，禁止再写一份 `apply_theme`
 - **CSS 变量**：使用 `app.css` 定义的 `--bg-*` / `--text-*` / `--accent-*` / `--scrim-bg` / `--shadow-drag` 等变量，禁止硬编码颜色或 rgba
 - **公共样式**：`.btn` / `.modal-overlay` / `.modal` / `.icon-btn` / `.spinner` / `.spinner-sm` / `.nav-item` / `@keyframes spin` 已提到 `app.css`，组件不应再各自定义
-- **三窗口**：`main.js` → `App.svelte`；`quick-add.js` → `pages/QuickAdd.svelte`；`spotlight.js` → `pages/Spotlight.svelte`，三者共享 `lib/`
+- **三窗口**：三个 JS 入口均以 `ErrorBoundary` 包装对应页面组件；页面仍分别为 `main.js` → `App.svelte`、`quick-add.js` → `pages/QuickAdd.svelte`、`spotlight.js` → `pages/Spotlight.svelte`，共享 `lib/`
 - **TypeScript**：`tsconfig.json` 当前 strict + checkJs 开启，但 `include` 不含 `.js`（事实未生效）；项目 0 处 `as any` / `@ts-ignore`，靠人工纪律保证；R 系列重构未引入全量 TS 化（评估后认为对独立开发者性价比有限）
 - **`.svelte.js` / `.svelte.ts` 后缀**：在工具模块中需要 `$state` / `$derived` 时必须用此后缀；本项目已用：`themeStore.svelte.js` / `imeGuard.svelte.js` / `categoryDragHandler.svelte.js`
 - **IME 守卫**：表单组件用 `createImeGuard()` 防止中文/日文输入法组词期间 Enter 误触发提交；模板内通过 `ime_guard.active` 在提交前判断
@@ -82,4 +85,4 @@ Svelte 5 + Vite 构建。三窗口入口（主窗口 / 快速添加 / 全局搜�
 - `App.svelte` onMount 通过 `lib/lifecycle/` 模块编排启动流程：`createCleanupManager()` 统一管理监听器清理，`restoreWindowState` / `setupWindowStateSaving` 处理窗口状态，`checkForUpdates` / `checkVersionNotes` 处理更新，`registerEventListeners` 注册跨窗口事件
 - QuickAdd / Spotlight 通过 `<html class="theme-ready">` 解除初始遮蔽，避免主题首屏闪白
 - Sidebar 拖拽 ghost 元素附着到 `<body>`，样式由 `:global(.drag-ghost)` 在 Sidebar 父组件定义；CategorySection 内只赋 className，不再内联 cssText
-- E2E 测试清单：`REFACTOR_E2E_CHECKLIST.md` 仅覆盖 R1-R6 改动；`E2E_TEST_CHECKLIST.md` 是全功能清单
+- E2E：自动化位于 `tests/e2e/`，Playwright 驱动真实 Vite 页面并通过 `tauriMock.js` 隔离 IPC；运行 `npm run test:e2e`。`REFACTOR_E2E_CHECKLIST.md` 仅覆盖 R1-R6 改动，`E2E_TEST_CHECKLIST.md` 是人工全功能清单

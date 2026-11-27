@@ -460,9 +460,10 @@ pub fn run() {
             // 导入导出
             commands::export_links,
             commands::import_bookmarks,
-            // 配置
+            // 配置与前端日志
             commands::get_setting,
             commands::set_setting,
+            commands::log_frontend_event,
             // 快捷键
             commands::get_shortcut,
             commands::set_shortcut,

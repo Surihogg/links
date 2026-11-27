@@ -7,6 +7,7 @@ export async function registerEventListeners(mainWindow, cleanup, callbacks) {
     resetFilters,
     refreshCurrentView,
     onSpotlightLocate,
+    onEditExistingLink,
   } = callbacks;
 
   cleanup.add(await listen("main-shown", () => {
@@ -41,4 +42,8 @@ export async function registerEventListeners(mainWindow, cleanup, callbacks) {
   }));
 
   cleanup.add(await listen("spotlight-locate", onSpotlightLocate));
+
+  cleanup.add(await listen("edit-existing-link", (event) => {
+    if (event.payload?.id) onEditExistingLink(event.payload);
+  }));
 }

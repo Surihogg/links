@@ -2,6 +2,8 @@
 
 本地链接管理工具 — 全平台桌面应用，用于管理个人书签和资源链接。
 
+> 当前版本：v1.3.6
+
 数据完全存储在本地（SQLite），无需账号、无需联网，你的链接只属于你。
 
 ## 设计理念
@@ -12,7 +14,7 @@
 - **全局搜索**：`Cmd+Shift+K`（macOS）/ `Ctrl+Shift+K`（Windows）唤起 Spotlight 搜索浮层，即时搜索并打开链接
 - **自动更新**：内置更新检查，新版本发布后一键安装
 - **自动抓取**：粘贴 URL 后自动抓取页面标题、描述、favicon 和封面图
-- **全文搜索**：基于 SQLite FTS5，支持中文和标签搜索，搜索结果高亮
+- **全文搜索**：基于 SQLite FTS5，支持中文、标签搜索和空格多条件组合，搜索结果高亮
 - **安全可靠**：链接去重检测、失效检测，数据损坏自动重建
 
 ## 核心功能
@@ -24,15 +26,15 @@
 | 分组管理 | 树形分组，支持嵌套、创建 / 删除 / 收缩展开 |
 | 标签系统 | 多标签关联，独立管理，模糊搜索，智能推荐，手动创建 / 删除 |
 | 书签收藏 | 一键收藏，书签样式图标，星标筛选 |
-| 全文搜索 | FTS5 实时搜索，结果高亮，同时搜索标签名，LIKE 降级兜底 |
+| 全文搜索 | FTS5 实时搜索，支持空格多条件（关键词间 AND），结果高亮，LIKE 降级兜底 |
 | 链接分享 | 复制到剪贴板，支持 URL / Markdown / HTML 三种格式；复制链接信息快速创建新链接 |
-| 去重检测 | URL 重复时自动提示，编辑时排除自身 |
+| 去重检测 | URL 重复时自动提示，可一键跳转编辑已有链接，编辑时排除自身 |
 | 失效检测 | 添加时自动检测可达性，卡片显示警告图标 |
 | 书签导入 | 支持 Chrome / Firefox / Safari 书签 HTML + JSON + CSV 导入 |
 | 数据导出 | JSON / Markdown / CSV / 浏览器书签 HTML，原生文件保存对话框 |
 | 暗色模式 | CSS 变量驱动，持久化到 config.json |
 | 全局快捷键 | 快速添加窗口，随时保存链接，支持自定义快捷键 |
-| 系统托盘 | 最小化到托盘后台运行，左键点击显示主窗口 |
+| 系统托盘 | 最小化到托盘后台运行，左键点击显示主窗口；macOS 支持点击 Dock 图标恢复 |
 | 配置管理 | 窗口大小/位置记忆、关闭行为、暗色模式等，持久化到 config.json |
 | 跨平台 | macOS / Windows / Linux |
 | 全局搜索 | Spotlight 搜索浮层，快捷键唤起，即时搜索，键盘导航，Enter 打开 / Cmd+Enter 定位到主窗口 |
@@ -63,7 +65,7 @@ links/
 │   ├── src/
 │   │   ├── main.rs                  # 入口，调用 app_lib::run()
 │   │   ├── lib.rs                   # Tauri builder：插件、命令注册、数据库初始化、全局快捷键、系统托盘；deep-link + 单实例处理
-│   │   ├── commands.rs              # 39 个 Tauri 命令、快捷键 helper、书签解析、剪贴板、去重/失效检测、可达性检查共享函数
+│   │   ├── commands.rs              # 40 个 Tauri 命令、快捷键 helper、书签解析、剪贴板、去重/失效检测、前端日志与可达性检查共享函数
 │   │   ├── db/                      # 数据库层（R2 拆分自 db.rs）
 │   │   │   ├── mod.rs               # Db(Mutex<Connection>) 封装 + open()
 │   │   │   ├── error.rs             # AppError 统一错误类型
@@ -71,7 +73,7 @@ links/
 │   │   │   ├── migration.rs         # PRAGMA user_version 迁移框架（R5）
 │   │   │   ├── row_mapping.rs       # 行映射 + 共享 SQL 工具 + load_tags_for_links 批量加载（R5）
 │   │   │   ├── repository.rs        # 链接 / 分组 / 标签 CRUD 与列表
-│   │   │   ├── search.rs            # FTS5 + 标签 + 分类 + LIKE 四路 UNION 搜索 + 统计
+│   │   │   ├── search.rs            # 空格多条件 AND + FTS5 / 标签 / 分类 / LIKE 搜索与统计
 │   │   │   ├── export.rs            # JSON / Markdown / CSV / Netscape Bookmark HTML
 │   │   │   └── tests.rs             # 30+ 个内嵌单元测试
 │   │   ├── fetcher.rs               # URL 元数据异步抓取；build_http_client 共享 Windows 系统代理（R1）
@@ -89,7 +91,8 @@ links/
 │   ├── App.svelte                   # 主布局（侧边栏 + 内容区 + FAB + 各类模态装配）
 │   ├── app.css                      # CSS 变量设计系统 + 全局公共样式（.btn/.modal/.icon-btn/.spinner/.nav-item）
 │   ├── lib/
-│   │   ├── api.js                   # Tauri invoke 封装（39 个后端命令的 JS 绑定，命名"动词在前"）
+│   │   ├── api.js                   # Tauri invoke 封装（40 个后端命令的 JS 绑定，命名"动词在前"）
+│   │   ├── monitoring/              # 全局异常上报与搜索 / 列表渲染性能测量
 │   │   ├── ready.js                 # 等待后端就绪辅助
 │   │   ├── stores/
 │   │   │   ├── index.js             # linksStore / categoriesStore / tagsStore / settingsStore
@@ -166,7 +169,7 @@ links/
 数据库 schema 通过 `PRAGMA user_version` 显式版本管理（见 `src-tauri/src/db/migration.rs`），
 每个迁移用事务包裹、失败回滚；老库（无 user_version）首次启动自动幂等升级到 v1。
 
-### 后端命令（39 个）
+### 后端命令（40 个）
 
 R2 重构后所有命令统一为「动词在前」命名风格。
 
@@ -176,7 +179,7 @@ R2 重构后所有命令统一为「动词在前」命名风格。
 | `create_link` | 创建链接 + 后台异步抓取元数据 + 可达性检测 |
 | `update_link` | 部分更新（`category_id: -1` 清除分组） |
 | `delete_link` | 删除链接 |
-| `search_links` | FTS5 + 标签名 + 分类名 + LIKE 四路 UNION，FTS 失败时回退 LIKE-only |
+| `search_links` | 空格分隔多条件 AND；每词可命中 FTS5 / 标签 / 分类 / LIKE，FTS 失败整组回退 |
 | `get_links_stats` | 统计：总数 + 本周新增 + Top 3 链接 |
 | `check_duplicate` | URL 去重检测（支持排除自身） |
 | `check_link_status` | 链接可达性检测（HEAD → GET 降级） |
@@ -192,6 +195,7 @@ R2 重构后所有命令统一为「动词在前」命名风格。
 | `export_links` | 导出为 JSON / Markdown / CSV / Netscape Bookmark HTML |
 | `import_bookmarks` | 导入浏览器书签 HTML / JSON（解析与事务分离，避免持锁阻塞） |
 | `get_setting` / `set_setting` | 读写配置项（持久化到 config.json） |
+| `log_frontend_event` | 前端异常与慢操作写入本地应用日志，限制消息与上下文长度 |
 | `get_shortcut` / `set_shortcut` | 快速添加快捷键 |
 | `get_main_shortcut` / `set_main_shortcut` | 主窗口快捷键 |
 | `get_spotlight_shortcut` / `set_spotlight_shortcut` | Spotlight 快捷键 |
@@ -229,7 +233,9 @@ npm run tauri dev          # 开发模式（Rust + 前端热重载）
 npm run dev                # 仅前端（浏览器预览，后端不可用）
 npm run build              # 仅构建前端
 cd src-tauri && cargo check  # 快速检查 Rust 语法
-cd src-tauri && cargo test   # 运行 Rust 单元测试（共 95 个）
+cd src-tauri && cargo test   # 运行 Rust 单元测试（共 99 个）
+npx playwright install chromium  # 首次运行前端 E2E 前安装浏览器
+npm run test:e2e           # 运行 7 个 Playwright 浏览器测试（模拟 Tauri IPC）
 ```
 
 ## 打包

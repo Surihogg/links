@@ -13,7 +13,7 @@ R2 重构后 `db.rs` 1686 行已拆为 `db/` 子模块；R5 引入 `PRAGMA user_
 | 数据模型与 DTO | `db/models.rs` | `Link` / `Category` / `Tag` / `*Payload` / `LinksStats` / `SearchParams` 等 |
 | 数据库 schema 与迁移 | `db/migration.rs` | `Migration { version, apply }` + `MIGRATIONS` 数组；`PRAGMA user_version` 驱动 |
 | 链接 / 分组 / 标签 CRUD | `db/repository.rs` | `impl Db` 含 `find_by_url` / `create_link` / `list_links` / 分组与标签全套 |
-| 搜索与统计 | `db/search.rs` | `search_links` 四路 UNION + LIKE 回退；`get_stats` Top 3 |
+| 搜索与统计 | `db/search.rs` | 空白分词后逐词 AND；每词可命中 FTS / 标签 / 分类 / LIKE；FTS 失败整组回退 |
 | 导出 | `db/export.rs` | json / markdown / csv / Netscape Bookmark HTML |
 | 行映射 / 公共 SQL 工具 | `db/row_mapping.rs` | `row_to_link` / `row_to_category` / `row_to_tag` / `LINK_COLUMNS` / `load_tags_for_links`（批量）/ `build_category_tree` / `ensure_tags` |
 | 错误类型 | `db/error.rs` | `AppError` 枚举（Database/Io/Fetch/Json/General）+ Serialize impl |
@@ -40,7 +40,7 @@ R2 重构后 `db.rs` 1686 行已拆为 `db/` 子模块；R5 引入 `PRAGMA user_
 - **路径解析**：用 `commands::app_data_dir(app)` helper 获取数据目录，避免散落的 `expect()`
 - **快捷键管理**：4 套快捷键（quick-add/main/spotlight/hide）通过 `update_shortcut(app, config, &KIND, value)` 统一处理
 - **HTTP 客户端**：`fetch_metadata` 与 `check_link_status` 共用 `fetcher::build_http_client(url, timeout, ua)`；不再各写一份代理装配
-- **日志**：`log::info!` / `log::warn!` / `log::error!`，自动写入 `links.log`（tauri-plugin-log）；元数据抓取失败额外写 `fail_links.log`
+- **日志**：`log::info!` / `log::warn!` / `log::error!`，自动写入 `links.log`（tauri-plugin-log）；前端异常与慢操作通过 `log_frontend_event` 统一记录并限制长度；元数据抓取失败额外写 `fail_links.log`
 - **可达性检查**：`create_link` 与 `update_link` 的可达性检查逻辑统一通过 `check_and_update_link_reachability(app, url, link_id, strategy)` 异步函数处理；策略由 `ReachabilityUpdateStrategy` 枚举控制（`UpdateOnlyIfBroken` 仅不可达时写库，`AlwaysUpdate` 双向写回）；禁止在两处分别重写检查逻辑
 - **测试**：内嵌 `#[cfg(test)] mod tests` 或独立 `tests.rs`；用 `Connection::open_in_memory()` 隔离
 
@@ -58,13 +58,13 @@ R2 重构后 `db.rs` 1686 行已拆为 `db/` 子模块；R5 引入 `PRAGMA user_
 ## 备注
 
 - `db/` 子模块（R2 拆分后）：`mod.rs` 53 / `error.rs` 25 / `models.rs` 182 / `migration.rs` 287 / `row_mapping.rs` 192 / `repository.rs` 455 / `search.rs` 261 / `export.rs` 272 / `tests.rs` 822（测试占比 26%）
-- 生产代码最大文件：`commands.rs` 1167 行（导入解析 + 39 个命令 + 共享 helper）
+- 生产代码最大文件：`commands.rs`（导入解析 + 40 个命令 + 共享 helper）
 - `fetcher.rs` 566 行（含 Windows 代理逻辑与 13 个测试）；截取前 2MB HTML 防 OOM；标题/描述截断 500/2000 字符
-- `lib.rs` 593 行：插件、托盘、deep-link、HTTP 服务装配；`invoke_handler!` 注册全部 39 个命令
+- `lib.rs`：插件、托盘、deep-link、HTTP 服务装配；`invoke_handler!` 注册全部 40 个命令
 - `normalize.rs` 仍是死代码（127 行 + 14 个测试）：R5 评估后决定**不接入**——库内已存的 URL 是用户粘贴的原文，强制归一化会让"按 URL 查询/对比"在用户眼里突然变样；现有 `find_by_url` 的尾斜杠容错已覆盖最常见场景
 - `is_broken` / `click_count` / `last_opened_at` / `tags.updated_at` 都是历史 ALTER TABLE 加的列；R5 后由 v1 基线迁移用 `try_alter` 容忍重复添加
 - 抓取失败日志：`commands::log_fetch_failure` 写入 `fail_links.log`（独立于 tauri-plugin-log，便于事后排查）
-- `cargo test` 共 95 个：90 个 db CRUD + 3 迁移框架 + 2 批量加载（R5 新增）
+- `cargo test` 共 99 个：含 db CRUD / 多条件搜索 / 迁移框架 / 批量加载、fetcher、normalize、http_server 与 deep-link
 - 启动期 `data_dir(app)` 用 expect 直接 panic（应用都启动不了）；运行期请用 `commands::app_data_dir` 传播 `AppError`
 - HTTP 服务监听 127.0.0.1，端口动态分配（启动时找空闲），token 32 字符随机生成；前端通过 `get_local_server_info` 拉取动态参数构造 Bookmarklet
 - `main.rs` 含 `#![windows_subsystem = "windows"]` 指令（**禁止移除**，否则 Windows 会弹出 console 窗口）

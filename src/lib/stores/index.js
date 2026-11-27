@@ -1,5 +1,6 @@
 import { writable } from "svelte/store";
 import * as api from "../api.js";
+import { measureAsync } from "../monitoring/performance.js";
 
 function createLinksStore() {
   const { subscribe, set, update } = writable({
@@ -94,7 +95,18 @@ function createLinksStore() {
     async search(params = {}, append = false) {
       update((s) => ({ ...s, loading: true }));
       try {
-        const result = await api.searchLinks(params);
+        const result = await measureAsync(
+          "links-search",
+          () => api.searchLinks(params),
+          {
+            slowThreshold: 500,
+            details: {
+              query_length: params.query?.length ?? 0,
+              page: params.page ?? 1,
+              append,
+            },
+          },
+        );
         if (append) {
           update((s) => ({
             ...result,

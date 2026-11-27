@@ -1,9 +1,9 @@
 # Links 项目知识库
 
-**最后刷新:** 2026-07-21
-**对应提交:** 93531c4
+**最后刷新:** 2026-11-21
+**对应提交:** 6356187
 **对应分支:** main
-**应用版本:** v1.3.5
+**应用版本:** v1.3.6
 
 ## 概述
 
@@ -21,10 +21,13 @@ links/
 │   ├── lib/stores/             # 状态管理：list/category/tag store + R3 themeStore
 │   ├── lib/utils/              # R3+R4 抽出的共享工具：time / url / linkShare / imeGuard / categoryTree / categoryDragHandler / cyclePlaceholder
 │   ├── lib/lifecycle/          # App.svelte onMount 生命周期拆分：cleanup / windowState / updates / eventListeners
+│   ├── lib/monitoring/         # 前端错误上报与 Performance 性能测量
 │   └── pages/                  # 多窗口入口的页面：QuickAdd / Spotlight
 ├── .github/workflows/          # CI/CD（macOS + Windows 自动构建）
 ├── browser-extension/          # Chrome MV3 扩展（deep-link links://add 推送当前页面）
 ├── test-data/                  # 导入测试样本（Bookmarks HTML / JSON 多种格式）
+├── tests/e2e/                  # Playwright 浏览器测试 + 独立 Tauri IPC 测试替身
+├── playwright.config.js        # E2E Chromium / Vite webServer 配置
 ├── index.html                  # 主窗口入口
 ├── quick-add.html              # 快速添加窗口入口
 ├── spotlight.html              # 全局搜索浮层入口
@@ -40,7 +43,7 @@ links/
 | 数据模型 / DTO | `src-tauri/src/db/models.rs` | `Link` / `Category` / `Tag` / `*Payload` |
 | 数据库迁移 | `src-tauri/src/db/migration.rs` | R5 引入 PRAGMA user_version 显式版本管理 |
 | 链接 / 分组 / 标签 CRUD | `src-tauri/src/db/repository.rs` | impl Db 散布于多个文件，repository 是其中一份 |
-| 搜索与统计 | `src-tauri/src/db/search.rs` | FTS5 + 标签 + 分类 + LIKE 四路 UNION，FTS 失败回退 |
+| 搜索与统计 | `src-tauri/src/db/search.rs` | 空白分词后逐词 AND；单词可命中 FTS5 / 标签 / 分类 / LIKE，FTS 失败整组回退 |
 | 导出（json/md/csv/html） | `src-tauri/src/db/export.rs` | HTML 走 Netscape Bookmark 格式 |
 | 行映射 / 共享 SQL 工具 | `src-tauri/src/db/row_mapping.rs` | `LINK_COLUMNS` 列序、`row_to_link/category/tag`、`load_tags_for_links` 批量加载、`build_category_tree` |
 | 错误类型 | `src-tauri/src/db/error.rs` | `AppError` 枚举（Database/Io/Fetch/Json/General） |
@@ -53,7 +56,9 @@ links/
 | 链接 / 分组 / 标签 store | `src/lib/stores/index.js` | linksStore / categoriesStore / tagsStore |
 | 共享工具 | `src/lib/utils/` | time / url / linkShare / imeGuard / categoryTree / categoryDragHandler / cyclePlaceholder |
 | 主布局 | `src/App.svelte` | 顶部内容头 + Sidebar + LinkList + FAB + 各类模态 |
-| 链接表单 | `src/lib/components/LinkForm.svelte` | 支持 `mode="modal" \| "standalone"`；导出 `reset` / `focusUrl` / `triggerFetch` / `setSaving` 给父组件；含 IME 守卫；监听 `fill-link-form` 事件预填表单 |
+| 链接表单 | `src/lib/components/LinkForm.svelte` | 支持 `mode="modal" \| "standalone"`；导出 `reset` / `focusUrl` / `triggerFetch` / `setSaving`；含 IME 守卫；重复链接可通过 `oneditduplicate` 跳转编辑 |
+| 全局错误边界 | `src/lib/components/ErrorBoundary.svelte` | 三窗口统一挂载；渲染错误回退页 + 非致命错误提示 |
+| 前端监控 | `src/lib/monitoring/` | errorMonitor 全局异常去重上报；performance 记录搜索与列表渲染耗时 |
 | 链接卡片 | `src/lib/components/LinkCard.svelte` | 卡片 UI、hint 浮层、失效标记、书签图标、复制按钮；时间用 `formatRelativeTime` / `formatAbsoluteTime`；域名用 `getDomain`；分享格式用 `formatLinkAs` |
 | 侧边栏组合 | `src/lib/components/Sidebar.svelte` | 仅装配子组件 |
 | 侧边栏子节 | `src/lib/components/Sidebar/` | Brand / CategorySection / TagSection |
@@ -97,8 +102,8 @@ links/
 | `StatsPanel` / `CloseDialog` / `ReleaseNotesDialog` | component | `src/lib/components/` | App.svelte 抽出的内联模态 |
 | `Sidebar/Brand` / `Sidebar/CategorySection` / `Sidebar/TagSection` | component | `src/lib/components/Sidebar/` | Sidebar 拆出的子节 |
 | `createCleanupManager` | factory | `src/lib/lifecycle/cleanup.js` | 统一管理 onMount 监听器清理（`add` / `run`） |
-| `registerEventListeners` | fn | `src/lib/lifecycle/eventListeners.js` | 跨窗口事件注册（main-shown/hidden、links-changed、link-broken 等） |
-| `restoreWindowState` / `setupWindowStateSaving` | fn | `src/lib/lifecycle/windowState.js` | 窗口尺寸/位置恢复与自动保存 |
+| `registerEventListeners` | fn | `src/lib/lifecycle/eventListeners.js` | 跨窗口事件注册（main-shown/hidden、links-changed、link-broken、edit-existing-link 等） |
+| `restoreWindowState` / `setupWindowStateSaving` | fn | `src/lib/lifecycle/windowState.js` | 合法尺寸/位置恢复、异常配置回退；隐藏或最小化时不保存尺寸 |
 | `checkForUpdates` / `checkVersionNotes` | fn | `src/lib/lifecycle/updates.js` | 更新检查 + 版本变更弹发布说明 |
 
 ## 约定
@@ -112,6 +117,7 @@ links/
 - **公共样式**：`.btn` / `.modal-overlay` / `.modal` / `.icon-btn` / `.spinner` / `.spinner-sm` / `.nav-item` / `@keyframes spin` 已提到 `app.css`，组件不应再各自定义
 - **三窗口架构**：主窗口（index.html / App.svelte）、快速添加（quick-add.html / pages/QuickAdd.svelte）、全局搜索（spotlight.html / pages/Spotlight.svelte）三个独立入口共享 `lib/`
 - **主题状态**：通过 `themeStore.init()` 一次性初始化；切换用 `themeStore.setMode(next)` 自动跨窗口同步
+- **错误与性能监控**：三窗口通过 `ErrorBoundary` 挂载；异常用 `reportFrontendError` 去重上报，慢搜索/慢渲染通过 `log_frontend_event` 写入本地日志，不上传外部服务
 - **IME 守卫**：表单组件用 `createImeGuard()` 防止中文/日文输入法组词期间 Enter 误触发提交
 - **浏览器扩展**：Chrome MV3 扩展，通过 deep-link 协议（`links://add?url=...&title=...`）将当前页面推送到桌面应用；本地 HTTP 服务（`http_server.rs`）用于 Bookmarklet 功能，与浏览器扩展独立
 - **自动更新**：`tauri-plugin-updater`，启动检查（受 `auto-check-update` 配置控制）+ 设置页手动检查
@@ -149,7 +155,11 @@ npm run tauri build        # 完整打包
 
 # 检查（src-tauri 目录下）
 cargo check                # Rust 语法检查
-cargo test                 # Rust 单元测试（95 个，覆盖 db 各层、fetcher、normalize、http_server、deep_link）
+cargo test                 # Rust 单元测试（99 个，覆盖 db 各层、fetcher、normalize、http_server、deep_link）
+
+# 前端 E2E（仓库根目录）
+npx playwright install chromium  # 首次安装测试浏览器
+npm run test:e2e           # Playwright + 模拟 Tauri IPC，7 个浏览器测试
 ```
 
 ## 备注
@@ -168,4 +178,4 @@ cargo test                 # Rust 单元测试（95 个，覆盖 db 各层、fet
 - **TODO 工作区开发日志归档**：若任务来自 TODO 工作区，完成后将相关条目写入 `TODO.md` 的开发日志（在工作区 TODO.md 内的 `## 开发日志` 小节），按时间戳追加归档，格式为 `YYYY-MM-DD HH:MM:SS`。
 - **Release 文档刷新**：每当发布新版本（打 tag `vX.Y.Z`），必须同步刷新 `AGENTS.md`、`README.md`、`USER_GUIDE.md` 三个文档。更新内容包括版本号引用、新功能描述、工作流变更、弃用/迁移说明、资源链接等，确保文档与代码保持一致。
 - **重构刷新**：大规模重构（如 R1-R6）即使未打 tag，也应在合并前刷新本文件、`src-tauri/AGENTS.md`、`src/AGENTS.md` 三份知识库文档；REA​DME / USER_GUIDE 仅在涉及对外可见变化时刷新。
-- **版本号**：分别在 `tauri.conf.json` 的 `version`、`Cargo.toml` 与 `Cargo.lock` 的 `package.version`、`package.json` 的 `version`；四者当前均同步至 `1.3.5`。
+- **版本号**：分别在 `tauri.conf.json` 的 `version`、`Cargo.toml` 与 `Cargo.lock` 的 `package.version`、`package.json` 的 `version`；四者当前均同步至 `1.3.6`。

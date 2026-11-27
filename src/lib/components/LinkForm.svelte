@@ -10,6 +10,7 @@
    * @property {object|null} [link] 待编辑的链接；为空表示新建
    * @property {Array} [categories] 分组树
    * @property {(payload: object) => void} [onsave] 保存按钮回调（payload 见 submit）
+   * @property {(link: object) => void} [oneditduplicate] 跳转编辑重复链接
    * @property {() => void} [oncancel] 取消按钮回调
    * @property {"modal"|"standalone"} [mode] 渲染模式：modal=独立弹窗（默认），
    *   standalone=不带 modal-overlay 与 header，直接嵌入父容器（QuickAdd 用）
@@ -21,6 +22,7 @@
     link = null,
     categories = [],
     onsave,
+    oneditduplicate,
     oncancel,
     mode = "modal",
     submitText = "保存",
@@ -42,6 +44,9 @@
   let fetch_error = $state("");
   let fetch_timer = null;
   let duplicate_warning = $state("");
+  let duplicate_link = $state(null);
+  let duplicate_timer = null;
+  let duplicate_check_seq = 0;
   let user_edited = $state({ title: false, description: false });
   let fetched_meta = $state({ favicon_url: "", og_image_url: "" });
   let fetched_url = "";
@@ -62,6 +67,10 @@
       notes = data.notes || "";
       category_id = data.category_id || null;
       tags = data.tags?.slice() || [];
+      duplicate_check_seq += 1;
+      clearTimeout(duplicate_timer);
+      duplicate_link = null;
+      duplicate_warning = "";
       user_edited = { title: false, description: false };
       // 聚焦到 URL 输入框
       if (url_input) url_input.focus();
@@ -101,22 +110,33 @@
     pending_fetch = null;
   }
 
-  async function check_dup(u) {
-    const existing = await checkDuplicate(u, link?.id ?? null);
-    if (existing) {
-      duplicate_warning = existing.title ? `已有相同链接：${existing.title}` : "已有相同链接";
-    } else {
+  async function check_dup(u, request_id) {
+    try {
+      const existing = await checkDuplicate(u, link?.id ?? null);
+      // 输入变化后返回的旧请求不得覆盖新 URL 的去重状态。
+      if (request_id !== duplicate_check_seq || url.trim() !== u) return;
+      duplicate_link = existing;
+      duplicate_warning = existing
+        ? (existing.title ? `已有相同链接：${existing.title}` : "已有相同链接")
+        : "";
+    } catch {
+      if (request_id !== duplicate_check_seq) return;
+      duplicate_link = null;
       duplicate_warning = "";
     }
   }
 
   function on_url_input() {
     clearTimeout(fetch_timer);
+    clearTimeout(duplicate_timer);
+    duplicate_check_seq += 1;
+    duplicate_link = null;
+    duplicate_warning = "";
     fetch_error = "";
     const u = url.trim();
     if (!u || !/^https?:\/\//.test(u)) return;
-    // Duplicate check (debounced 300ms)
-    setTimeout(() => check_dup(u), 300);
+    const request_id = duplicate_check_seq;
+    duplicate_timer = setTimeout(() => check_dup(u, request_id), 300);
     fetch_timer = setTimeout(() => {
       pending_fetch = do_fetch(u);
     }, 500);
@@ -164,6 +184,9 @@
     fetching = false;
     fetch_error = "";
     duplicate_warning = "";
+    duplicate_link = null;
+    duplicate_check_seq += 1;
+    clearTimeout(duplicate_timer);
     user_edited = { title: false, description: false };
     fetched_meta = { favicon_url: "", og_image_url: "" };
     fetched_url = "";
@@ -188,6 +211,10 @@
   /** 由父组件触发一次去重检查 + 元数据抓取（如 deep-link 预填后）。 */
   export function triggerFetch() {
     on_url_input();
+  }
+
+  function edit_duplicate() {
+    if (duplicate_link) oneditduplicate?.(duplicate_link);
   }
 
   async function refresh_meta() {
@@ -219,7 +246,12 @@
       <div class="field-label-row">
         <label class="field-label">URL <span class="required">*</span></label>
         {#if duplicate_warning}
-          <span class="dup-warning">{duplicate_warning}</span>
+          <span class="dup-warning">
+            <span>{duplicate_warning}</span>
+            {#if duplicate_link}
+              <button type="button" class="dup-edit" onclick={edit_duplicate}>编辑已有链接</button>
+            {/if}
+          </span>
         {/if}
       </div>
       <div class="url-input-wrap">
@@ -412,8 +444,26 @@
   }
 
   .dup-warning {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 4px 8px;
     font-size: 11px;
     color: var(--warning);
+    text-align: right;
+  }
+
+  .dup-edit {
+    flex: none;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    font-size: 11px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   .field-textarea {

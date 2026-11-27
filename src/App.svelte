@@ -92,6 +92,8 @@
 
     const isDeepLinkStartup = await api.checkStartupDeepLink();
     await themeStore.init();
+    // 先恢复合法尺寸与位置再首绘，避免 Windows 安装后首启出现透明小方块。
+    await restoreWindowState(mainWindow);
     if (!isDeepLinkStartup) {
       try { await mainWindow.show(); } catch (e) {}
     }
@@ -108,7 +110,6 @@
       setShowReleaseNotes: (v) => { show_release_notes = v; },
     });
 
-    await restoreWindowState(mainWindow);
     remove_splash();
     await setupWindowStateSaving(mainWindow, cleanup);
 
@@ -116,6 +117,7 @@
       getSearchBar: () => search_bar,
       resetFilters: reset_filters,
       refreshCurrentView: refresh_current_view,
+      onEditExistingLink: on_edit_existing_link,
       onSpotlightLocate: async (e) => {
         const { link_id } = e.payload;
         try { await mainWindow.show(); } catch {}
@@ -336,6 +338,11 @@ async function with_scroll_preserve(fn) {
     }
   }
 
+  function on_edit_existing_link(link) {
+    show_add_form = false;
+    edit_link = link;
+  }
+
   function on_copy_link(link) {
     // 打开添加链接窗口，并预填复制的链接信息
     edit_link = null;
@@ -480,7 +487,7 @@ async function on_toggle_favorite(link) {
   let show_stats_view = $derived(selected_category === 'stats');
   let current_title = $derived(
     selected_category === 'stats' ? '统计' :
-    search_query.trim() ? `搜索: ${search_query}` :
+    search_query.trim() ? "搜索结果" :
     selected_tag === "__untagged__" ? "无标签" :
     selected_tag ? `标签: ${selected_tag}` :
     selected_category === "favorite" ? "特别关注" :
@@ -767,11 +774,11 @@ async function on_toggle_favorite(link) {
   </div>
 
   {#if show_add_form}
-    <LinkForm categories={categories} onsave={on_save_link} oncancel={() => { show_add_form = false; categoriesStore.load(); tagsStore.load(); }} />
+    <LinkForm categories={categories} onsave={on_save_link} oneditduplicate={on_edit_existing_link} oncancel={() => { show_add_form = false; categoriesStore.load(); tagsStore.load(); }} />
   {/if}
 
   {#if edit_link}
-    <LinkForm link={edit_link} categories={categories} onsave={on_save_link} oncancel={() => { edit_link = null; categoriesStore.load(); tagsStore.load(); }} />
+    <LinkForm link={edit_link} categories={categories} onsave={on_save_link} oneditduplicate={on_edit_existing_link} oncancel={() => { edit_link = null; categoriesStore.load(); tagsStore.load(); }} />
   {/if}
 
   {#if show_export}

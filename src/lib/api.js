@@ -121,6 +121,11 @@ export async function setSetting(key, value) {
   return invoke("set_setting", { key, value });
 }
 
+// 前端错误与性能事件统一交给 Rust log 插件写入应用日志
+export async function logFrontendEvent(level, message, context = null) {
+  return invoke("log_frontend_event", { payload: { level, message, context } });
+}
+
 // —— 快捷键 ——
 
 export async function getShortcut() {

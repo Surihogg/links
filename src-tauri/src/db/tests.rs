@@ -605,6 +605,143 @@ fn test_search_by_category_name() {
 }
 
 #[test]
+fn test_find_by_url_returns_tags_and_excludes_self() {
+    let db = test_db();
+    let link = db
+        .create_link(&make_link_full(
+            "https://example.com",
+            "Existing",
+            "desc",
+            vec!["runtime", "rust"],
+        ))
+        .unwrap();
+
+    let found = db
+        .find_by_url("https://example.com/", None)
+        .unwrap()
+        .expect("尾斜杠变体应命中已有链接");
+    assert_eq!(found.tags, vec!["runtime", "rust"]);
+
+    let excluded = db.find_by_url("https://example.com", Some(link.id)).unwrap();
+    assert!(excluded.is_none(), "编辑自身时不应报告重复");
+}
+
+#[test]
+fn test_search_multiple_terms_use_and_across_fields() {
+    let db = test_db();
+    db.create_link(&make_link_full(
+        "https://example.com/rust-guide",
+        "Rust 编程语言",
+        "桌面应用开发指南",
+        vec![],
+    ))
+    .unwrap();
+    db.create_link(&make_link_full(
+        "https://example.com/rust-only",
+        "Rust 编程语言",
+        "系统内存安全",
+        vec![],
+    ))
+    .unwrap();
+    db.create_link(&make_link_full(
+        "https://example.com/guide-only",
+        "桌面应用指南",
+        "跨平台开发",
+        vec![],
+    ))
+    .unwrap();
+
+    let results = db
+        .search_links(&SearchParams {
+            query: "  Rust   指南  ".into(),
+            page: None,
+            per_page: None,
+            category_id: None,
+            tag: None,
+            favorite_only: None,
+            untagged_only: None,
+            sort_by: None,
+        })
+        .unwrap();
+
+    assert_eq!(results.total, 1, "空格分隔的关键词必须同时命中");
+    assert_eq!(results.items[0].url, "https://example.com/rust-guide");
+}
+
+#[test]
+fn test_search_multiple_terms_match_tag_and_category() {
+    let db = test_db();
+    let category = db
+        .create_category(&CreateCategoryPayload {
+            name: "开发工具".into(),
+            parent_id: None,
+        })
+        .unwrap();
+    db.create_link(&make_link_full_cat(
+        "https://example.com/webassembly",
+        "WebAssembly 资料",
+        Some(category.id),
+    ))
+    .unwrap();
+    db.update_link(&UpdateLinkPayload {
+        id: 1,
+        tags: Some(vec!["runtime".into()]),
+        ..Default::default()
+    })
+    .unwrap();
+
+    let results = db
+        .search_links(&SearchParams {
+            query: "webassembly runtime 开发".into(),
+            page: None,
+            per_page: None,
+            category_id: None,
+            tag: None,
+            favorite_only: None,
+            untagged_only: None,
+            sort_by: None,
+        })
+        .unwrap();
+
+    assert_eq!(results.items.len(), 1, "不同关键词可分别命中标题、标签和分类");
+}
+
+#[test]
+fn test_search_escapes_like_wildcards_with_multiple_terms() {
+    let db = test_db();
+    db.create_link(&make_link_full(
+        "https://example.com/percent",
+        "100% Rust 编程",
+        "desc",
+        vec![],
+    ))
+    .unwrap();
+    db.create_link(&make_link_full(
+        "https://example.com/no-percent",
+        "100 Rust 编程",
+        "desc",
+        vec![],
+    ))
+    .unwrap();
+
+    let results = db
+        .search_links(&SearchParams {
+            query: "% 编程".into(),
+            page: None,
+            per_page: None,
+            category_id: None,
+            tag: None,
+            favorite_only: None,
+            untagged_only: None,
+            sort_by: None,
+        })
+        .unwrap();
+
+    assert_eq!(results.items.len(), 1, "百分号应按字面值匹配并触发 LIKE 回退");
+    assert_eq!(results.items[0].url, "https://example.com/percent");
+}
+
+#[test]
 fn test_export_json() {
     let db = test_db();
     db.create_link(&make_link_full(

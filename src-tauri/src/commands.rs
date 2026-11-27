@@ -47,6 +47,41 @@ pub fn get_local_server_info(state: State<'_, LocalServerInfo>) -> LocalServerIn
     LocalServerInfoDto { port: state.port, token: state.token.clone() }
 }
 
+#[derive(serde::Deserialize)]
+pub struct FrontendLogPayload {
+    level: String,
+    message: String,
+    context: Option<Value>,
+}
+
+/// 将三个 Webview 的错误与慢操作统一写入应用日志。
+/// 输入在本地记录前限制长度并压成单行，避免异常内容刷爆日志文件。
+#[tauri::command]
+pub fn log_frontend_event(payload: FrontendLogPayload) -> Result<(), AppError> {
+    let level = payload.level.to_ascii_lowercase();
+    if !matches!(level.as_str(), "debug" | "info" | "warn" | "error") {
+        return Err(AppError::General(format!(
+            "unsupported frontend log level: {}",
+            payload.level
+        )));
+    }
+    let message: String = payload.message.chars().take(4000).collect();
+    let message = message.replace(['\r', '\n'], " | ");
+    let context = payload.context.map(|value| {
+        let text: String = value.to_string().chars().take(4000).collect();
+        format!(" context={}", text)
+    });
+    let context = context.as_deref().unwrap_or("");
+    match level.as_str() {
+        "debug" => log::debug!("[frontend] {}{}", message, context),
+        "info" => log::info!("[frontend] {}{}", message, context),
+        "warn" => log::warn!("[frontend] {}{}", message, context),
+        "error" => log::error!("[frontend] {}{}", message, context),
+        _ => unreachable!(),
+    }
+    Ok(())
+}
+
 fn log_fetch_failure(app: &AppHandle, url: &str, error: &str) {
     let Ok(dir) = app.path().app_data_dir() else { return };
     let _ = std::fs::create_dir_all(&dir);

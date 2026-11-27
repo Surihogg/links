@@ -1,5 +1,6 @@
 <script>
   import LinkCard from "./LinkCard.svelte";
+  import { endPerformanceMeasure, startPerformanceMeasure } from "../monitoring/performance.js";
 
   let { links = [], categories = [], loading = false, highlight = "", has_more = false, selected_index = -1, onedit, ondelete, ontoggle_favorite, onloadmore, onremovecategory, onremovetag, onremovenotes, oncopy } = $props();
 
@@ -15,6 +16,21 @@
     }
     walk(categories, '');
     return map;
+  });
+
+  let renderMeasurement = null;
+  $effect.pre(() => {
+    renderMeasurement = startPerformanceMeasure("link-list-render");
+    renderMeasurement.itemCount = links.length;
+  });
+  $effect(() => {
+    const itemCount = links.length;
+    const token = renderMeasurement;
+    renderMeasurement = null;
+    endPerformanceMeasure(token, {
+      slowThreshold: 200,
+      details: { item_count: itemCount },
+    });
   });
 
   function on_scroll(e) {

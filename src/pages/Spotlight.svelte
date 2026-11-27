@@ -5,6 +5,7 @@
   import { formatAbsoluteTime, formatRelativeTime } from "../lib/utils/time.js";
   import { getDomain } from "../lib/utils/url.js";
   import { themeStore } from "../lib/stores/themeStore.svelte.js";
+  import { measureAsync } from "../lib/monitoring/performance.js";
   import { emit, listen } from "@tauri-apps/api/event";
   import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
 
@@ -104,12 +105,16 @@
     }
     searching = true;
     try {
-      const res = await searchLinks({
-        query: q.trim(),
-        page: 1,
-        per_page: PAGE_SIZE,
-        sort_by: current_sort || undefined,
-      });
+      const res = await measureAsync(
+        "spotlight-search",
+        () => searchLinks({
+          query: q.trim(),
+          page: 1,
+          per_page: PAGE_SIZE,
+          sort_by: current_sort || undefined,
+        }),
+        { slowThreshold: 500, details: { query_length: q.trim().length, page: 1 } },
+      );
       results = res.items || [];
       total_count = res.total ?? results.length;
       current_page = res.page ?? 1;
@@ -173,12 +178,16 @@
     try {
       const next_page = current_page + 1;
       const res = q
-        ? await searchLinks({
-            query: q,
-            page: next_page,
-            per_page: PAGE_SIZE,
-            sort_by: current_sort || undefined,
-          })
+        ? await measureAsync(
+            "spotlight-search",
+            () => searchLinks({
+              query: q,
+              page: next_page,
+              per_page: PAGE_SIZE,
+              sort_by: current_sort || undefined,
+            }),
+            { slowThreshold: 500, details: { query_length: q.length, page: next_page } },
+          )
         : await listLinks({
             page: next_page,
             per_page: PAGE_SIZE,
