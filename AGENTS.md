@@ -155,11 +155,11 @@ npm run tauri build        # 完整打包
 
 # 检查（src-tauri 目录下）
 cargo check                # Rust 语法检查
-cargo test                 # Rust 单元测试（99 个，覆盖 db 各层、fetcher、normalize、http_server、deep_link）
+cargo test                 # Rust 单元测试（100 个，覆盖 db 各层、fetcher、normalize、http_server、deep_link）
 
 # 前端 E2E（仓库根目录）
 npx playwright install chromium  # 首次安装测试浏览器
-npm run test:e2e           # Playwright + 模拟 Tauri IPC，7 个浏览器测试
+npm run test:e2e           # Playwright + 模拟 Tauri IPC，8 个浏览器测试
 ```
 
 ## 备注

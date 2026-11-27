@@ -91,6 +91,16 @@ test("损坏的窗口尺寸 JSON 不会阻止启动", async ({ page }) => {
   expect(resize.args.value.Logical).toEqual({ width: 900, height: 600 });
 });
 
+test("冷启动仍有待处理 deep-link 时不显示主窗口", async ({ page }) => {
+  await openWithMock(page, "/", {
+    // 不设置 startupDeepLink，专门覆盖启动标记尚未到达时的队列兜底。
+    pendingDeepLink: { url: "https://example.com/rust", title: "Rust 编程语言" },
+  });
+  await expect(page.locator(".header-title")).toHaveText("全部链接");
+  const windowCalls = await calls(page);
+  expect(windowCalls.some((call) => call.cmd === "plugin:window|show" && call.args.label === "main")).toBe(false);
+});
+
 test("全局异常显示友好提示并上报 Rust，列表渲染有性能记录", async ({ page }) => {
   await openWithMock(page);
   await expect(page.locator(".link-card")).toHaveCount(2);

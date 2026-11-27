@@ -75,6 +75,9 @@ pub fn run() {
     }
 
     tauri::Builder::default()
+        // deep-link 可能早于 setup 到达，状态必须先于 single-instance / deep-link 插件注册。
+        .manage(commands::PendingDeepLink(std::sync::Mutex::new(None)))
+        .manage(commands::StartupDeepLinkReceived(std::sync::atomic::AtomicBool::new(false)))
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             let is_deep_link = argv.iter().any(|a| a.starts_with("links://"));
             if is_deep_link {
@@ -348,9 +351,8 @@ pub fn run() {
             let shortcut = Shortcut::from_str(&shortcut_str).expect("failed to parse shortcut");
             app.global_shortcut().register(shortcut)?;
 
-            // 深度链接处理：支持浏览器 Bookmarklet 一键收藏
-            app.manage(commands::PendingDeepLink(std::sync::Mutex::new(None)));
-            app.manage(commands::StartupDeepLinkReceived(std::sync::atomic::AtomicBool::new(false)));
+            // 深度链接处理：支持浏览器 Bookmarklet 一键收藏。
+            // PendingDeepLink / StartupDeepLinkReceived 已在 Builder 阶段注册，避免冷启动竞态。
 
             // 启动本地 HTTP 服务（固定端口 48927，token 持久化到 config）
             {

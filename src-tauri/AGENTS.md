@@ -43,6 +43,7 @@ R2 重构后 `db.rs` 1686 行已拆为 `db/` 子模块；R5 引入 `PRAGMA user_
 - **日志**：`log::info!` / `log::warn!` / `log::error!`，自动写入 `links.log`（tauri-plugin-log）；前端异常与慢操作通过 `log_frontend_event` 统一记录并限制长度；元数据抓取失败额外写 `fail_links.log`
 - **可达性检查**：`create_link` 与 `update_link` 的可达性检查逻辑统一通过 `check_and_update_link_reachability(app, url, link_id, strategy)` 异步函数处理；策略由 `ReachabilityUpdateStrategy` 枚举控制（`UpdateOnlyIfBroken` 仅不可达时写库，`AlwaysUpdate` 双向写回）；禁止在两处分别重写检查逻辑
 - **测试**：内嵌 `#[cfg(test)] mod tests` 或独立 `tests.rs`；用 `Connection::open_in_memory()` 隔离
+- **Deep-link 初始化**：`PendingDeepLink` / `StartupDeepLinkReceived` 必须在 Builder 阶段、single-instance / deep-link 插件前注册；主窗口启动判断必须同时检查待处理队列，不能只依赖启动标记
 
 ## 反模式
 
@@ -64,7 +65,7 @@ R2 重构后 `db.rs` 1686 行已拆为 `db/` 子模块；R5 引入 `PRAGMA user_
 - `normalize.rs` 仍是死代码（127 行 + 14 个测试）：R5 评估后决定**不接入**——库内已存的 URL 是用户粘贴的原文，强制归一化会让"按 URL 查询/对比"在用户眼里突然变样；现有 `find_by_url` 的尾斜杠容错已覆盖最常见场景
 - `is_broken` / `click_count` / `last_opened_at` / `tags.updated_at` 都是历史 ALTER TABLE 加的列；R5 后由 v1 基线迁移用 `try_alter` 容忍重复添加
 - 抓取失败日志：`commands::log_fetch_failure` 写入 `fail_links.log`（独立于 tauri-plugin-log，便于事后排查）
-- `cargo test` 共 99 个：含 db CRUD / 多条件搜索 / 迁移框架 / 批量加载、fetcher、normalize、http_server 与 deep-link
+- `cargo test` 共 100 个：含 db CRUD / 多条件搜索 / 迁移框架 / 批量加载、fetcher、normalize、http_server 与 deep-link
 - 启动期 `data_dir(app)` 用 expect 直接 panic（应用都启动不了）；运行期请用 `commands::app_data_dir` 传播 `AppError`
 - HTTP 服务监听 127.0.0.1，端口动态分配（启动时找空闲），token 32 字符随机生成；前端通过 `get_local_server_info` 拉取动态参数构造 Bookmarklet
 - `main.rs` 含 `#![windows_subsystem = "windows"]` 指令（**禁止移除**，否则 Windows 会弹出 console 窗口）

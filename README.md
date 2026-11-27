@@ -233,9 +233,9 @@ npm run tauri dev          # 开发模式（Rust + 前端热重载）
 npm run dev                # 仅前端（浏览器预览，后端不可用）
 npm run build              # 仅构建前端
 cd src-tauri && cargo check  # 快速检查 Rust 语法
-cd src-tauri && cargo test   # 运行 Rust 单元测试（共 99 个）
+cd src-tauri && cargo test   # 运行 Rust 单元测试（共 100 个）
 npx playwright install chromium  # 首次运行前端 E2E 前安装浏览器
-npm run test:e2e           # 运行 7 个 Playwright 浏览器测试（模拟 Tauri IPC）
+npm run test:e2e           # 运行 8 个 Playwright 浏览器测试（模拟 Tauri IPC）
 ```
 
 ## 打包

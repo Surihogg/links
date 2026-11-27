@@ -23,11 +23,25 @@ pub fn pop_pending_deep_link(state: State<'_, PendingDeepLink>) -> Option<Value>
 /// 冷启动时收到深链接的标记（独立于 PendingDeepLink 数据，不受 QuickAdd 消费影响）
 pub struct StartupDeepLinkReceived(pub AtomicBool);
 
+/// 主窗口启动时同时检查冷启动标记和未消费数据。
+/// 即使 deep-link 早于窗口初始化，只要队列仍有数据，也不能让主窗口盖住 QuickAdd。
+fn consume_startup_deep_link(
+    flag: &AtomicBool,
+    pending: &Mutex<Option<Value>>,
+) -> bool {
+    let marked = flag.swap(false, Ordering::SeqCst);
+    let has_pending = pending.lock().unwrap().is_some();
+    marked || has_pending
+}
+
 /// 检查并重置冷启动深链接标记。主窗口据此决定是否显示。
-/// 返回 true 表示本次启动是由深链接触发的，应只显示 quick-add。
+/// 返回 true 表示本次启动由深链接触发或仍有待消费链接，应只显示 quick-add。
 #[tauri::command]
-pub fn check_startup_deep_link(state: State<'_, StartupDeepLinkReceived>) -> bool {
-    state.0.swap(false, Ordering::SeqCst)
+pub fn check_startup_deep_link(
+    state: State<'_, StartupDeepLinkReceived>,
+    pending: State<'_, PendingDeepLink>,
+) -> bool {
+    consume_startup_deep_link(&state.0, &pending.0)
 }
 
 /// 本地 HTTP 服务的端口与 token，前端用来动态生成 Bookmarklet
@@ -935,6 +949,22 @@ pub async fn check_link_status(app: AppHandle, url: String) -> Result<bool, AppE
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_startup_deep_link_checks_pending_queue() {
+        let flag = AtomicBool::new(false);
+        let pending = Mutex::new(Some(serde_json::json!({
+            "url": "https://example.com",
+            "title": "Example"
+        })));
+        assert!(consume_startup_deep_link(&flag, &pending));
+        assert!(pending.lock().unwrap().is_some(), "主窗口检查不得消费 QuickAdd 数据");
+
+        let empty = Mutex::new(None);
+        flag.store(true, Ordering::SeqCst);
+        assert!(consume_startup_deep_link(&flag, &empty));
+        assert!(!consume_startup_deep_link(&flag, &empty), "标记只消费一次");
+    }
 
     #[test]
     fn test_parse_bookmark_html_nested_folders() {

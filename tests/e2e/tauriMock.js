@@ -54,6 +54,8 @@ export function installTauriMock(fixture = {}) {
     position: { x: 100, y: 100 },
     visible: false,
     minimized: false,
+    pendingDeepLink: fixture.pendingDeepLink || null,
+    startupDeepLink: !!fixture.startupDeepLink,
     nextLinkId: 100,
   };
   const calls = [];
@@ -142,10 +144,16 @@ export function installTauriMock(fixture = {}) {
       case "set_setting":
         state.settings[args.key] = args.value;
         return null;
-      case "check_startup_deep_link":
-        return false;
-      case "pop_pending_deep_link":
-        return null;
+      case "check_startup_deep_link": {
+        const marked = state.startupDeepLink;
+        state.startupDeepLink = false;
+        return marked || !!state.pendingDeepLink;
+      }
+      case "pop_pending_deep_link": {
+        const pending = state.pendingDeepLink;
+        state.pendingDeepLink = null;
+        return clone(pending);
+      }
       case "list_links":
         return pageResult(filteredLinks(args.params), args.params);
       case "search_links":

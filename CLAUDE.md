@@ -17,7 +17,7 @@ npm run tauri build        # 当前平台的完整安装包
 
 npx oxlint src             # 使用项目已安装的 oxlint；没有 npm run lint 脚本
 npx playwright install chromium  # 首次运行 E2E 前安装浏览器
-npm run test:e2e           # 7 个真实浏览器测试，使用隔离的 Tauri IPC mock
+npm run test:e2e           # 8 个真实浏览器测试，使用隔离的 Tauri IPC mock
 
 (cd src-tauri && cargo check)
 (cd src-tauri && cargo test)
